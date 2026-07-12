@@ -1,13 +1,11 @@
-import { useMemo, useState } from 'react'
+import { useMemo } from 'react'
 import { useForm } from 'react-hook-form'
 import { z } from 'zod'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { Link } from 'react-router-dom'
 import { motion } from 'framer-motion'
-import { providerRegistrationSteps } from '@/data/mockData'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import { Textarea } from '@/components/ui/textarea'
 import { Select } from '@/components/ui/select'
 import { Card } from '@/components/ui/card'
 import { useToast } from '@/hooks/use-toast'
@@ -50,6 +48,26 @@ function LoginForm({ portalLabel = 'customer' }) {
   )
 }
 
+function SharedLoginContent() {
+  return (
+    <>
+      <LoginForm portalLabel="all roles" />
+      <Link to="/forgot-password" className="text-sm font-medium text-primary">Forgot password?</Link>
+      <div className="rounded-xl border border-border bg-muted/40 p-3">
+        <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">New users</p>
+        <div className="grid gap-2 text-sm">
+          <Link to="/register" className="font-medium text-primary hover:underline">
+            Customer Sign Up
+          </Link>
+          <Link to="/provider/register" className="font-medium text-primary hover:underline">
+            Service Provider Sign Up
+          </Link>
+        </div>
+      </div>
+    </>
+  )
+}
+
 function RegisterForm({ portal = 'customer' }) {
   const toast = useToast()
   const schema = useMemo(() => z.object({
@@ -74,26 +92,11 @@ function RegisterForm({ portal = 'customer' }) {
 export function CustomerLoginPage() {
   return (
     <AuthShell
-      title="Customer Login"
-      subtitle="Welcome back to SevaLink"
+      title="Sign In"
+      subtitle="One login experience for customer, provider, and admin"
       footer={<>New here? <Link to="/register" className="font-semibold text-primary">Create account</Link></>}
     >
-      <LoginForm />
-      <Link to="/forgot-password" className="text-sm font-medium text-primary">Forgot password?</Link>
-      <div className="rounded-xl border border-border bg-muted/40 p-3">
-        <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Other portals</p>
-        <div className="grid gap-2 text-sm">
-          <Link to="/provider/register" className="font-medium text-primary hover:underline">
-            Service Provider? Sign up here
-          </Link>
-          <Link to="/provider/login" className="font-medium text-primary hover:underline">
-            Service Provider Login
-          </Link>
-          <Link to="/admin/login" className="font-medium text-primary hover:underline">
-            Admin Login
-          </Link>
-        </div>
-      </div>
+      <SharedLoginContent />
     </AuthShell>
   )
 }
@@ -153,46 +156,69 @@ export function EmailVerificationPage() {
 export function ProviderLoginPage() {
   return (
     <AuthShell
-      title="Provider Login"
-      subtitle="Access your bookings, earnings, and profile"
+      title="Sign In"
+      subtitle="One login experience for customer, provider, and admin"
       footer={<>Need provider account? <Link to="/provider/register" className="font-semibold text-primary">Apply now</Link></>}
     >
-      <LoginForm portalLabel="provider" />
-      <Link to="/provider/forgot-password" className="text-sm font-medium text-primary">Forgot password?</Link>
+      <SharedLoginContent />
     </AuthShell>
   )
 }
 
 export function ProviderRegisterPage() {
-  const [step, setStep] = useState(0)
+  const toast = useToast()
+  const schema = useMemo(() => z.object({
+    fullName: z.string().min(2, 'Full name is required'),
+    email: z.string().email('Valid email is required'),
+    phone: z.string().min(10, 'Valid phone is required'),
+    serviceType: z.string().min(1, 'Please select a service type'),
+    password: z.string().min(6, 'Password must be at least 6 chars'),
+  }), [])
+  const form = useForm({
+    resolver: zodResolver(schema),
+    defaultValues: {
+      fullName: '',
+      email: '',
+      phone: '',
+      serviceType: '',
+      password: '',
+    },
+  })
 
   return (
-    <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} className="space-y-5">
-      <div>
-        <h1 className="text-2xl font-bold">Provider Registration Wizard</h1>
-        <p className="text-sm text-muted-foreground">Complete onboarding to get verified and start receiving bookings.</p>
-      </div>
-      <div className="grid grid-cols-2 gap-2 text-xs sm:grid-cols-5">
-        {providerRegistrationSteps.map((item, idx) => (
-          <div key={item} className={`rounded-lg border px-2 py-1 ${idx <= step ? 'border-primary bg-primary/10 text-primary' : 'border-border text-muted-foreground'}`}>
-            {item}
-          </div>
-        ))}
-      </div>
-      <Card className="space-y-3">
-        <Input placeholder="Business Name" />
-        <Input placeholder="Owner Name" />
-        <Input placeholder="Contact Number" />
-        <Select placeholder="Primary Category" options={[{ label: 'Cleaning', value: 'cleaning' }, { label: 'Salon', value: 'salon' }]} />
-        <Textarea placeholder="Business Address" />
-        <Input placeholder="Bank Account Number" />
-      </Card>
-      <div className="flex gap-2">
-        <Button variant="outline" className="flex-1" onClick={() => setStep((value) => Math.max(0, value - 1))}>Previous</Button>
-        <Button className="flex-1" onClick={() => setStep((value) => Math.min(providerRegistrationSteps.length - 1, value + 1))}>Next</Button>
-      </div>
-      <Button className="w-full">Submit Application</Button>
-    </motion.div>
+    <AuthShell
+      title="Service Provider Sign Up"
+      subtitle="Add basic details and choose your service type"
+      footer={<>Already have an account? <Link to="/login" className="font-semibold text-primary">Sign in</Link></>}
+    >
+      <motion.form
+        initial={{ opacity: 0, y: 12 }}
+        animate={{ opacity: 1, y: 0 }}
+        className="space-y-3"
+        onSubmit={form.handleSubmit(() => toast.success('Provider signup submitted'))}
+      >
+        <Input placeholder="Full Name" {...form.register('fullName')} />
+        {form.formState.errors.fullName && <p className="text-xs text-red-500">{form.formState.errors.fullName.message}</p>}
+        <Input placeholder="Email" {...form.register('email')} />
+        {form.formState.errors.email && <p className="text-xs text-red-500">{form.formState.errors.email.message}</p>}
+        <Input placeholder="Phone Number" {...form.register('phone')} />
+        {form.formState.errors.phone && <p className="text-xs text-red-500">{form.formState.errors.phone.message}</p>}
+        <Select
+          options={[
+            { label: 'Home Cleaning', value: 'home_cleaning' },
+            { label: 'Salon & Beauty', value: 'salon_beauty' },
+            { label: 'Repair & Maintenance', value: 'repair_maintenance' },
+            { label: 'Driver Services', value: 'driver_services' },
+          ]}
+          placeholder="Type of Service"
+          {...form.register('serviceType')}
+        />
+        {form.formState.errors.serviceType && <p className="text-xs text-red-500">{form.formState.errors.serviceType.message}</p>}
+        <Input type="password" placeholder="Password" {...form.register('password')} />
+        {form.formState.errors.password && <p className="text-xs text-red-500">{form.formState.errors.password.message}</p>}
+        <Button className="w-full" type="submit">Create Provider Account</Button>
+      </motion.form>
+    </AuthShell>
   )
 }
 
@@ -232,9 +258,8 @@ export function ProviderForgotPasswordPage() {
 
 export function AdminLoginPage() {
   return (
-    <AuthShell title="Admin Login" subtitle="Secure access to SevaLink command center.">
-      <LoginForm portalLabel="admin" />
-      <Link to="/admin/forgot-password" className="text-sm font-medium text-primary">Forgot password?</Link>
+    <AuthShell title="Sign In" subtitle="One login experience for customer, provider, and admin">
+      <SharedLoginContent />
     </AuthShell>
   )
 }
