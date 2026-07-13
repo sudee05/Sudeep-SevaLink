@@ -1,0 +1,76 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
+@import 'tailwindcss';
+
+:root {
+  --background: #f8fafc;
+  --foreground: #0f172a;
+  --card: #ffffff;
+  --border: #dbe4f0;
+  --primary: #2563eb;
+  --secondary: #10b981;
+  --muted: #eff4fa;
+  --muted-foreground: #64748b;
+  --radius: 16px;
+}
+
+.dark {
+  --background: #0b1220;
+  --foreground: #e2e8f0;
+  --card: #121b2d;
+  --border: #24324b;
+  --primary: #60a5fa;
+  --secondary: #34d399;
+  --muted: #1c2940;
+  --muted-foreground: #93a8c6;
+}
+
+@theme inline {
+  --font-sans: 'Inter', sans-serif;
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-border: var(--border);
+  --color-primary: var(--primary);
+  --color-secondary: var(--secondary);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --radius-xl: var(--radius);
+}
+
+* {
+  border-color: var(--border);
+}
+
+body {
+  font-family: 'Inter', sans-serif;
+  background:
+    radial-gradient(circle at 10% -10%, rgba(37, 99, 235, 0.16), transparent 35%),
+    radial-gradient(circle at 95% 20%, rgba(16, 185, 129, 0.14), transparent 32%),
+    var(--background);
+  color: var(--foreground);
+  min-height: 100vh;
+}
+
+#root {
+  min-height: 100vh;
+}
+
+.glass {
+  backdrop-filter: blur(8px);
+  background: color-mix(in srgb, var(--card) 85%, transparent);
+}
+
+.page-enter {
+  animation: fadeSlide 0.35s ease;
+}
+
+@keyframes fadeSlide {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
