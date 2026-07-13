@@ -1,7 +1,7 @@
 import { motion } from 'framer-motion'
 import { Link, useParams } from 'react-router-dom'
 import { Search, SlidersHorizontal } from 'lucide-react'
-import { useCategoriesQuery, useProviderQuery, useProvidersQuery, useServiceQuery, useServicesQuery } from '@/hooks/use-mock-queries'
+import { useCategoriesQuery, useProviderQuery, useProvidersQuery, useServiceQuery, useServicesQuery } from '@/hooks/use-queries'
 import { mockFaqs, mockTestimonials, landingStats } from '@/data/mockData'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'

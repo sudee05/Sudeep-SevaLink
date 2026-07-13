@@ -4,6 +4,7 @@ import { AuthLayout } from '@/layouts/auth-layout'
 import { CustomerLayout } from '@/layouts/customer-layout'
 import { ProviderLayout } from '@/layouts/provider-layout'
 import { AdminLayout } from '@/layouts/admin-layout'
+import { ProtectedRoute } from '@/components/common/protected-route'
 import {
   CategoriesPage,
   LandingPage,
@@ -116,7 +117,15 @@ export function AppRouter() {
         <Route path="/admin/forgot-password" element={<AdminForgotPasswordPage />} />
       </Route>
 
-      <Route path="/customer" element={<CustomerLayout />}>
+      {/* Customer Portal — protected, requires "customer" role */}
+      <Route
+        path="/customer"
+        element={
+          <ProtectedRoute allowedRoles={['customer', 'admin']}>
+            <CustomerLayout />
+          </ProtectedRoute>
+        }
+      >
         <Route index element={<CustomerDashboardPage />} />
         <Route path="bookings" element={<CustomerBookingsPage />} />
         <Route path="bookings/:id" element={<CustomerBookingDetailsPage />} />
@@ -132,7 +141,15 @@ export function AppRouter() {
         <Route path="booking/tracking/:id" element={<BookingTrackingPage />} />
       </Route>
 
-      <Route path="/provider" element={<ProviderLayout />}>
+      {/* Provider Portal — protected, requires "provider" role */}
+      <Route
+        path="/provider"
+        element={
+          <ProtectedRoute allowedRoles={['provider', 'admin']}>
+            <ProviderLayout />
+          </ProtectedRoute>
+        }
+      >
         <Route index element={<ProviderDashboardPage />} />
         <Route path="bookings" element={<ProviderBookingsPage />} />
         <Route path="services" element={<ProviderServicesPage />} />
@@ -146,7 +163,15 @@ export function AppRouter() {
         <Route path="settings" element={<ProviderSettingsPage />} />
       </Route>
 
-      <Route path="/admin" element={<AdminLayout />}>
+      {/* Admin Console — protected, requires "admin" role */}
+      <Route
+        path="/admin"
+        element={
+          <ProtectedRoute allowedRoles="admin">
+            <AdminLayout />
+          </ProtectedRoute>
+        }
+      >
         <Route index element={<AdminDashboardPage />} />
         <Route path="users" element={<AdminUsersPage />} />
         <Route path="providers" element={<AdminProvidersPage />} />

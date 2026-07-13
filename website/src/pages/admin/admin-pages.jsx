@@ -1,5 +1,5 @@
 import { motion } from 'framer-motion'
-import { useAdminStatsQuery, useBookingsQuery, useProvidersQuery } from '@/hooks/use-mock-queries'
+import { useAdminStatsQuery, useBookingsQuery, useProvidersQuery } from '@/hooks/use-queries'
 import { BookingBarChart, RevenueAreaChart } from '@/components/charts/revenue-booking-chart'
 import { DataTable } from '@/components/common/data-table'
 import { SectionHeader } from '@/components/common/section-header'

@@ -1,6 +1,6 @@
 import { motion } from 'framer-motion'
 import { Calendar, CheckCircle2, CircleDollarSign, Clock, Plus } from 'lucide-react'
-import { useBookingsQuery, useServicesQuery } from '@/hooks/use-mock-queries'
+import { useBookingsQuery, useServicesQuery } from '@/hooks/use-queries'
 import { BookingBarChart, RevenueAreaChart } from '@/components/charts/revenue-booking-chart'
 import { DataTable } from '@/components/common/data-table'
 import { SectionHeader } from '@/components/common/section-header'
