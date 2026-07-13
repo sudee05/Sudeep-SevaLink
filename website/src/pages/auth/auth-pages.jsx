@@ -1,14 +1,25 @@
-import { useMemo } from 'react'
+import { useMemo, useState } from 'react'
 import { useForm } from 'react-hook-form'
 import { z } from 'zod'
 import { zodResolver } from '@hookform/resolvers/zod'
-import { Link } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import { motion } from 'framer-motion'
+import { useDispatch, useSelector } from 'react-redux'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Select } from '@/components/ui/select'
 import { Card } from '@/components/ui/card'
 import { useToast } from '@/hooks/use-toast'
+import {
+  signInWithEmail,
+  signUpWithEmail,
+  resetPassword,
+  updatePassword,
+  selectAuthLoading,
+  selectAuthError,
+  selectUserRole,
+  clearError,
+} from '@/store/authSlice'
 
 function AuthShell({ title, subtitle, children, footer }) {
   return (
@@ -28,22 +39,42 @@ const loginSchema = z.object({
   password: z.string().min(6, 'Password must be at least 6 chars'),
 })
 
+function getRedirectPath(role) {
+  switch (role) {
+    case 'provider': return '/provider'
+    case 'admin': return '/admin'
+    default: return '/customer'
+  }
+}
+
 function LoginForm({ portalLabel = 'customer' }) {
   const toast = useToast()
+  const dispatch = useDispatch()
+  const navigate = useNavigate()
+  const loading = useSelector(selectAuthLoading)
   const form = useForm({ resolver: zodResolver(loginSchema), defaultValues: { email: '', password: '' } })
 
+  async function onSubmit(values) {
+    dispatch(clearError())
+    const result = await dispatch(signInWithEmail(values))
+    if (signInWithEmail.fulfilled.match(result)) {
+      const role = result.payload.profile?.role
+      toast.success('Signed in successfully!')
+      navigate(getRedirectPath(role))
+    } else {
+      toast.error(result.payload || 'Sign in failed')
+    }
+  }
+
   return (
-    <form
-      className="space-y-3"
-      onSubmit={form.handleSubmit(() => {
-        toast.success(`Mock login successful for ${portalLabel}`)
-      })}
-    >
+    <form className="space-y-3" onSubmit={form.handleSubmit(onSubmit)}>
       <Input placeholder="Email" {...form.register('email')} />
       {form.formState.errors.email && <p className="text-xs text-red-500">{form.formState.errors.email.message}</p>}
       <Input type="password" placeholder="Password" {...form.register('password')} />
       {form.formState.errors.password && <p className="text-xs text-red-500">{form.formState.errors.password.message}</p>}
-      <Button className="w-full" type="submit">Continue</Button>
+      <Button className="w-full" type="submit" disabled={loading}>
+        {loading ? 'Signing in…' : 'Continue'}
+      </Button>
     </form>
   )
 }
@@ -70,6 +101,9 @@ function SharedLoginContent() {
 
 function RegisterForm({ portal = 'customer' }) {
   const toast = useToast()
+  const dispatch = useDispatch()
+  const navigate = useNavigate()
+  const loading = useSelector(selectAuthLoading)
   const schema = useMemo(() => z.object({
     name: z.string().min(2),
     email: z.string().email(),
@@ -78,13 +112,32 @@ function RegisterForm({ portal = 'customer' }) {
   }), [])
   const form = useForm({ resolver: zodResolver(schema), defaultValues: { name: '', email: '', phone: '', password: '' } })
 
+  async function onSubmit(values) {
+    dispatch(clearError())
+    const result = await dispatch(signUpWithEmail({
+      email: values.email,
+      password: values.password,
+      fullName: values.name,
+      phone: values.phone,
+      role: portal,
+    }))
+    if (signUpWithEmail.fulfilled.match(result)) {
+      toast.success('Account created! Please check your email for verification.')
+      navigate('/verify-email')
+    } else {
+      toast.error(result.payload || 'Registration failed')
+    }
+  }
+
   return (
-    <form className="space-y-3" onSubmit={form.handleSubmit(() => toast.success(`Mock ${portal} registration submitted`))}>
+    <form className="space-y-3" onSubmit={form.handleSubmit(onSubmit)}>
       <Input placeholder="Full Name" {...form.register('name')} />
       <Input placeholder="Email" {...form.register('email')} />
       <Input placeholder="Phone" {...form.register('phone')} />
       <Input type="password" placeholder="Password" {...form.register('password')} />
-      <Button className="w-full" type="submit">Create account</Button>
+      <Button className="w-full" type="submit" disabled={loading}>
+        {loading ? 'Creating account…' : 'Create account'}
+      </Button>
     </form>
   )
 }
@@ -114,21 +167,74 @@ export function CustomerRegisterPage() {
 }
 
 export function ForgotPasswordPage() {
+  const toast = useToast()
+  const dispatch = useDispatch()
+  const [email, setEmail] = useState('')
+  const [sent, setSent] = useState(false)
+
+  async function handleSubmit(e) {
+    e.preventDefault()
+    if (!email) return
+    const result = await dispatch(resetPassword({ email }))
+    if (resetPassword.fulfilled.match(result)) {
+      toast.success('Reset link sent! Check your email.')
+      setSent(true)
+    } else {
+      toast.error(result.payload || 'Failed to send reset link')
+    }
+  }
+
   return (
     <AuthShell title="Forgot Password" subtitle="We will send reset instructions to your email.">
-      <Input placeholder="Email address" />
-      <Button className="w-full">Send Reset Link</Button>
+      <form onSubmit={handleSubmit} className="space-y-3">
+        <Input
+          placeholder="Email address"
+          type="email"
+          value={email}
+          onChange={(e) => setEmail(e.target.value)}
+        />
+        <Button className="w-full" type="submit" disabled={sent}>
+          {sent ? 'Link Sent ✓' : 'Send Reset Link'}
+        </Button>
+      </form>
       <Link to="/reset-password" className="text-sm font-medium text-primary">Already have a code? Reset now</Link>
     </AuthShell>
   )
 }
 
 export function ResetPasswordPage() {
+  const toast = useToast()
+  const dispatch = useDispatch()
+  const navigate = useNavigate()
+  const [password, setPassword] = useState('')
+  const [confirm, setConfirm] = useState('')
+
+  async function handleSubmit(e) {
+    e.preventDefault()
+    if (password !== confirm) {
+      toast.error('Passwords do not match')
+      return
+    }
+    if (password.length < 6) {
+      toast.error('Password must be at least 6 characters')
+      return
+    }
+    const result = await dispatch(updatePassword({ password }))
+    if (updatePassword.fulfilled.match(result)) {
+      toast.success('Password updated successfully!')
+      navigate('/login')
+    } else {
+      toast.error(result.payload || 'Failed to update password')
+    }
+  }
+
   return (
     <AuthShell title="Reset Password" subtitle="Set a secure new password.">
-      <Input type="password" placeholder="New password" />
-      <Input type="password" placeholder="Confirm password" />
-      <Button className="w-full">Update Password</Button>
+      <form onSubmit={handleSubmit} className="space-y-3">
+        <Input type="password" placeholder="New password" value={password} onChange={(e) => setPassword(e.target.value)} />
+        <Input type="password" placeholder="Confirm password" value={confirm} onChange={(e) => setConfirm(e.target.value)} />
+        <Button className="w-full" type="submit">Update Password</Button>
+      </form>
     </AuthShell>
   )
 }
@@ -167,6 +273,9 @@ export function ProviderLoginPage() {
 
 export function ProviderRegisterPage() {
   const toast = useToast()
+  const dispatch = useDispatch()
+  const navigate = useNavigate()
+  const loading = useSelector(selectAuthLoading)
   const schema = useMemo(() => z.object({
     fullName: z.string().min(2, 'Full name is required'),
     email: z.string().email('Valid email is required'),
@@ -185,6 +294,23 @@ export function ProviderRegisterPage() {
     },
   })
 
+  async function onSubmit(values) {
+    dispatch(clearError())
+    const result = await dispatch(signUpWithEmail({
+      email: values.email,
+      password: values.password,
+      fullName: values.fullName,
+      phone: values.phone,
+      role: 'provider',
+    }))
+    if (signUpWithEmail.fulfilled.match(result)) {
+      toast.success('Provider application submitted!')
+      navigate('/provider/application-submitted')
+    } else {
+      toast.error(result.payload || 'Registration failed')
+    }
+  }
+
   return (
     <AuthShell
       title="Service Provider Sign Up"
@@ -195,7 +321,7 @@ export function ProviderRegisterPage() {
         initial={{ opacity: 0, y: 12 }}
         animate={{ opacity: 1, y: 0 }}
         className="space-y-3"
-        onSubmit={form.handleSubmit(() => toast.success('Provider signup submitted'))}
+        onSubmit={form.handleSubmit(onSubmit)}
       >
         <Input placeholder="Full Name" {...form.register('fullName')} />
         {form.formState.errors.fullName && <p className="text-xs text-red-500">{form.formState.errors.fullName.message}</p>}
@@ -216,7 +342,9 @@ export function ProviderRegisterPage() {
         {form.formState.errors.serviceType && <p className="text-xs text-red-500">{form.formState.errors.serviceType.message}</p>}
         <Input type="password" placeholder="Password" {...form.register('password')} />
         {form.formState.errors.password && <p className="text-xs text-red-500">{form.formState.errors.password.message}</p>}
-        <Button className="w-full" type="submit">Create Provider Account</Button>
+        <Button className="w-full" type="submit" disabled={loading}>
+          {loading ? 'Submitting…' : 'Create Provider Account'}
+        </Button>
       </motion.form>
     </AuthShell>
   )
@@ -248,10 +376,31 @@ export function ProviderApprovedPage() {
 }
 
 export function ProviderForgotPasswordPage() {
+  const toast = useToast()
+  const dispatch = useDispatch()
+  const [email, setEmail] = useState('')
+  const [sent, setSent] = useState(false)
+
+  async function handleSubmit(e) {
+    e.preventDefault()
+    if (!email) return
+    const result = await dispatch(resetPassword({ email }))
+    if (resetPassword.fulfilled.match(result)) {
+      toast.success('Reset link sent!')
+      setSent(true)
+    } else {
+      toast.error(result.payload || 'Failed to send reset link')
+    }
+  }
+
   return (
     <AuthShell title="Provider Forgot Password" subtitle="Receive password reset instructions via email.">
-      <Input placeholder="Business email" />
-      <Button className="w-full">Send Reset Link</Button>
+      <form onSubmit={handleSubmit} className="space-y-3">
+        <Input placeholder="Business email" type="email" value={email} onChange={(e) => setEmail(e.target.value)} />
+        <Button className="w-full" type="submit" disabled={sent}>
+          {sent ? 'Link Sent ✓' : 'Send Reset Link'}
+        </Button>
+      </form>
     </AuthShell>
   )
 }
@@ -265,10 +414,31 @@ export function AdminLoginPage() {
 }
 
 export function AdminForgotPasswordPage() {
+  const toast = useToast()
+  const dispatch = useDispatch()
+  const [email, setEmail] = useState('')
+  const [sent, setSent] = useState(false)
+
+  async function handleSubmit(e) {
+    e.preventDefault()
+    if (!email) return
+    const result = await dispatch(resetPassword({ email }))
+    if (resetPassword.fulfilled.match(result)) {
+      toast.success('Recovery link sent!')
+      setSent(true)
+    } else {
+      toast.error(result.payload || 'Failed to send recovery link')
+    }
+  }
+
   return (
     <AuthShell title="Admin Password Recovery" subtitle="Request reset token via verified email.">
-      <Input placeholder="Admin email" />
-      <Button className="w-full">Send Recovery Link</Button>
+      <form onSubmit={handleSubmit} className="space-y-3">
+        <Input placeholder="Admin email" type="email" value={email} onChange={(e) => setEmail(e.target.value)} />
+        <Button className="w-full" type="submit" disabled={sent}>
+          {sent ? 'Link Sent ✓' : 'Send Recovery Link'}
+        </Button>
+      </form>
     </AuthShell>
   )
 }

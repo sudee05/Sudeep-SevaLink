@@ -1,7 +1,7 @@
 import { Link, useParams } from 'react-router-dom'
 import { motion } from 'framer-motion'
 import { CalendarCheck, Clock3, CreditCard, Heart, MapPin, Receipt, Sparkles } from 'lucide-react'
-import { useBookingsQuery, useServicesQuery } from '@/hooks/use-mock-queries'
+import { useBookingsQuery, useServicesQuery } from '@/hooks/use-queries'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
