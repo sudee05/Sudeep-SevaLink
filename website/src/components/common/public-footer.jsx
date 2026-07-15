@@ -21,7 +21,7 @@ export function PublicFooter() {
           <div className="space-y-2 text-sm text-muted-foreground">
             <Link to="/customer" className="block hover:text-primary">Customer Dashboard</Link>
             <Link to="/provider" className="block hover:text-primary">Provider Dashboard</Link>
-            <Link to="/admin" className="block hover:text-primary">Admin Panel</Link>
+            <Link to="/sevalink-admin" className="block hover:text-primary">Admin Panel</Link>
           </div>
         </div>
         <div>

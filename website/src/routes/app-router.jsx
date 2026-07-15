@@ -61,15 +61,11 @@ import {
 } from '@/pages/provider/provider-pages'
 import {
   AdminBookingsPage,
-  AdminCategoriesPage,
-  AdminComplaintsPage,
   AdminDashboardPage,
-  AdminPaymentsPage,
   AdminProvidersPage,
   AdminReportsPage,
+  AdminSectionPage,
   AdminServicesPage,
-  AdminSettingsPage,
-  AdminUsersPage,
 } from '@/pages/admin/admin-pages'
 import { Button } from '@/components/ui/button'
 
@@ -113,8 +109,8 @@ export function AppRouter() {
         <Route path="/provider/rejected" element={<ProviderRejectedPage />} />
         <Route path="/provider/approved" element={<ProviderApprovedPage />} />
 
-        <Route path="/admin/login" element={<AdminLoginPage />} />
-        <Route path="/admin/forgot-password" element={<AdminForgotPasswordPage />} />
+        <Route path="/sevalink-admin/login" element={<AdminLoginPage />} />
+        <Route path="/sevalink-admin/forgot-password" element={<AdminForgotPasswordPage />} />
       </Route>
 
       {/* Customer Portal — protected, requires "customer" role */}
@@ -165,7 +161,7 @@ export function AppRouter() {
 
       {/* Admin Console — protected, requires "admin" role */}
       <Route
-        path="/admin"
+        path="/sevalink-admin"
         element={
           <ProtectedRoute allowedRoles="admin">
             <AdminLayout />
@@ -173,15 +169,11 @@ export function AppRouter() {
         }
       >
         <Route index element={<AdminDashboardPage />} />
-        <Route path="users" element={<AdminUsersPage />} />
-        <Route path="providers" element={<AdminProvidersPage />} />
-        <Route path="categories" element={<AdminCategoriesPage />} />
+        <Route path="reports" element={<AdminReportsPage />} />
         <Route path="services" element={<AdminServicesPage />} />
         <Route path="bookings" element={<AdminBookingsPage />} />
-        <Route path="payments" element={<AdminPaymentsPage />} />
-        <Route path="reports" element={<AdminReportsPage />} />
-        <Route path="complaints" element={<AdminComplaintsPage />} />
-        <Route path="settings" element={<AdminSettingsPage />} />
+        <Route path="providers" element={<AdminProvidersPage />} />
+        <Route path=":section" element={<AdminSectionPage />} />
       </Route>
 
       <Route path="*" element={<NotFound />} />

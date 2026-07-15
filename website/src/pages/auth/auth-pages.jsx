@@ -42,7 +42,7 @@ const loginSchema = z.object({
 function getRedirectPath(role) {
   switch (role) {
     case 'provider': return '/provider'
-    case 'admin': return '/admin'
+    case 'admin': return '/sevalink-admin'
     default: return '/customer'
   }
 }

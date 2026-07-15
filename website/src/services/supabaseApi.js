@@ -11,48 +11,122 @@ export async function getCategories() {
   return data
 }
 
-// ── Services ──────────────────────────────────────────────────
-
-export async function getServices() {
+export async function getAdminCategories() {
   const { data, error } = await supabase
-    .from('services')
-    .select('*, categories(name), providers(business_name, verified)')
-    .eq('active', true)
+    .from('categories')
+    .select('*')
     .order('created_at', { ascending: false })
   if (error) throw error
   return data
 }
 
-export async function getServiceById(id) {
+// ── Services (master catalog — admin-managed) ─────────────────
+
+export async function getServices() {
   const { data, error } = await supabase
     .from('services')
-    .select('*, categories(name), providers(id, business_name, rating, verified, image_url, location)')
-    .eq('id', id)
+    .select('id, name, description')
+    .order('name')
+  if (error) throw error
+  return data
+}
+
+export async function getAdminServices() {
+  const { data, error } = await supabase
+    .from('services')
+    .select('id, name, description')
+    .order('name')
+  if (error) throw error
+  return data
+}
+
+export async function createService(payload) {
+  const { data, error } = await supabase
+    .from('services')
+    .insert({ name: payload.name, description: payload.description })
+    .select('id, name, description')
     .single()
   if (error) throw error
   return data
 }
 
-export async function getServicesByCategory(categoryId) {
+export async function updateService(id, payload) {
   const { data, error } = await supabase
     .from('services')
-    .select('*, categories(name), providers(business_name, verified)')
-    .eq('category_id', categoryId)
-    .eq('active', true)
-    .order('rating', { ascending: false })
+    .update({ name: payload.name, description: payload.description })
+    .eq('id', id)
+    .select('id, name, description')
+    .single()
   if (error) throw error
   return data
 }
 
-export async function searchServices(query) {
+export async function deleteService(id) {
+  const { error } = await supabase.from('services').delete().eq('id', id)
+  if (error) throw error
+}
+
+// ── Provider Services (enrollment) ────────────────────────────
+
+export async function getProviderServices(providerId) {
+  // Returns service IDs the provider has enrolled in
+  const { data, error } = await supabase
+    .from('provider_services')
+    .select('service_id')
+    .eq('provider_id', providerId)
+  if (error) throw error
+  return (data || []).map((r) => r.service_id)
+}
+
+export async function setProviderServices(providerId, serviceIds) {
+  // Replace all enrollments for this provider
+  // 1. Delete existing
+  await supabase.from('provider_services').delete().eq('provider_id', providerId)
+  if (!serviceIds.length) return
+  // 2. Insert new
+  const rows = serviceIds.map((service_id) => ({ provider_id: providerId, service_id }))
+  const { error } = await supabase.from('provider_services').insert(rows)
+  if (error) throw error
+}
+
+// ── Service Requests (provider requests new service type) ──────
+
+export async function submitServiceRequest(providerId, { name, description }) {
+  const { error } = await supabase
+    .from('service_requests')
+    .insert({ provider_id: providerId, name, description, status: 'pending' })
+  if (error) throw error
+}
+
+export async function getServiceRequests() {
+  const { data, error } = await supabase
+    .from('service_requests')
+    .select('*, providers(business_name)')
+    .order('created_at', { ascending: false })
+  if (error) throw error
+  return data || []
+}
+
+export async function updateServiceRequestStatus(id, status) {
+  const { error } = await supabase
+    .from('service_requests')
+    .update({ status })
+    .eq('id', id)
+  if (error) throw error
+}
+
+// (legacy stubs kept so other pages don't break)
+export async function getServiceById(id) {
   const { data, error } = await supabase
     .from('services')
-    .select('*, categories(name), providers(business_name, verified)')
-    .or(`title.ilike.%${query}%,description.ilike.%${query}%`)
-    .eq('active', true)
+    .select('id, name, description')
+    .eq('id', id)
+    .single()
   if (error) throw error
   return data
 }
+export async function getServicesByCategory() { return [] }
+export async function searchServices() { return [] }
 
 // ── Providers ─────────────────────────────────────────────────
 
@@ -77,10 +151,74 @@ export async function getProviderById(id) {
 }
 
 export async function getAllProviders() {
-  // Admin-only: returns all providers regardless of verification
+  // Query profiles with role='provider' — this shows ALL provider users
+  // even if they haven't completed their business profile yet.
   const { data, error } = await supabase
-    .from('providers')
-    .select('*, profiles(full_name, phone)')
+    .from('profiles')
+    .select('*, providers(id, business_name, category, location, rating, verified, status)')
+    .eq('role', 'provider')
+    .order('created_at', { ascending: false })
+  if (error) throw error
+
+  return (data || []).map((p) => {
+    // providers can be an array (one-to-many) or null
+    const biz = Array.isArray(p.providers) ? p.providers[0] : p.providers
+    return {
+      ...p,
+      // Expose profile ID clearly for approval actions
+      profile_id: p.id,
+      // Business info from providers table (may be absent if not yet filled)
+      provider_record_id: biz?.id || null,
+      business_name: biz?.business_name || p.full_name || '-',
+      location: biz?.location || '-',
+      rating: biz?.rating || 0,
+      verified: biz?.verified || false,
+      owner_name: p.full_name || '-',
+      owner_phone: p.phone || '-',
+      // approval_status is on the profile row itself
+      approval_status: p.approval_status || 'pending',
+    }
+  })
+}
+
+export async function updateProviderApproval(profileId, providerRecordId, status) {
+  // Update profiles.approval_status
+  const { error: profileError } = await supabase
+    .from('profiles')
+    .update({ approval_status: status })
+    .eq('id', profileId)
+  if (profileError) throw profileError
+
+  // Sync providers.verified + status if business profile exists
+  if (providerRecordId) {
+    const providerStatus =
+      status === 'approved' ? 'approved'
+      : status === 'denied'   ? 'rejected'
+      : 'pending'
+    const { error: providerError } = await supabase
+      .from('providers')
+      .update({ verified: status === 'approved', status: providerStatus })
+      .eq('id', providerRecordId)
+    if (providerError) throw providerError
+  }
+
+  return { profileId, status }
+}
+
+
+export async function getAdminUsers() {
+  const { data, error } = await supabase
+    .from('profiles')
+    .select('*')
+    .order('created_at', { ascending: false })
+  if (error) throw error
+  return data
+}
+
+export async function getAdminComplaints() {
+  const { data, error } = await supabase
+    .from('reviews')
+    .select('*, profiles(full_name), services(name)')
     .order('created_at', { ascending: false })
   if (error) throw error
   return data
@@ -89,12 +227,36 @@ export async function getAllProviders() {
 // ── Bookings ──────────────────────────────────────────────────
 
 export async function getBookings() {
+  // Try with joins first; fall back to plain select if FK aliases aren't set up
+  try {
+    const { data, error } = await supabase
+      .from('bookings')
+      .select(
+        `*,
+        customer:profiles!bookings_customer_id_fkey(full_name, phone),
+        provider:providers!bookings_provider_id_fkey(business_name),
+        service:services!bookings_service_id_fkey(name)`
+      )
+      .order('created_at', { ascending: false })
+    if (!error) {
+      return (data || []).map((b) => ({
+        ...b,
+        customer_name: b.customer?.full_name || b.customer_name || '-',
+        customer_phone: b.customer?.phone || '-',
+        provider_name: b.provider?.business_name || b.provider_name || '-',
+        service_title: b.service?.name || b.service_title || '-',
+      }))
+    }
+  } catch {
+    // fall through to plain select
+  }
+  // Fallback: plain select (no joins)
   const { data, error } = await supabase
     .from('bookings')
     .select('*')
     .order('created_at', { ascending: false })
   if (error) throw error
-  return data
+  return data || []
 }
 
 export async function getBookingById(id) {

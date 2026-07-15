@@ -43,14 +43,12 @@ export const providerNav = [
 ]
 
 export const adminNav = [
-  { label: 'Dashboard', path: '/admin', icon: LayoutDashboard },
-  { label: 'Users', path: '/admin/users', icon: Users },
-  { label: 'Providers', path: '/admin/providers', icon: ShieldCheck },
-  { label: 'Categories', path: '/admin/categories', icon: Sparkles },
-  { label: 'Services', path: '/admin/services', icon: Wrench },
-  { label: 'Bookings', path: '/admin/bookings', icon: ClipboardList },
-  { label: 'Payments', path: '/admin/payments', icon: BadgeIndianRupee },
-  { label: 'Reports', path: '/admin/reports', icon: Briefcase },
-  { label: 'Complaints', path: '/admin/complaints', icon: MessageSquareWarning },
-  { label: 'Settings', path: '/admin/settings', icon: Settings },
+  { label: 'Dashboard', path: '/sevalink-admin', icon: LayoutDashboard },
+  { label: 'Users', path: '/sevalink-admin/users', icon: Users },
+  { label: 'Providers', path: '/sevalink-admin/providers', icon: ShieldCheck },
+  { label: 'Services', path: '/sevalink-admin/services', icon: Wrench },
+  { label: 'Bookings', path: '/sevalink-admin/bookings', icon: ClipboardList },
+  { label: 'Reports', path: '/sevalink-admin/reports', icon: Briefcase },
+  { label: 'Complaints', path: '/sevalink-admin/complaints', icon: MessageSquareWarning },
+  { label: 'Settings', path: '/sevalink-admin/settings', icon: Settings },
 ]

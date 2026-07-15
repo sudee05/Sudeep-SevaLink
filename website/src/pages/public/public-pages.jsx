@@ -14,8 +14,6 @@ import { LoadingGrid } from '@/components/ui/loading-grid'
 import { EmptyState } from '@/components/ui/empty-state'
 import { ErrorState } from '@/components/ui/error-state'
 import { Badge } from '@/components/ui/badge'
-import { Rating } from '@/components/ui/rating'
-import { formatCurrency } from '@/utils/format'
 
 const fade = {
   initial: { opacity: 0, y: 10 },
@@ -156,7 +154,7 @@ export function CategoriesPage() {
             <Card key={category.id} className="space-y-3">
               <div className="inline-flex rounded-xl bg-muted p-3"><Icon className="h-5 w-5 text-primary" /></div>
               <h3 className="font-semibold">{category.name}</h3>
-              <p className="text-sm text-muted-foreground">{category.services}+ active services</p>
+              <p className="text-sm text-muted-foreground">{category.services}+ services</p>
             </Card>
           )
         })}
@@ -170,12 +168,11 @@ export function ServicesPage() {
 
   return (
     <motion.div {...fade}>
-      <SectionHeader title="Services" subtitle="Compare offerings, pricing, and provider quality." />
-      <div className="mb-5 grid gap-3 lg:grid-cols-5">
+      <SectionHeader title="Services" subtitle="Browse service types available on SevaLink." />
+      <div className="mb-5 grid gap-3 lg:grid-cols-4">
         <Input className="lg:col-span-2" placeholder="Search services" />
         <Select placeholder="Category" options={[{ label: 'All', value: 'all' }]} />
         <Select placeholder="Location" options={[{ label: 'All', value: 'all' }]} />
-        <Select placeholder="Rating" options={[{ label: '4+ stars', value: '4' }]} />
       </div>
       {isLoading ? <LoadingGrid /> : (
         <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
@@ -216,35 +213,12 @@ export function ServiceDetailsPage() {
 
   return (
     <motion.div className="space-y-6" {...fade}>
-      <div className="grid gap-6 lg:grid-cols-[1.5fr_1fr]">
-        <Card className="overflow-hidden p-0">
-          <img src={data.image} alt={data.title} className="h-[340px] w-full object-cover" />
-          <div className="space-y-3 p-5">
-            <div className="flex items-center justify-between">
-              <Badge>{data.category}</Badge>
-              <Rating value={data.rating} />
-            </div>
-            <h1 className="text-2xl font-bold">{data.title}</h1>
-            <p className="text-muted-foreground">{data.description}</p>
-            <div className="grid grid-cols-3 gap-3">
-              {[data.image, data.image, data.image].map((img, idx) => (
-                <img key={idx} src={img} alt="Gallery" className="h-24 w-full rounded-xl object-cover" />
-              ))}
-            </div>
-          </div>
-        </Card>
-        <Card className="space-y-4">
-          <p className="text-sm text-muted-foreground">Starting from</p>
-          <p className="text-3xl font-extrabold text-primary">{formatCurrency(data.price)}</p>
-          <p className="text-sm text-muted-foreground">Includes platform assurance, invoice, and tracking.</p>
-          <Link to="/customer/booking/new"><Button className="w-full">Book Now</Button></Link>
-          <Button variant="outline" className="w-full">Contact Provider</Button>
-          <div className="rounded-xl bg-muted p-3 text-sm">
-            <p className="font-semibold">Availability</p>
-            <p className="text-muted-foreground">Today 2 slots, Tomorrow 6 slots</p>
-          </div>
-        </Card>
-      </div>
+      <Card className="space-y-4">
+        <Badge>Service</Badge>
+        <h1 className="text-2xl font-bold">{data.name}</h1>
+        <p className="text-muted-foreground">{data.description || 'Service details will be added soon.'}</p>
+        <Link to="/customer/booking/new"><Button>Book Now</Button></Link>
+      </Card>
     </motion.div>
   )
 }

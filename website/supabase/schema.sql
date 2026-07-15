@@ -14,6 +14,7 @@ create table public.profiles (
   phone text default '',
   avatar_url text default '',
   role text not null default 'customer' check (role in ('customer', 'provider', 'admin')),
+  approval_status text not null default 'pending' check (approval_status in ('pending', 'approved', 'denied')),
   created_at timestamptz default now(),
   updated_at timestamptz default now()
 );
@@ -113,42 +114,30 @@ create policy "Providers can update own record"
 -- =============================================
 create table public.services (
   id uuid default uuid_generate_v4() primary key,
-  title text not null,
-  description text default '',
-  category_id uuid references public.categories(id) on delete set null,
-  provider_id uuid references public.providers(id) on delete cascade,
-  location text default '',
-  price numeric(10,2) not null default 0,
-  rating numeric(2,1) default 0,
-  reviews_count int default 0,
-  verified boolean default false,
-  image_url text default '',
-  active boolean default true,
-  created_at timestamptz default now(),
-  updated_at timestamptz default now()
+  name text not null,
+  description text default ''
 );
 
 alter table public.services enable row level security;
 
--- Everyone can read active services
-create policy "Active services are viewable by everyone"
-  on public.services for select using (
-    active = true
-    or exists (select 1 from public.providers where id = provider_id and user_id = auth.uid())
-    or exists (select 1 from public.profiles where id = auth.uid() and role = 'admin')
-  );
+-- Everyone can read the master service catalog
+create policy "Services are viewable by everyone"
+  on public.services for select using (true);
 
--- Providers can create services under their own provider record
-create policy "Providers can insert own services"
+-- Only admins can manage service catalog rows
+create policy "Admins can insert services"
   on public.services for insert with check (
-    exists (select 1 from public.providers where id = provider_id and user_id = auth.uid())
+    exists (select 1 from public.profiles where id = auth.uid() and role = 'admin')
   );
 
--- Providers can update own services, admins can update any
-create policy "Providers can update own services"
+create policy "Admins can update services"
   on public.services for update using (
-    exists (select 1 from public.providers where id = provider_id and user_id = auth.uid())
-    or exists (select 1 from public.profiles where id = auth.uid() and role = 'admin')
+    exists (select 1 from public.profiles where id = auth.uid() and role = 'admin')
+  );
+
+create policy "Admins can delete services"
+  on public.services for delete using (
+    exists (select 1 from public.profiles where id = auth.uid() and role = 'admin')
   );
 
 -- =============================================
@@ -313,8 +302,6 @@ create trigger profiles_updated_at before update on public.profiles
 create trigger providers_updated_at before update on public.providers
   for each row execute function public.update_updated_at();
 
-create trigger services_updated_at before update on public.services
-  for each row execute function public.update_updated_at();
 
 create trigger bookings_updated_at before update on public.bookings
   for each row execute function public.update_updated_at();
