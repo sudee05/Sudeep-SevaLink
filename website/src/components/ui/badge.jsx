@@ -6,9 +6,9 @@ const badgeVariants = cva('inline-flex items-center rounded-full px-2.5 py-1 tex
     variant: {
       default: 'bg-primary/10 text-primary',
       secondary: 'bg-secondary/10 text-secondary',
-      success: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300',
-      warning: ' bg-yellow-600 text-white p-2',
-      danger: 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300',
+      success: 'border border-emerald-200 bg-emerald-100 text-emerald-700 dark:border-emerald-200 dark:bg-emerald-100 dark:text-emerald-700',
+      warning: 'border border-amber-200 bg-amber-100 text-amber-800 dark:border-amber-200 dark:bg-amber-100 dark:text-amber-800',
+      danger: 'border border-red-200 bg-red-100 text-red-700 dark:border-red-200 dark:bg-red-100 dark:text-red-700',
       outline: 'border border-border text-foreground',
     },
   },
