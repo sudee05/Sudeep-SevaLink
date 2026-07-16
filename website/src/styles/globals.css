@@ -64,6 +64,61 @@ body {
   animation: fadeSlide 0.35s ease;
 }
 
+.dark .public-marketing .bg-white,
+.dark .public-footer .bg-white,
+.dark .public-nav .bg-white {
+  background-color: var(--card) !important;
+}
+
+.dark .public-marketing .bg-\[\#f6f8ff\] {
+  background-color: var(--background) !important;
+}
+
+.dark .public-marketing .bg-slate-100,
+.dark .public-marketing .bg-blue-50,
+.dark .public-marketing .bg-emerald-50,
+.dark .public-marketing .bg-emerald-100,
+.dark .public-marketing .bg-blue-100 {
+  background-color: var(--muted) !important;
+}
+
+.dark .public-marketing .text-slate-950,
+.dark .public-marketing .text-slate-900,
+.dark .public-footer .text-slate-950,
+.dark .public-footer .text-slate-900,
+.dark .public-nav .text-slate-950,
+.dark .public-nav .text-slate-900 {
+  color: var(--foreground) !important;
+}
+
+.dark .public-marketing .text-slate-600,
+.dark .public-marketing .text-slate-500,
+.dark .public-marketing .text-slate-400,
+.dark .public-footer .text-slate-600,
+.dark .public-footer .text-slate-500,
+.dark .public-footer .text-slate-400,
+.dark .public-nav .text-slate-500 {
+  color: var(--muted-foreground) !important;
+}
+
+.dark .public-marketing .text-blue-700,
+.dark .public-footer .text-blue-700,
+.dark .public-nav .text-blue-700,
+.dark .public-marketing .text-emerald-700 {
+  color: var(--primary) !important;
+}
+
+.dark .public-marketing .border-slate-100,
+.dark .public-marketing .border-slate-200,
+.dark .public-marketing .border-blue-100,
+.dark .public-marketing .border-blue-200,
+.dark .public-marketing .border-emerald-100,
+.dark .public-marketing .border-orange-100,
+.dark .public-footer .border-slate-200,
+.dark .public-nav .border-slate-200 {
+  border-color: var(--border) !important;
+}
+
 @keyframes fadeSlide {
   from {
     opacity: 0;

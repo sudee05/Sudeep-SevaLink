@@ -1,10 +1,12 @@
 import { Navigate, Route, Routes } from 'react-router-dom'
+import { useSelector } from 'react-redux'
 import { PublicLayout } from '@/layouts/public-layout'
 import { AuthLayout } from '@/layouts/auth-layout'
 import { CustomerLayout } from '@/layouts/customer-layout'
 import { ProviderLayout } from '@/layouts/provider-layout'
 import { AdminLayout } from '@/layouts/admin-layout'
 import { ProtectedRoute } from '@/components/common/protected-route'
+import { selectAuthLoading, selectIsAuthenticated, selectUserRole } from '@/store/authSlice'
 import {
   CategoriesPage,
   LandingPage,
@@ -71,11 +73,24 @@ function NotFound() {
   )
 }
 
+function LandingRoute() {
+  const isAuthenticated = useSelector(selectIsAuthenticated)
+  const loading = useSelector(selectAuthLoading)
+  const role = useSelector(selectUserRole)
+
+  if (!loading && isAuthenticated) {
+    if (role === 'customer') return <Navigate to="/customer" replace />
+    if (role === 'provider') return <Navigate to="/provider" replace />
+  }
+
+  return <LandingPage />
+}
+
 export function AppRouter() {
   return (
     <Routes>
       <Route element={<PublicLayout />}>
-        <Route path="/" element={<LandingPage />} />
+        <Route path="/" element={<LandingRoute />} />
         <Route path="/services" element={<ServicesPage />} />
         <Route path="/categories" element={<CategoriesPage />} />
         <Route path="/providers" element={<ProvidersPage />} />

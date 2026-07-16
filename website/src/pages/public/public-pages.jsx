@@ -1,9 +1,20 @@
 import { motion } from 'framer-motion'
 import { useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
-import { Search, SlidersHorizontal } from 'lucide-react'
+import {
+  ArrowRight,
+  BadgeCheck,
+  BriefcaseBusiness,
+  ChartNoAxesCombined,
+  Handshake,
+  MoveRight,
+  Search,
+  ShieldCheck,
+  SlidersHorizontal,
+  Sparkles,
+  Users,
+} from 'lucide-react'
 import { useCategoriesQuery, useProviderQuery, useProvidersQuery, useServiceQuery, useServicesQuery } from '@/hooks/use-queries'
-import { mockFaqs, mockTestimonials, landingStats } from '@/data/mockData'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
@@ -16,6 +27,17 @@ import { LoadingGrid } from '@/components/ui/loading-grid'
 import { EmptyState } from '@/components/ui/empty-state'
 import { ErrorState } from '@/components/ui/error-state'
 import { Badge } from '@/components/ui/badge'
+import heroConsultation from '@/assets/landing-hero-consultation.png'
+import missionPortrait from '@/assets/uncle.jpg'
+import cleaningImage from '@/assets/cleaning.jpg'
+import logisticsImage from '@/assets/logistics.jpg'
+import counselingImage from '@/assets/talling aunties.jpg'
+import providerGrowthImage from '@/assets/cyber_security.jpg'
+import nurseImage from '@/assets/nursing.jpg'
+import relocationImage from '@/assets/relocation.jpg'
+import markImage from '@/assets/mark.jpg'
+import zaraImage from '@/assets/zara.jpg'
+import joyImage from '@/assets/joy.jpg'
 
 const fade = {
   initial: { opacity: 0, y: 10 },
@@ -23,113 +45,400 @@ const fade = {
   transition: { duration: 0.35 },
 }
 
+const popularCategories = [
+  {
+    title: 'Home Maintenance',
+    subtitle: '1.2k providers available',
+    image: cleaningImage,
+    className: 'md:col-span-2 md:row-span-2',
+  },
+  {
+    title: 'Health & Wellness',
+    subtitle: 'Yoga, nursing, therapy',
+    image: counselingImage,
+    className: 'md:col-span-2',
+  },
+  {
+    title: 'Logistics',
+    subtitle: 'Moving and storage',
+    image: logisticsImage,
+    className: '',
+  },
+]
+
+const providerBenefits = [
+  {
+    icon: BriefcaseBusiness,
+    title: 'Flexible schedule',
+    text: 'Work when you want, where you want, and choose the jobs that match your strengths.',
+  },
+  {
+    icon: ShieldCheck,
+    title: 'Secure payments',
+    text: 'Get paid instantly upon job completion through our protected workflow.',
+  },
+  {
+    icon: ChartNoAxesCombined,
+    title: 'Business tools',
+    text: 'Track bookings, customer repeat rate, and performance from one clean dashboard.',
+  },
+  {
+    icon: BadgeCheck,
+    title: 'Verified trust',
+    text: 'Build credibility with verified reviews, badges, and quality milestones.',
+  },
+]
+
+const featuredPros = [
+  {
+    title: 'Elite Deep Cleaning',
+    rating: '4.9',
+    price: '$85.00',
+    image: cleaningImage,
+    text: 'Complete sanitation and organization for luxury homes and recurring care.',
+  },
+  {
+    title: 'In-Home Nursing',
+    rating: '5.0',
+    price: '$120.00',
+    image: nurseImage,
+    text: 'Specialized home care for recovery, elder support, and daily comfort.',
+  },
+  {
+    title: 'Premium Relocation',
+    rating: '4.8',
+    price: '$250.00',
+    image: relocationImage,
+    text: 'Full-service white glove moving for homes, offices, and delicate items.',
+  },
+  {
+    title: 'IT & Cybersecurity',
+    rating: '4.9',
+    price: '$95.00',
+    image: providerGrowthImage,
+    text: 'Home network audits, device protection, and professional troubleshooting.',
+  },
+]
+
+const qualitySteps = [
+  {
+    icon: ShieldCheck,
+    title: '1. Verification',
+    text: 'Pros undergo deep vetting, skill checks, and identity review before they go live.',
+  },
+  {
+    icon: MoveRight,
+    title: '2. Matching',
+    text: 'Our matching flow pairs local needs with the right skill set, rating, and availability.',
+  },
+  {
+    icon: Handshake,
+    title: '3. Collaboration',
+    text: 'Customers and providers manage milestones, updates, and payments in one place.',
+  },
+]
+
 export function LandingPage() {
-  const categories = useCategoriesQuery()
-  const services = useServicesQuery()
-  const providers = useProvidersQuery()
   const [location, setLocation] = useState('')
 
   return (
-    <motion.div className="space-y-16" {...fade}>
-      <section className="grid gap-8 rounded-3xl border border-border bg-card p-6 shadow-lg lg:grid-cols-2 lg:p-10">
-        <div className="space-y-6">
-          <Badge>Trusted by 1.9M households</Badge>
-          <h1 className="text-4xl font-extrabold tracking-tight lg:text-5xl">Book premium home services in minutes.</h1>
-          <p className="text-muted-foreground">SevaLink connects customers with verified experts for cleaning, repairs, beauty, and business support.</p>
-          <div className="grid gap-3 sm:grid-cols-[1fr_2fr_140px]">
-            <Input placeholder="Search services, providers..." />
-            <LocationSelector value={location} onChange={setLocation} />
-            <Button>
-              <Search className="h-4 w-4" /> Search
-            </Button>
+    <motion.div className="public-marketing relative left-1/2 w-screen -translate-x-1/2 space-y-0 overflow-hidden bg-[#f6f8ff] text-slate-900 dark:bg-background dark:text-foreground" {...fade}>
+      <section className="px-4 pb-18 pt-8 lg:px-8">
+        <div className="mx-auto grid max-w-7xl gap-10 lg:grid-cols-[1.02fr_1fr] lg:items-center">
+          <div className="space-y-7">
+            <div className="inline-flex items-center gap-2 rounded-full bg-emerald-100 px-3 py-1 text-xs font-semibold text-emerald-700">
+              <span className="h-2 w-2 rounded-full bg-emerald-500" />
+              Connecting skilled hands with local needs
+            </div>
+            <div className="space-y-4">
+              <h1 className="max-w-xl text-4xl font-black leading-tight text-slate-950 lg:text-6xl">
+                Quality Services
+                <br />
+                <span className="text-blue-700">Meet Empowered Pros.</span>
+              </h1>
+              <p className="max-w-lg text-base leading-7 text-slate-600">
+                Whether you&apos;re looking for elite home care or seeking to grow your own service business,
+                SevaLink is the bridge to excellence and professional freedom.
+              </p>
+            </div>
+            <div className="grid gap-3 rounded-3xl border border-blue-100 bg-white p-3 shadow-[0_20px_60px_rgba(59,91,219,0.12)] sm:grid-cols-[1fr_1fr_146px]">
+              <div className="flex items-center gap-3 rounded-2xl border border-slate-100 px-4 py-3 text-slate-500">
+                <Search className="h-4 w-4 text-blue-700" />
+                <Input className="h-auto border-0 bg-transparent p-0 shadow-none focus-visible:ring-0" placeholder="Service needed" />
+              </div>
+              <div className="rounded-2xl border border-slate-100 px-1 py-1">
+                <LocationSelector value={location} onChange={setLocation} />
+              </div>
+              <Button className="h-full rounded-2xl bg-blue-700 px-6 text-white hover:bg-blue-800">
+                Get Started
+              </Button>
+            </div>
+            <div className="flex flex-wrap items-center gap-6">
+              <div className="flex items-center gap-3">
+                <div className="flex -space-x-3">
+                  {[zaraImage, joyImage, markImage].map((avatar) => (
+                    <img key={avatar} src={avatar} alt="Trusted provider" className="h-10 w-10 rounded-full border-2 border-white object-cover shadow-sm" />
+                  ))}
+                </div>
+                <p className="text-sm text-slate-500">Trusted ecosystem</p>
+              </div>
+              <Link to="/register" className="inline-flex items-center gap-1 text-sm font-semibold text-blue-700 hover:text-blue-800">
+                Register your business
+                <ArrowRight className="h-4 w-4" />
+              </Link>
+            </div>
           </div>
-          <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-            {landingStats.map((stat) => (
-              <Card key={stat.label} className="p-3">
-                <p className="text-xs text-muted-foreground">{stat.label}</p>
-                <p className="text-lg font-bold">{stat.value}</p>
+
+          <div className="relative">
+            <div className="overflow-hidden rounded-[2rem] border border-blue-100 bg-white p-2 shadow-[0_28px_80px_rgba(44,77,193,0.18)]">
+              <img src={heroConsultation} alt="Professional consultation" className="h-[320px] w-full rounded-[1.5rem] object-cover sm:h-[430px] lg:h-[520px]" />
+            </div>
+            <div className="absolute -bottom-5 left-5 rounded-2xl border border-emerald-100 bg-white px-4 py-3 shadow-xl">
+              <div className="flex items-center gap-3">
+                <div className="rounded-xl bg-emerald-100 p-2 text-emerald-700">
+                  <ShieldCheck className="h-5 w-5" />
+                </div>
+                <div>
+                  <p className="text-sm font-semibold text-slate-900">Dual Vetting</p>
+                  <p className="text-xs text-slate-500">Verified pros and clients</p>
+                </div>
+              </div>
+            </div>
+            <div className="absolute right-3 top-24 rounded-2xl border border-orange-100 bg-white px-4 py-3 text-right shadow-lg">
+              <p className="text-lg font-bold text-slate-950">+45%</p>
+              <p className="text-xs text-slate-500">Provider revenue growth</p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section className="bg-white px-4 py-18 lg:px-8">
+        <div className="mx-auto grid max-w-7xl gap-10 lg:grid-cols-[1fr_1.1fr] lg:items-center">
+          <div className="grid grid-cols-2 gap-4">
+            <div className="flex h-full items-center justify-center rounded-[1.75rem] bg-blue-50 text-blue-700">
+              <Users className="h-9 w-9" />
+            </div>
+            <div className="overflow-hidden rounded-[1.75rem]">
+              <img src={missionPortrait} alt="Trusted senior professional" className="h-52 w-full object-cover" />
+            </div>
+            <div className="overflow-hidden rounded-[1.75rem]">
+              <img src={heroConsultation} alt="Consultation at SevaLink" className="h-44 w-full object-cover" />
+            </div>
+            <div className="flex h-full items-center justify-center rounded-[1.75rem] bg-emerald-50 text-emerald-700">
+              <Handshake className="h-9 w-9" />
+            </div>
+          </div>
+          <div className="space-y-5">
+            <div>
+              <p className="mb-2 text-sm font-semibold uppercase tracking-[0.22em] text-slate-400">Our Mission</p>
+              <h2 className="text-3xl font-black leading-tight text-slate-950 lg:text-5xl">
+                Bridging the Gap
+              </h2>
+            </div>
+            <p className="max-w-2xl text-base leading-7 text-slate-600">
+              SevaLink was born from a simple observation: skilled professionals often struggle to find reliable
+              clients, while people in need of help can&apos;t find quality they can trust.
+            </p>
+            <p className="max-w-2xl text-base leading-7 text-slate-600">
+              We didn&apos;t just build a marketplace. We built an ecosystem that values integrity, skill, and mutual
+              growth, turning every booking into an opportunity to strengthen communities.
+            </p>
+            <div className="grid gap-3 sm:grid-cols-3">
+              <Card className="rounded-2xl border-0 bg-blue-50 p-4 shadow-none">
+                <p className="text-2xl font-black text-blue-700">500+</p>
+                <p className="text-sm text-slate-600">Local Cities</p>
               </Card>
+              <Card className="rounded-2xl border-0 bg-emerald-50 p-4 shadow-none">
+                <p className="text-2xl font-black text-emerald-700">98%</p>
+                <p className="text-sm text-slate-600">Job Satisfaction</p>
+              </Card>
+              <Card className="rounded-2xl border-0 bg-slate-100 p-4 shadow-none">
+                <p className="text-2xl font-black text-slate-900">24/7</p>
+                <p className="text-sm text-slate-600">Human Support</p>
+              </Card>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section className="px-4 py-18 lg:px-8">
+        <div className="mx-auto max-w-7xl space-y-8">
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+            <div>
+              <h2 className="text-3xl font-black text-slate-950">Popular Categories</h2>
+              <p className="mt-2 text-slate-500">Explore services or find your next business opportunity.</p>
+            </div>
+            <Link to="/categories" className="inline-flex items-center gap-1 text-sm font-semibold text-blue-700 hover:text-blue-800">
+              View All
+              <ArrowRight className="h-4 w-4" />
+            </Link>
+          </div>
+          <div className="grid auto-rows-[220px] gap-4 md:grid-cols-4">
+            {popularCategories.map((category) => (
+              <article key={category.title} className={`group relative overflow-hidden rounded-[1.8rem] ${category.className}`}>
+                <img src={category.image} alt={category.title} className="h-full w-full object-cover transition duration-500 group-hover:scale-105" />
+                <div className="absolute inset-0 bg-gradient-to-t from-black/75 via-black/20 to-transparent" />
+                <div className="absolute inset-x-0 bottom-0 p-5 text-white">
+                  <h3 className="text-xl font-bold">{category.title}</h3>
+                  <p className="mt-1 text-sm text-white/80">{category.subtitle}</p>
+                </div>
+              </article>
+            ))}
+            <article className="flex flex-col justify-between rounded-[1.8rem] bg-blue-700 p-6 text-white shadow-[0_24px_50px_rgba(33,84,210,0.25)]">
+              <div className="rounded-2xl bg-white/10 p-3 text-white">
+                <Sparkles className="h-5 w-5" />
+              </div>
+              <div className="space-y-3">
+                <h3 className="text-2xl font-black leading-tight">List your service</h3>
+                <p className="text-sm text-blue-100">Open your own category today and start getting verified demand.</p>
+              </div>
+              <Link to="/register">
+                <Button className="rounded-2xl bg-white text-blue-700 hover:bg-blue-50">Join Now</Button>
+              </Link>
+            </article>
+          </div>
+        </div>
+      </section>
+
+      <section className="bg-[#272b36] px-4 py-18 text-white lg:px-8">
+        <div className="mx-auto grid max-w-7xl gap-10 lg:grid-cols-[0.95fr_1fr] lg:items-center">
+          <div className="space-y-6">
+            <div className="inline-flex items-center gap-2 rounded-full bg-emerald-500/10 px-3 py-1 text-xs font-semibold uppercase tracking-[0.16em] text-emerald-300">
+              <Sparkles className="h-3.5 w-3.5" />
+              Grow with SevaLink
+            </div>
+            <h2 className="text-3xl font-black leading-tight lg:text-5xl">
+              Turn Your Skills Into
+              <br />
+              <span className="text-emerald-300">Sustainable Growth</span>
+            </h2>
+            <p className="max-w-xl text-base leading-7 text-slate-300">
+              Join our network of providers and take full control of your business. We provide the tools, trust, and
+              visibility. You provide the talent.
+            </p>
+            <div className="grid gap-5 sm:grid-cols-2">
+              {providerBenefits.map((item) => {
+                const Icon = item.icon
+                return (
+                  <div key={item.title} className="flex gap-3">
+                    <div className="rounded-2xl bg-white/8 p-3 text-emerald-300">
+                      <Icon className="h-5 w-5" />
+                    </div>
+                    <div>
+                      <h3 className="font-semibold text-white">{item.title}</h3>
+                      <p className="mt-1 text-sm leading-6 text-slate-400">{item.text}</p>
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+            <Link to="/register">
+              <Button className="rounded-2xl bg-emerald-400 px-8 text-slate-950 hover:bg-emerald-300">Join as a Pro</Button>
+            </Link>
+          </div>
+          <div className="relative rounded-[2rem] border border-white/10 bg-white/6 p-4 shadow-2xl backdrop-blur-sm">
+            <img src={providerGrowthImage} alt="Provider dashboard" className="h-[420px] w-full rounded-[1.6rem] object-cover" />
+            <div className="absolute bottom-8 left-8 rounded-2xl bg-white px-4 py-3 text-slate-900 shadow-xl">
+              <div className="flex items-center gap-3">
+                <img src={markImage} alt="Mark Sterling" className="h-11 w-11 rounded-full object-cover" />
+                <div>
+                  <p className="text-sm font-semibold">Mark Sterling</p>
+                  <p className="text-xs text-slate-500">SevaLink helped me double my bookings in 3 months.</p>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section className="bg-white px-4 py-18 lg:px-8">
+        <div className="mx-auto max-w-7xl space-y-8">
+          <div className="text-center">
+            <h2 className="text-3xl font-black text-slate-950">Top-Rated Professionals</h2>
+            <p className="mt-2 text-slate-500">Discover elite providers ready to assist you today and see the quality standard we uphold.</p>
+          </div>
+          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+            {featuredPros.map((item) => (
+              <article key={item.title} className="overflow-hidden rounded-[1.7rem] border border-slate-200 bg-white shadow-[0_16px_40px_rgba(15,23,42,0.07)]">
+                <img src={item.image} alt={item.title} className="h-48 w-full object-cover" />
+                <div className="space-y-4 p-5">
+                  <div className="flex items-start justify-between gap-3">
+                    <h3 className="text-lg font-bold text-slate-950">{item.title}</h3>
+                    <div className="rounded-full bg-amber-50 px-2.5 py-1 text-xs font-semibold text-amber-700">
+                      {item.rating}
+                    </div>
+                  </div>
+                  <p className="text-sm leading-6 text-slate-500">{item.text}</p>
+                  <div className="flex items-end justify-between gap-3">
+                    <div>
+                      <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-400">Starts from</p>
+                      <p className="text-xl font-black text-slate-950">{item.price}</p>
+                    </div>
+                    <Button variant="outline" className="rounded-2xl border-blue-200 text-blue-700 hover:bg-blue-50">
+                      Book Now
+                    </Button>
+                  </div>
+                </div>
+              </article>
             ))}
           </div>
         </div>
-        <div className="relative overflow-hidden rounded-2xl">
-          <img
-            src="https://images.unsplash.com/photo-1521790797524-b2497295b8a0?auto=format&fit=crop&w=1400&q=80"
-            alt="SevaLink hero"
-            className="h-full min-h-[360px] w-full object-cover"
-          />
-        </div>
       </section>
 
-      <section>
-        <SectionHeader title="Popular Categories" subtitle="From essentials to premium plans." action={<Link to="/categories"><Button variant="outline">View all</Button></Link>} />
-        {categories.isLoading ? <LoadingGrid count={6} /> : (
-          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-            {categories.data?.map((category) => {
-              const Icon = category.icon
+      <section className="px-4 py-18 lg:px-8">
+        <div className="mx-auto grid max-w-7xl gap-8 lg:grid-cols-[0.95fr_1.2fr] lg:items-start">
+          <div className="space-y-5">
+            <h2 className="text-3xl font-black leading-tight text-slate-950">
+              How SevaLink
+              <br />
+              <span className="text-blue-700">Ensures Quality</span>
+            </h2>
+            <p className="max-w-md text-base leading-7 text-slate-500">
+              A streamlined path for both customers seeking help and trusted providers offering skills.
+            </p>
+            <Card className="rounded-[1.7rem] border border-slate-200 bg-white p-5 shadow-none">
+              <div className="mb-3 inline-flex rounded-2xl bg-emerald-50 p-3 text-emerald-700">
+                <ShieldCheck className="h-5 w-5" />
+              </div>
+              <h3 className="text-lg font-bold text-slate-950">Trust Guarantee</h3>
+              <p className="mt-2 text-sm leading-6 text-slate-500">
+                Every booking is protected by our service quality checks and support-backed resolution flow.
+              </p>
+            </Card>
+          </div>
+          <div className="grid gap-4 md:grid-cols-3">
+            {qualitySteps.map((step) => {
+              const Icon = step.icon
               return (
-                <Card key={category.id} className="group transition hover:-translate-y-1 hover:shadow-lg">
-                  <div className="mb-4 inline-flex rounded-2xl bg-muted p-3">
-                    <Icon className="h-5 w-5 text-primary" />
+                <div key={step.title} className="space-y-4 rounded-[1.6rem] bg-white p-5 shadow-[0_16px_40px_rgba(15,23,42,0.07)]">
+                  <div className="inline-flex rounded-2xl bg-blue-700 p-3 text-white">
+                    <Icon className="h-5 w-5" />
                   </div>
-                  <h3 className="font-semibold">{category.name}</h3>
-                  <p className="text-sm text-muted-foreground">{category.services}+ services available</p>
-                </Card>
+                  <h3 className="text-lg font-bold text-slate-950">{step.title}</h3>
+                  <p className="text-sm leading-6 text-slate-500">{step.text}</p>
+                </div>
               )
             })}
           </div>
-        )}
+        </div>
       </section>
 
-      <section>
-        <SectionHeader title="Featured Services" subtitle="Best rated services near you." action={<Link to="/services"><Button variant="outline">Browse services</Button></Link>} />
-        {services.isLoading ? <LoadingGrid /> : (
-          <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
-            {services.data?.slice(0, 6).map((service) => <ServiceCard key={service.id} service={service} />)}
+      <section className="px-4 pb-18 lg:px-8">
+        <div className="mx-auto max-w-7xl rounded-[2.25rem] bg-blue-700 px-6 py-14 text-center text-white shadow-[0_30px_80px_rgba(32,77,201,0.28)] lg:px-16">
+          <h2 className="text-3xl font-black leading-tight lg:text-5xl">The Future of Service Excellence is Here</h2>
+          <p className="mx-auto mt-4 max-w-2xl text-base leading-7 text-blue-100">
+            Whether you&apos;re looking to hire or looking to be hired, SevaLink is the ecosystem built for you.
+          </p>
+          <div className="mt-8 flex flex-col justify-center gap-3 sm:flex-row">
+            <Link to="/services">
+              <Button className="rounded-2xl bg-white px-8 text-blue-700 hover:bg-blue-50">Start Booking</Button>
+            </Link>
+            <Link to="/register">
+              <Button variant="outline" className="rounded-2xl border-white/30 bg-transparent px-8 text-white hover:bg-white/10">
+                Join as Provider
+              </Button>
+            </Link>
           </div>
-        )}
-      </section>
-
-      <section>
-        <SectionHeader title="Featured Providers" subtitle="Verified professionals with top reviews." action={<Link to="/providers"><Button variant="outline">See providers</Button></Link>} />
-        {providers.isLoading ? <LoadingGrid /> : (
-          <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
-            {providers.data?.map((provider) => <ProviderCard key={provider.id} provider={provider} />)}
-          </div>
-        )}
-      </section>
-
-      <section className="grid gap-4 md:grid-cols-3">
-        {['Choose Service', 'Book Slot', 'Get It Done'].map((step, idx) => (
-          <Card key={step}>
-            <p className="mb-2 text-xs font-semibold text-primary">Step {idx + 1}</p>
-            <h3 className="font-semibold">{step}</h3>
-            <p className="text-sm text-muted-foreground">Transparent pricing, trusted providers, and live booking timeline.</p>
-          </Card>
-        ))}
-      </section>
-
-      <section className="grid gap-4 lg:grid-cols-3">
-        {mockTestimonials.map((item) => (
-          <Card key={item.id} className="space-y-3">
-            <p className="text-sm text-muted-foreground">"{item.quote}"</p>
-            <div>
-              <p className="font-semibold">{item.author}</p>
-              <p className="text-xs text-muted-foreground">{item.role}</p>
-            </div>
-          </Card>
-        ))}
-      </section>
-
-      <section>
-        <SectionHeader title="FAQ" subtitle="Quick answers before your first booking." />
-        <div className="space-y-3">
-          {mockFaqs.map((faq) => (
-            <Card key={faq.q}>
-              <h4 className="font-semibold">{faq.q}</h4>
-              <p className="mt-2 text-sm text-muted-foreground">{faq.a}</p>
-            </Card>
-          ))}
         </div>
       </section>
     </motion.div>

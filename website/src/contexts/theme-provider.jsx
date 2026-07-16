@@ -5,6 +5,8 @@ export function ThemeProvider({ children }) {
     <NextThemesProvider
       attribute="class"
       defaultTheme="light"
+      storageKey="sevalink-theme"
+      themes={['light', 'dark']}
       enableSystem={false}
       disableTransitionOnChange
     >

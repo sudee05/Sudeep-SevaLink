@@ -4,9 +4,9 @@ import { PublicFooter } from '@/components/common/public-footer'
 
 export function PublicLayout() {
   return (
-    <div className="min-h-screen">
+    <div className="min-h-screen overflow-hidden">
       <PublicNavbar />
-      <main className="mx-auto w-full max-w-7xl px-4 pb-10 pt-6 lg:px-8">
+      <main className="mx-auto w-full max-w-7xl px-4 pb-10 lg:px-8">
         <Outlet />
       </main>
       <PublicFooter />

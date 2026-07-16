@@ -14,6 +14,7 @@ import { DataTable } from '@/components/common/data-table'
 import { SectionHeader } from '@/components/common/section-header'
 import { ServiceCard } from '@/components/common/service-card'
 import { formatCurrency, formatDate } from '@/utils/format'
+import { ServicesPage } from '../public/public-pages'
 
 const fade = {
   initial: { opacity: 0, y: 10 },
@@ -63,14 +64,7 @@ export function CustomerDashboardPage() {
           </div>
         </Card>
       </div>
-      <section>
-        <SectionHeader title="Recommended Services" subtitle="Based on your recent activity." />
-        {services.isLoading ? <LoadingGrid /> : (
-          <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
-            {services.data?.slice(0, 3).map((service) => <ServiceCard key={service.id} service={service} />)}
-          </div>
-        )}
-      </section>
+     <ServicesPage/>
     </motion.div>
   )
 }
