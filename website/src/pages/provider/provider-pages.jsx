@@ -395,7 +395,77 @@ export function ProviderPaymentsPage() {
 }
 
 export function ProviderReviewsPage() {
-  return <ModuleCard title="Reviews" subtitle="Monitor service quality feedback and customer sentiment." />
+  const [providerRecord, setProviderRecord] = useState(null)
+  const [feedback, setFeedback] = useState([])
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    let active = true
+
+    async function loadFeedback() {
+      setLoading(true)
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) {
+        if (active) setLoading(false)
+        return
+      }
+
+      const { data: provider } = await supabase
+        .from('providers')
+        .select('id')
+        .eq('user_id', user.id)
+        .maybeSingle()
+
+      if (!provider) {
+        if (active) {
+          setProviderRecord(null)
+          setFeedback([])
+          setLoading(false)
+        }
+        return
+      }
+
+      const { data } = await supabase
+        .from('booking_feedback')
+        .select('*, profiles(full_name), bookings(booking_code, service_title)')
+        .eq('provider_id', provider.id)
+        .order('created_at', { ascending: false })
+
+      if (active) {
+        setProviderRecord(provider)
+        setFeedback(data || [])
+        setLoading(false)
+      }
+    }
+
+    loadFeedback()
+    return () => {
+      active = false
+    }
+  }, [])
+
+  return (
+    <motion.div className="space-y-4" {...fade}>
+      <SectionHeader title="Reviews" subtitle="Customer feedback for your completed bookings." />
+      {loading ? <LoadingGrid count={3} /> : !providerRecord ? (
+        <Card className="text-sm text-muted-foreground">Complete your provider profile to receive feedback.</Card>
+      ) : feedback.length ? (
+        <DataTable
+          columns={[
+            { key: 'booking', label: 'Booking', render: (row) => row.bookings?.booking_code || row.booking_id },
+            { key: 'service', label: 'Service', render: (row) => row.bookings?.service_title || '-' },
+            { key: 'customer', label: 'Customer', render: (row) => row.profiles?.full_name || '-' },
+            { key: 'rating', label: 'Rating', render: (row) => `${row.rating}/5` },
+            { key: 'comment', label: 'Comment', render: (row) => row.comment || '-' },
+            { key: 'created_at', label: 'Created', render: (row) => formatDate(row.created_at) },
+          ]}
+          rows={feedback}
+        />
+      ) : (
+        <Card className="text-sm text-muted-foreground">No feedback yet.</Card>
+      )}
+    </motion.div>
+  )
 }
 
 export function ProviderProfilePage() {

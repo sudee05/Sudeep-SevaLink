@@ -153,11 +153,8 @@ create table public.provider_services (
 
 alter table public.provider_services enable row level security;
 
-create policy "Provider services are viewable by owners and admins"
-  on public.provider_services for select using (
-    exists (select 1 from public.providers where id = provider_id and user_id = auth.uid())
-    or exists (select 1 from public.profiles where id = auth.uid() and role = 'admin')
-  );
+create policy "Provider services are viewable by everyone"
+  on public.provider_services for select using (true);
 
 create policy "Providers can insert own services"
   on public.provider_services for insert with check (
@@ -216,6 +213,8 @@ create table public.bookings (
   provider_name text default '',
   customer_name text default '',
   scheduled_date timestamptz not null,
+  booking_date date,
+  booking_time time,
   status text default 'pending' check (status in ('pending', 'confirmed', 'in_progress', 'completed', 'cancelled')),
   amount numeric(10,2) not null default 0,
   address text default '',
@@ -273,7 +272,64 @@ create policy "Customers can update own reviews"
   on public.reviews for update using (auth.uid() = customer_id);
 
 -- =============================================
--- 9. DOCUMENTS (provider verification)
+-- 9. FEEDBACK
+-- =============================================
+create table public.booking_feedback (
+  id uuid default uuid_generate_v4() primary key,
+  booking_id uuid not null references public.bookings(id) on delete cascade,
+  provider_id uuid references public.providers(id) on delete cascade,
+  customer_id uuid not null references public.profiles(id) on delete cascade,
+  rating int not null check (rating >= 1 and rating <= 5),
+  comment text default '',
+  created_at timestamptz default now(),
+  unique (booking_id, customer_id)
+);
+
+alter table public.booking_feedback enable row level security;
+
+create policy "Customers and providers can view booking feedback"
+  on public.booking_feedback for select using (
+    auth.uid() = customer_id
+    or exists (select 1 from public.providers where id = provider_id and user_id = auth.uid())
+    or exists (select 1 from public.profiles where id = auth.uid() and role = 'admin')
+  );
+
+create policy "Customers can create booking feedback"
+  on public.booking_feedback for insert with check (auth.uid() = customer_id);
+
+-- =============================================
+-- 10. COMPLAINTS
+-- =============================================
+create table public.booking_complaints (
+  id uuid default uuid_generate_v4() primary key,
+  booking_id uuid not null references public.bookings(id) on delete cascade,
+  provider_id uuid references public.providers(id) on delete set null,
+  customer_id uuid not null references public.profiles(id) on delete cascade,
+  service_id uuid references public.services(id) on delete set null,
+  subject text not null,
+  comment text default '',
+  status text not null default 'open' check (status in ('open', 'reviewing', 'resolved', 'closed')),
+  created_at timestamptz default now()
+);
+
+alter table public.booking_complaints enable row level security;
+
+create policy "Customers and admins can view booking complaints"
+  on public.booking_complaints for select using (
+    auth.uid() = customer_id
+    or exists (select 1 from public.profiles where id = auth.uid() and role = 'admin')
+  );
+
+create policy "Customers can create booking complaints"
+  on public.booking_complaints for insert with check (auth.uid() = customer_id);
+
+create policy "Admins can update booking complaints"
+  on public.booking_complaints for update using (
+    exists (select 1 from public.profiles where id = auth.uid() and role = 'admin')
+  );
+
+-- =============================================
+-- 11. DOCUMENTS (provider verification)
 -- =============================================
 create table public.documents (
   id uuid default uuid_generate_v4() primary key,
@@ -300,7 +356,7 @@ create policy "Providers can insert own documents"
   );
 
 -- =============================================
--- 10. NOTIFICATIONS
+-- 12. NOTIFICATIONS
 -- =============================================
 create table public.notifications (
   id uuid default uuid_generate_v4() primary key,
@@ -329,7 +385,7 @@ create policy "Users can update own notifications"
   on public.notifications for update using (auth.uid() = user_id);
 
 -- =============================================
--- 11. AUTO-CREATE PROFILE TRIGGER
+-- 13. AUTO-CREATE PROFILE TRIGGER
 -- =============================================
 create or replace function public.handle_new_user()
 returns trigger as $$

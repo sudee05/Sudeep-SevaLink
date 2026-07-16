@@ -1,7 +1,10 @@
 import { Link, useParams } from 'react-router-dom'
 import { motion } from 'framer-motion'
+import { useMemo, useState } from 'react'
+import { useMutation, useQueryClient } from '@tanstack/react-query'
+import { useSelector } from 'react-redux'
 import { CalendarCheck, Clock3, CreditCard, Heart, MapPin, Receipt, Sparkles } from 'lucide-react'
-import { useBookingsQuery, useServicesQuery } from '@/hooks/use-queries'
+import { useBookingsQuery, useProvidersByServiceQuery, useServicesQuery } from '@/hooks/use-queries'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
@@ -14,7 +17,9 @@ import { DataTable } from '@/components/common/data-table'
 import { SectionHeader } from '@/components/common/section-header'
 import { ServiceCard } from '@/components/common/service-card'
 import { formatCurrency, formatDate } from '@/utils/format'
-import { ServicesPage } from '../public/public-pages'
+import { selectProfile } from '@/store/authSlice'
+import { createBooking, createBookingComplaint, createBookingFeedback } from '@/services/supabaseApi'
+import { useToast } from '@/hooks/use-toast'
 
 const fade = {
   initial: { opacity: 0, y: 10 },
@@ -22,49 +27,158 @@ const fade = {
   transition: { duration: 0.3 },
 }
 
+function bookingStatusVariant(status) {
+  if (status === 'completed') return 'success'
+  if (status === 'cancelled') return 'danger'
+  return 'warning'
+}
+
 export function CustomerDashboardPage() {
   const bookings = useBookingsQuery()
   const services = useServicesQuery()
+  const profile = useSelector(selectProfile)
+  const queryClient = useQueryClient()
+  const toast = useToast()
+  const [selectedService, setSelectedService] = useState(null)
+  const [location, setLocation] = useState('')
+  const [maxPrice, setMaxPrice] = useState('')
+  const [bookingProvider, setBookingProvider] = useState(null)
+  const [bookingForm, setBookingForm] = useState({ booking_date: '', booking_time: '', address: '', notes: '' })
+  const providers = useProvidersByServiceQuery(selectedService?.id)
+
+  const visibleProviders = useMemo(() => {
+    const priceLimit = Number(maxPrice)
+    return (providers.data || []).filter((provider) => {
+      const matchesLocation = !location || (provider.location || '').toLowerCase().includes(location.toLowerCase())
+      const providerPrice = Number(provider.price || provider.starting_price || provider.base_price || 0)
+      const matchesPrice = !priceLimit || !providerPrice || providerPrice <= priceLimit
+      return matchesLocation && matchesPrice
+    })
+  }, [providers.data, location, maxPrice])
+
+  const bookingMutation = useMutation({
+    mutationFn: createBooking,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['bookings'] })
+      toast.success('Booking created successfully.')
+      setBookingProvider(null)
+      setBookingForm({ booking_date: '', booking_time: '', address: '', notes: '' })
+    },
+    onError: (error) => toast.error(error.message || 'Could not create booking'),
+  })
+
+  function handleBookingSubmit(event) {
+    event.preventDefault()
+    if (!profile?.id || !selectedService || !bookingProvider) return
+
+    bookingMutation.mutate({
+      customer_id: profile.id,
+      provider_id: bookingProvider.id,
+      service_id: selectedService.id,
+      service_title: selectedService.name,
+      provider_name: bookingProvider.business_name || bookingProvider.name || '',
+      customer_name: profile.full_name || '',
+      booking_date: bookingForm.booking_date,
+      booking_time: bookingForm.booking_time,
+      address: bookingForm.address,
+      notes: bookingForm.notes,
+      amount: Number(bookingProvider.price || bookingProvider.starting_price || bookingProvider.base_price || 0),
+      status: 'pending',
+    })
+  }
 
   return (
     <motion.div className="space-y-6" {...fade}>
-      <SectionHeader title="Welcome back, Priya" subtitle="Manage upcoming bookings, invoices, and notifications." />
+      <SectionHeader
+        title={`Welcome back${profile?.full_name ? `, ${profile.full_name}` : ''}`}
+        subtitle="Select a service, compare providers, and book the date and time when you need help."
+      />
+
       <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-        <Card><p className="text-xs text-muted-foreground">Upcoming Bookings</p><p className="mt-2 text-2xl font-bold">06</p></Card>
-        <Card><p className="text-xs text-muted-foreground">Completed This Month</p><p className="mt-2 text-2xl font-bold">14</p></Card>
-        <Card><p className="text-xs text-muted-foreground">Wishlist</p><p className="mt-2 text-2xl font-bold">09</p></Card>
-        <Card><p className="text-xs text-muted-foreground">Reward Points</p><p className="mt-2 text-2xl font-bold">3,240</p></Card>
+        <Card><p className="text-xs text-muted-foreground">Total Bookings</p><p className="mt-2 text-2xl font-bold">{bookings.data?.length || 0}</p></Card>
+        <Card><p className="text-xs text-muted-foreground">Pending</p><p className="mt-2 text-2xl font-bold">{bookings.data?.filter((b) => b.status === 'pending').length || 0}</p></Card>
+        <Card><p className="text-xs text-muted-foreground">Completed</p><p className="mt-2 text-2xl font-bold">{bookings.data?.filter((b) => b.status === 'completed').length || 0}</p></Card>
+        <Card><p className="text-xs text-muted-foreground">Available Services</p><p className="mt-2 text-2xl font-bold">{services.data?.length || 0}</p></Card>
       </div>
-      <div className="grid gap-4 xl:grid-cols-3">
-        <Card className="xl:col-span-2">
-          <h3 className="mb-4 font-semibold">Recent Bookings</h3>
-          {bookings.isLoading ? <LoadingGrid count={2} /> : (
-            <div className="space-y-3">
-              {bookings.data?.map((booking) => (
-                <div key={booking.id} className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-border p-3">
-                  <div>
-                    <p className="font-semibold">{booking.service}</p>
-                    <p className="text-xs text-muted-foreground">{formatDate(booking.date)} • {booking.address}</p>
-                  </div>
-                  <div className="flex items-center gap-3">
-                    <Badge variant={booking.status === 'Completed' ? 'success' : booking.status === 'Pending' ? 'warning' : 'default'}>{booking.status}</Badge>
-                    <Link to={`/customer/bookings/${booking.id}`}><Button variant="outline" size="sm">Details</Button></Link>
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
-        </Card>
-        <Card>
-          <h3 className="mb-4 font-semibold">Notifications</h3>
-          <div className="space-y-3 text-sm text-muted-foreground">
-            <p>Provider assigned for booking BK-4501</p>
-            <p>Invoice generated for BK-4502</p>
-            <p>Price drop on saved service: Wall Painting</p>
+
+      <Card>
+        <SectionHeader title="Choose a Service" subtitle="Start by selecting what you need." />
+        {services.isLoading ? <LoadingGrid count={3} /> : (
+          <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+            {(services.data || []).map((service) => (
+              <button
+                key={service.id}
+                type="button"
+                onClick={() => {
+                  setSelectedService(service)
+                  setBookingProvider(null)
+                }}
+                className={`rounded-xl border p-4 text-left transition hover:border-primary ${
+                  selectedService?.id === service.id ? 'border-primary bg-primary/5' : 'border-border'
+                }`}
+              >
+                <p className="font-semibold">{service.name}</p>
+                <p className="mt-1 line-clamp-2 text-sm text-muted-foreground">{service.description || 'Available service'}</p>
+              </button>
+            ))}
           </div>
+        )}
+      </Card>
+
+      {selectedService && (
+        <Card className="space-y-4">
+          <SectionHeader
+            title={`Providers for ${selectedService.name}`}
+            subtitle="Filter by location now; price filtering is ready for your future provider price column."
+          />
+          <div className="grid gap-3 md:grid-cols-3">
+            <Input placeholder="Filter by location" value={location} onChange={(event) => setLocation(event.target.value)} />
+            <Input type="number" min="0" placeholder="Max price" value={maxPrice} onChange={(event) => setMaxPrice(event.target.value)} />
+            <Button variant="outline" onClick={() => { setLocation(''); setMaxPrice('') }}>Reset Filters</Button>
+          </div>
+          {providers.isLoading ? <LoadingGrid count={3} /> : visibleProviders.length ? (
+            <div className="grid gap-3 lg:grid-cols-2">
+              {visibleProviders.map((provider) => {
+                const providerPrice = provider.price || provider.starting_price || provider.base_price
+                return (
+                  <Card key={provider.id} className="space-y-3">
+                    <div>
+                      <h3 className="font-semibold">{provider.business_name || provider.name}</h3>
+                      <p className="text-sm text-muted-foreground">
+                        {provider.location || 'Location not added'} | Rating {Number(provider.rating || 0).toFixed(1)}
+                      </p>
+                    </div>
+                    <p className="text-sm text-muted-foreground">{provider.about || provider.description || 'Provider details will appear here.'}</p>
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <p className="text-sm font-semibold">{Number(providerPrice || 0) ? formatCurrency(providerPrice) : 'Price TBD'}</p>
+                      <Button size="sm" onClick={() => setBookingProvider(provider)}>Book</Button>
+                    </div>
+                  </Card>
+                )
+              })}
+            </div>
+          ) : <EmptyState title="No providers found" description="Try another service or clear your filters." />}
         </Card>
-      </div>
-     <ServicesPage/>
+      )}
+
+      {bookingProvider && (
+        <Card>
+          <SectionHeader
+            title={`Book ${bookingProvider.business_name || bookingProvider.name}`}
+            subtitle="Choose the date and time when the service is needed."
+          />
+          <form className="grid gap-3 md:grid-cols-2" onSubmit={handleBookingSubmit}>
+            <Input required type="date" value={bookingForm.booking_date} onChange={(event) => setBookingForm((form) => ({ ...form, booking_date: event.target.value }))} />
+            <Input required type="time" value={bookingForm.booking_time} onChange={(event) => setBookingForm((form) => ({ ...form, booking_time: event.target.value }))} />
+            <Input required placeholder="Service address" className="md:col-span-2" value={bookingForm.address} onChange={(event) => setBookingForm((form) => ({ ...form, address: event.target.value }))} />
+            <Textarea placeholder="Special instructions" className="md:col-span-2" value={bookingForm.notes} onChange={(event) => setBookingForm((form) => ({ ...form, notes: event.target.value }))} />
+            <div className="flex gap-2 md:col-span-2">
+              <Button type="submit" disabled={bookingMutation.isPending}>{bookingMutation.isPending ? 'Booking...' : 'Confirm Booking'}</Button>
+              <Button type="button" variant="outline" onClick={() => setBookingProvider(null)}>Cancel</Button>
+            </div>
+          </form>
+        </Card>
+      )}
     </motion.div>
   )
 }
@@ -77,10 +191,10 @@ export function CustomerBookingsPage() {
       <SectionHeader title="Booking History" subtitle="Track, reschedule, and manage bookings." action={<Button>Export</Button>} />
       <DataTable
         columns={[
-          { key: 'id', label: 'Booking ID' },
+          { key: 'booking_code', label: 'Booking ID', render: (row) => row.booking_code || row.id },
           { key: 'service', label: 'Service' },
-          { key: 'date', label: 'Date', render: (row) => formatDate(row.date) },
-          { key: 'status', label: 'Status', render: (row) => <Badge variant={row.status === 'Completed' ? 'success' : 'warning'}>{row.status}</Badge> },
+          { key: 'date', label: 'Needed On', render: (row) => formatDate(row.date) },
+          { key: 'status', label: 'Status', render: (row) => <Badge variant={bookingStatusVariant(row.status)}>{row.status}</Badge> },
           { key: 'amount', label: 'Amount', render: (row) => formatCurrency(row.amount) },
           { key: 'action', label: 'Action', render: (row) => <Link to={`/customer/bookings/${row.id}`} className="font-semibold text-primary">View</Link> },
         ]}
@@ -93,20 +207,66 @@ export function CustomerBookingsPage() {
 export function CustomerBookingDetailsPage() {
   const { id } = useParams()
   const { data = [] } = useBookingsQuery()
+  const profile = useSelector(selectProfile)
+  const toast = useToast()
+  const [feedback, setFeedback] = useState({ rating: '5', comment: '' })
+  const [complaint, setComplaint] = useState({ subject: '', comment: '' })
   const booking = data.find((item) => item.id === id) || data[0]
+
+  const feedbackMutation = useMutation({
+    mutationFn: createBookingFeedback,
+    onSuccess: () => {
+      toast.success('Feedback submitted.')
+      setFeedback({ rating: '5', comment: '' })
+    },
+    onError: (error) => toast.error(error.message || 'Could not submit feedback'),
+  })
+
+  const complaintMutation = useMutation({
+    mutationFn: createBookingComplaint,
+    onSuccess: () => {
+      toast.success('Complaint submitted.')
+      setComplaint({ subject: '', comment: '' })
+    },
+    onError: (error) => toast.error(error.message || 'Could not submit complaint'),
+  })
 
   if (!booking) return <EmptyState title="No booking found" />
 
+  function handleFeedbackSubmit(event) {
+    event.preventDefault()
+    feedbackMutation.mutate({
+      booking_id: booking.id,
+      provider_id: booking.provider_id,
+      customer_id: profile.id,
+      rating: Number(feedback.rating),
+      comment: feedback.comment,
+    })
+  }
+
+  function handleComplaintSubmit(event) {
+    event.preventDefault()
+    complaintMutation.mutate({
+      booking_id: booking.id,
+      provider_id: booking.provider_id,
+      customer_id: profile.id,
+      service_id: booking.service_id,
+      subject: complaint.subject,
+      comment: complaint.comment,
+    })
+  }
+
   return (
     <motion.div className="space-y-4" {...fade}>
-      <SectionHeader title={`Booking ${booking.id}`} subtitle="Timeline, provider details, invoice and actions." />
+      <SectionHeader title={`Booking ${booking.booking_code || booking.id}`} subtitle="Timeline, provider details, feedback and complaints." />
       <div className="grid gap-4 lg:grid-cols-2">
         <Card className="space-y-3">
           <h3 className="font-semibold">Booking Details</h3>
           <p className="text-sm text-muted-foreground">Service: {booking.service}</p>
           <p className="text-sm text-muted-foreground">Provider: {booking.provider}</p>
-          <p className="text-sm text-muted-foreground">Date: {formatDate(booking.date)}</p>
+          <p className="text-sm text-muted-foreground">Needed on: {formatDate(booking.date)}</p>
           <p className="text-sm text-muted-foreground">Address: {booking.address}</p>
+          <Badge variant={bookingStatusVariant(booking.status)}>{booking.status}</Badge>
         </Card>
         <Card className="space-y-3">
           <h3 className="font-semibold">Actions</h3>
@@ -115,15 +275,34 @@ export function CustomerBookingDetailsPage() {
           <Button variant="danger" className="w-full">Cancel Booking</Button>
         </Card>
       </div>
-      <Card>
-        <h3 className="mb-3 font-semibold">Tracking Timeline</h3>
-        <div className="space-y-2 text-sm text-muted-foreground">
-          <p>Booking confirmed</p>
-          <p>Provider assigned</p>
-          <p>Provider en route</p>
-          <p>Service in progress</p>
-        </div>
-      </Card>
+      <div className="grid gap-4 lg:grid-cols-2">
+        <Card>
+          <h3 className="mb-3 font-semibold">Feedback</h3>
+          <form className="space-y-3" onSubmit={handleFeedbackSubmit}>
+            <Select
+              value={feedback.rating}
+              onChange={(event) => setFeedback((form) => ({ ...form, rating: event.target.value }))}
+              options={[
+                { label: '5 - Excellent', value: '5' },
+                { label: '4 - Good', value: '4' },
+                { label: '3 - Okay', value: '3' },
+                { label: '2 - Poor', value: '2' },
+                { label: '1 - Bad', value: '1' },
+              ]}
+            />
+            <Textarea placeholder="Share feedback for the provider" value={feedback.comment} onChange={(event) => setFeedback((form) => ({ ...form, comment: event.target.value }))} />
+            <Button type="submit" disabled={feedbackMutation.isPending}>{feedbackMutation.isPending ? 'Submitting...' : 'Submit Feedback'}</Button>
+          </form>
+        </Card>
+        <Card>
+          <h3 className="mb-3 font-semibold">Complaint</h3>
+          <form className="space-y-3" onSubmit={handleComplaintSubmit}>
+            <Input required placeholder="Subject" value={complaint.subject} onChange={(event) => setComplaint((form) => ({ ...form, subject: event.target.value }))} />
+            <Textarea placeholder="Describe the issue" value={complaint.comment} onChange={(event) => setComplaint((form) => ({ ...form, comment: event.target.value }))} />
+            <Button type="submit" variant="danger" disabled={complaintMutation.isPending}>{complaintMutation.isPending ? 'Submitting...' : 'Submit Complaint'}</Button>
+          </form>
+        </Card>
+      </div>
     </motion.div>
   )
 }
@@ -136,7 +315,7 @@ export function CustomerInvoicesPage() {
       <SectionHeader title="Invoices" subtitle="All receipts and GST invoices in one place." />
       <DataTable
         columns={[
-          { key: 'id', label: 'Invoice ID' },
+          { key: 'booking_code', label: 'Invoice ID', render: (row) => row.booking_code || row.id },
           { key: 'service', label: 'Service' },
           { key: 'amount', label: 'Amount', render: (row) => formatCurrency(row.amount) },
           { key: 'date', label: 'Issued On', render: (row) => formatDate(row.date) },
@@ -165,9 +344,9 @@ export function CustomerWishlistPage() {
 
 export function CustomerNotificationsPage() {
   const notifications = [
-    'Provider has accepted your booking BK-4501',
+    'Provider has accepted your booking',
     'Payment reminder for pending booking',
-    'Special 15% discount on Salon services this week',
+    'Special discount on selected services this week',
   ]
 
   return (
@@ -218,9 +397,9 @@ export function BookingNewPage() {
         <Textarea className="md:col-span-2" placeholder="Special instructions" />
         <Card className="md:col-span-2">
           <p className="text-sm text-muted-foreground">Summary</p>
-          <p className="font-semibold">Deep Home Cleaning Premium - ₹2499</p>
+          <p className="font-semibold">Select a service from the dashboard to create a live booking.</p>
         </Card>
-        <Link to="/customer/booking/payment" className="md:col-span-2"><Button className="w-full">Continue to Payment</Button></Link>
+        <Link to="/customer"><Button className="w-full md:col-span-2">Back to Services</Button></Link>
       </Card>
     </motion.div>
   )
@@ -249,7 +428,7 @@ export function BookingSuccessPage() {
         <CalendarCheck className="mx-auto mb-3 h-10 w-10 text-secondary" />
         <h2 className="text-2xl font-bold">Booking Confirmed</h2>
         <p className="mt-2 text-sm text-muted-foreground">Your service is successfully booked and provider is notified.</p>
-        <Link to="/customer/booking/tracking/BK-4501"><Button className="mt-4">Track Booking</Button></Link>
+        <Link to="/customer/bookings"><Button className="mt-4">View Bookings</Button></Link>
       </Card>
     </motion.div>
   )
@@ -262,7 +441,7 @@ export function BookingFailedPage() {
         <Clock3 className="mx-auto mb-3 h-10 w-10 text-red-500" />
         <h2 className="text-2xl font-bold">Payment Failed</h2>
         <p className="mt-2 text-sm text-muted-foreground">There was an issue processing your payment.</p>
-        <Link to="/customer/booking/payment"><Button className="mt-4">Retry Payment</Button></Link>
+        <Link to="/customer"><Button className="mt-4">Try Again</Button></Link>
       </Card>
     </motion.div>
   )
@@ -282,7 +461,7 @@ export function BookingTrackingPage() {
         </Card>
         <Card>
           <h3 className="font-semibold">Provider Contact</h3>
-          <p className="mt-2 text-sm text-muted-foreground">Rohan Verma - +91 90000 11223</p>
+          <p className="mt-2 text-sm text-muted-foreground">Provider details appear after assignment.</p>
           <Button className="mt-4">Call Provider</Button>
         </Card>
       </div>

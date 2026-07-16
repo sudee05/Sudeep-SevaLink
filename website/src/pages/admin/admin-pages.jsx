@@ -731,9 +731,12 @@ const sectionConfig = {
     subtitle: 'Review escalations, quality issues, and resolution timelines.',
     action: 'Assign',
     columns: [
+      { key: 'booking', label: 'Booking', render: (row) => row.bookings?.booking_code || row.booking_id },
+      { key: 'subject', label: 'Subject', render: (row) => row.subject || '-' },
       { key: 'service', label: 'Service', render: (row) => row.services?.name || '-' },
       { key: 'customer', label: 'Customer', render: (row) => row.profiles?.full_name || '-' },
-      { key: 'rating', label: 'Rating', render: (row) => `${row.rating}/5` },
+      { key: 'provider', label: 'Provider', render: (row) => row.providers?.business_name || '-' },
+      { key: 'status', label: 'Status', render: (row) => <Badge variant={row.status === 'resolved' ? 'success' : 'warning'}>{row.status}</Badge> },
       { key: 'comment', label: 'Comment', render: (row) => row.comment || '-' },
       { key: 'created_at', label: 'Created', render: (row) => formatDate(row.created_at) },
     ],

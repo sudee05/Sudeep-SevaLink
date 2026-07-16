@@ -147,6 +147,22 @@ export async function getProviders() {
   return data
 }
 
+export async function getProvidersByService(serviceId) {
+  if (!serviceId) return []
+
+  const { data, error } = await supabase
+    .from('provider_services')
+    .select('providers(*)')
+    .eq('service_id', serviceId)
+  if (error) throw error
+
+  return (data || [])
+    .map((row) => row.providers)
+    .filter(Boolean)
+    .filter((provider) => provider.verified)
+    .sort((a, b) => Number(b.rating || 0) - Number(a.rating || 0))
+}
+
 export async function getProviderById(id) {
   const { data, error } = await supabase
     .from('providers')
@@ -212,6 +228,20 @@ export async function updateProviderApproval(profileId, providerRecordId, status
   return { profileId, status }
 }
 
+function normalizeBooking(booking) {
+  return {
+    ...booking,
+    customer_name: booking.customer?.full_name || booking.customer_name || '-',
+    customer_phone: booking.customer?.phone || booking.customer_phone || '-',
+    provider_name: booking.provider?.business_name || booking.provider_name || '-',
+    service_title: booking.service?.name || booking.service_title || '-',
+    customer: booking.customer?.full_name || booking.customer_name || '-',
+    provider: booking.provider?.business_name || booking.provider_name || '-',
+    service: booking.service?.name || booking.service_title || '-',
+    date: booking.scheduled_date || booking.booking_date || booking.created_at,
+  }
+}
+
 
 export async function getAdminUsers() {
   const { data, error } = await supabase
@@ -224,8 +254,8 @@ export async function getAdminUsers() {
 
 export async function getAdminComplaints() {
   const { data, error } = await supabase
-    .from('reviews')
-    .select('*, profiles(full_name), services(name)')
+    .from('booking_complaints')
+    .select('*, profiles(full_name), services(name), providers(business_name), bookings(booking_code)')
     .order('created_at', { ascending: false })
   if (error) throw error
   return data
@@ -246,13 +276,7 @@ export async function getBookings() {
       )
       .order('created_at', { ascending: false })
     if (!error) {
-      return (data || []).map((b) => ({
-        ...b,
-        customer_name: b.customer?.full_name || b.customer_name || '-',
-        customer_phone: b.customer?.phone || '-',
-        provider_name: b.provider?.business_name || b.provider_name || '-',
-        service_title: b.service?.name || b.service_title || '-',
-      }))
+      return (data || []).map(normalizeBooking)
     }
   } catch {
     // fall through to plain select
@@ -263,7 +287,7 @@ export async function getBookings() {
     .select('*')
     .order('created_at', { ascending: false })
   if (error) throw error
-  return data || []
+  return (data || []).map(normalizeBooking)
 }
 
 export async function getBookingById(id) {
@@ -279,31 +303,32 @@ export async function getBookingById(id) {
 export async function getCustomerBookings(customerId) {
   const { data, error } = await supabase
     .from('bookings')
-    .select('*')
+    .select('*, provider:providers!bookings_provider_id_fkey(business_name), service:services!bookings_service_id_fkey(name)')
     .eq('customer_id', customerId)
     .order('created_at', { ascending: false })
   if (error) throw error
-  return data
+  return (data || []).map(normalizeBooking)
 }
 
 export async function getProviderBookings(providerId) {
   const { data, error } = await supabase
     .from('bookings')
-    .select('*')
+    .select('*, customer:profiles!bookings_customer_id_fkey(full_name, phone), service:services!bookings_service_id_fkey(name)')
     .eq('provider_id', providerId)
     .order('created_at', { ascending: false })
   if (error) throw error
-  return data
+  return (data || []).map(normalizeBooking)
 }
 
 export async function createBooking(booking) {
+  const scheduledDate = booking.scheduled_date || `${booking.booking_date}T${booking.booking_time || '09:00'}:00`
   const { data, error } = await supabase
     .from('bookings')
-    .insert(booking)
+    .insert({ ...booking, scheduled_date: scheduledDate })
     .select()
     .single()
   if (error) throw error
-  return data
+  return normalizeBooking(data)
 }
 
 export async function updateBookingStatus(id, status) {
@@ -315,6 +340,36 @@ export async function updateBookingStatus(id, status) {
     .single()
   if (error) throw error
   return data
+}
+
+export async function createBookingFeedback(feedback) {
+  const { data, error } = await supabase
+    .from('booking_feedback')
+    .insert(feedback)
+    .select()
+    .single()
+  if (error) throw error
+  return data
+}
+
+export async function createBookingComplaint(complaint) {
+  const { data, error } = await supabase
+    .from('booking_complaints')
+    .insert(complaint)
+    .select()
+    .single()
+  if (error) throw error
+  return data
+}
+
+export async function getProviderFeedback(providerId) {
+  const { data, error } = await supabase
+    .from('booking_feedback')
+    .select('*, profiles(full_name), bookings(booking_code, service_title)')
+    .eq('provider_id', providerId)
+    .order('created_at', { ascending: false })
+  if (error) throw error
+  return data || []
 }
 
 // ── Reviews ───────────────────────────────────────────────────

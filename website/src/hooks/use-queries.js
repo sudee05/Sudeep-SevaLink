@@ -4,6 +4,7 @@ import {
   getBookings,
   getCategories,
   getProviderById,
+  getProvidersByService,
   getProviders,
   getServiceById,
   getServices,
@@ -40,6 +41,14 @@ export function useSearchServicesQuery(query) {
 
 export function useProvidersQuery() {
   return useQuery({ queryKey: ['providers'], queryFn: getProviders })
+}
+
+export function useProvidersByServiceQuery(serviceId) {
+  return useQuery({
+    queryKey: ['providers', 'service', serviceId],
+    queryFn: () => getProvidersByService(serviceId),
+    enabled: Boolean(serviceId),
+  })
 }
 
 export function useProviderQuery(id) {
