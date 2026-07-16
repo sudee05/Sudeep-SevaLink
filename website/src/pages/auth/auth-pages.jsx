@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useForm } from 'react-hook-form'
 import { z } from 'zod'
 import { zodResolver } from '@hookform/resolvers/zod'
@@ -7,7 +7,6 @@ import { motion } from 'framer-motion'
 import { useDispatch, useSelector } from 'react-redux'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import { Select } from '@/components/ui/select'
 import { Card } from '@/components/ui/card'
 import { useToast } from '@/hooks/use-toast'
 import {
@@ -16,8 +15,6 @@ import {
   resetPassword,
   updatePassword,
   selectAuthLoading,
-  selectAuthError,
-  selectUserRole,
   clearError,
 } from '@/store/authSlice'
 
@@ -47,7 +44,7 @@ function getRedirectPath(role) {
   }
 }
 
-function LoginForm({ portalLabel = 'customer' }) {
+function LoginForm() {
   const toast = useToast()
   const dispatch = useDispatch()
   const navigate = useNavigate()
@@ -73,42 +70,23 @@ function LoginForm({ portalLabel = 'customer' }) {
       <Input type="password" placeholder="Password" {...form.register('password')} />
       {form.formState.errors.password && <p className="text-xs text-red-500">{form.formState.errors.password.message}</p>}
       <Button className="w-full" type="submit" disabled={loading}>
-        {loading ? 'Signing in…' : 'Continue'}
+        {loading ? 'Signing in...' : 'Continue'}
       </Button>
     </form>
   )
 }
 
-function SharedLoginContent() {
-  return (
-    <>
-      <LoginForm portalLabel="all roles" />
-      <Link to="/forgot-password" className="text-sm font-medium text-primary">Forgot password?</Link>
-      <div className="rounded-xl border border-border bg-muted/40 p-3">
-        <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">New users</p>
-        <div className="grid gap-2 text-sm">
-          <Link to="/register" className="font-medium text-primary hover:underline">
-            Customer Sign Up
-          </Link>
-          <Link to="/provider/register" className="font-medium text-primary hover:underline">
-            Service Provider Sign Up
-          </Link>
-        </div>
-      </div>
-    </>
-  )
-}
-
-function RegisterForm({ portal = 'customer' }) {
+function RegisterForm() {
   const toast = useToast()
   const dispatch = useDispatch()
   const navigate = useNavigate()
   const loading = useSelector(selectAuthLoading)
+  const [accountType, setAccountType] = useState('customer')
   const schema = useMemo(() => z.object({
-    name: z.string().min(2),
-    email: z.string().email(),
-    phone: z.string().min(10),
-    password: z.string().min(6),
+    name: z.string().min(2, 'Full name is required'),
+    email: z.string().email('Enter a valid email'),
+    phone: z.string().min(10, 'Enter a valid phone number'),
+    password: z.string().min(6, 'Password must be at least 6 chars'),
   }), [])
   const form = useForm({ resolver: zodResolver(schema), defaultValues: { name: '', email: '', phone: '', password: '' } })
 
@@ -119,10 +97,10 @@ function RegisterForm({ portal = 'customer' }) {
       password: values.password,
       fullName: values.name,
       phone: values.phone,
-      role: portal,
+      role: accountType,
     }))
     if (signUpWithEmail.fulfilled.match(result)) {
-      toast.success('Account created! Please check your email for verification.')
+      toast.success(accountType === 'provider' ? 'Provider account created! Please check your email.' : 'Account created! Please check your email.')
       navigate('/verify-email')
     } else {
       toast.error(result.payload || 'Registration failed')
@@ -131,12 +109,35 @@ function RegisterForm({ portal = 'customer' }) {
 
   return (
     <form className="space-y-3" onSubmit={form.handleSubmit(onSubmit)}>
+      <div className="grid grid-cols-2 gap-1 rounded-xl border border-border bg-muted/30 p-1">
+        {[
+          { label: 'Customer', value: 'customer' },
+          { label: 'Service Provider', value: 'provider' },
+        ].map((option) => (
+          <button
+            key={option.value}
+            type="button"
+            onClick={() => setAccountType(option.value)}
+            className={`rounded-lg px-3 py-2 text-sm font-semibold transition ${
+              accountType === option.value
+                ? 'bg-card text-foreground shadow-sm'
+                : 'text-muted-foreground hover:text-foreground'
+            }`}
+          >
+            {option.label}
+          </button>
+        ))}
+      </div>
       <Input placeholder="Full Name" {...form.register('name')} />
+      {form.formState.errors.name && <p className="text-xs text-red-500">{form.formState.errors.name.message}</p>}
       <Input placeholder="Email" {...form.register('email')} />
+      {form.formState.errors.email && <p className="text-xs text-red-500">{form.formState.errors.email.message}</p>}
       <Input placeholder="Phone" {...form.register('phone')} />
+      {form.formState.errors.phone && <p className="text-xs text-red-500">{form.formState.errors.phone.message}</p>}
       <Input type="password" placeholder="Password" {...form.register('password')} />
+      {form.formState.errors.password && <p className="text-xs text-red-500">{form.formState.errors.password.message}</p>}
       <Button className="w-full" type="submit" disabled={loading}>
-        {loading ? 'Creating account…' : 'Create account'}
+        {loading ? 'Creating account...' : accountType === 'provider' ? 'Create provider account' : 'Create customer account'}
       </Button>
     </form>
   )
@@ -149,7 +150,8 @@ export function CustomerLoginPage() {
       subtitle="One login experience for customer, provider, and admin"
       footer={<>New here? <Link to="/register" className="font-semibold text-primary">Create account</Link></>}
     >
-      <SharedLoginContent />
+      <LoginForm />
+      <Link to="/forgot-password" className="text-sm font-medium text-primary">Forgot password?</Link>
     </AuthShell>
   )
 }
@@ -157,11 +159,11 @@ export function CustomerLoginPage() {
 export function CustomerRegisterPage() {
   return (
     <AuthShell
-      title="Create Customer Account"
-      subtitle="Book premium services in minutes"
+      title="Create Account"
+      subtitle="Choose whether you are booking services or offering them"
       footer={<>Already have an account? <Link to="/login" className="font-semibold text-primary">Login</Link></>}
     >
-      <RegisterForm portal="customer" />
+      <RegisterForm />
     </AuthShell>
   )
 }
@@ -194,7 +196,7 @@ export function ForgotPasswordPage() {
           onChange={(e) => setEmail(e.target.value)}
         />
         <Button className="w-full" type="submit" disabled={sent}>
-          {sent ? 'Link Sent ✓' : 'Send Reset Link'}
+          {sent ? 'Link Sent' : 'Send Reset Link'}
         </Button>
       </form>
       <Link to="/reset-password" className="text-sm font-medium text-primary">Already have a code? Reset now</Link>
@@ -251,181 +253,44 @@ export function OtpPage() {
 }
 
 export function EmailVerificationPage() {
+  const toast = useToast()
+  const navigate = useNavigate()
+  const [secondsLeft, setSecondsLeft] = useState(180)
+
+  useEffect(() => {
+    if (secondsLeft <= 0) return
+
+    const timer = window.setInterval(() => {
+      setSecondsLeft((current) => {
+        if (current <= 1) {
+          window.clearInterval(timer)
+          return 0
+        }
+        return current - 1
+      })
+    }, 1000)
+
+    return () => window.clearInterval(timer)
+  }, [secondsLeft])
+
+  function formatCountdown(totalSeconds) {
+    const minutes = String(Math.floor(totalSeconds / 60)).padStart(2, '0')
+    const seconds = String(totalSeconds % 60).padStart(2, '0')
+    return `${minutes}:${seconds}`
+  }
+
+  function handleResend() {
+    toast.success('Verification email sent again.')
+    setSecondsLeft(180)
+  }
+
   return (
     <AuthShell title="Verify Email" subtitle="Please check your inbox and click verification link.">
       <Card className="text-sm text-muted-foreground">Verification email sent to your registered email address.</Card>
-      <Button className="w-full">Resend Email</Button>
-    </AuthShell>
-  )
-}
-
-export function ProviderLoginPage() {
-  return (
-    <AuthShell
-      title="Sign In"
-      subtitle="One login experience for customer, provider, and admin"
-      footer={<>Need provider account? <Link to="/provider/register" className="font-semibold text-primary">Apply now</Link></>}
-    >
-      <SharedLoginContent />
-    </AuthShell>
-  )
-}
-
-export function ProviderRegisterPage() {
-  const toast = useToast()
-  const dispatch = useDispatch()
-  const navigate = useNavigate()
-  const loading = useSelector(selectAuthLoading)
-  const schema = useMemo(() => z.object({
-    fullName: z.string().min(2, 'Full name is required'),
-    email: z.string().email('Valid email is required'),
-    phone: z.string().min(10, 'Valid phone is required'),
-    password: z.string().min(6, 'Password must be at least 6 chars'),
-  }), [])
-  const form = useForm({
-    resolver: zodResolver(schema),
-    defaultValues: {
-      fullName: '',
-      email: '',
-      phone: '',
-      password: '',
-    },
-  })
-
-  async function onSubmit(values) {
-    dispatch(clearError())
-    const result = await dispatch(signUpWithEmail({
-      email: values.email,
-      password: values.password,
-      fullName: values.fullName,
-      phone: values.phone,
-      role: 'provider',
-    }))
-    if (signUpWithEmail.fulfilled.match(result)) {
-      toast.success('Provider application submitted!')
-      navigate('/provider/application-submitted')
-    } else {
-      toast.error(result.payload || 'Registration failed')
-    }
-  }
-
-  return (
-    <AuthShell
-      title="Service Provider Sign Up"
-      subtitle="Create your account — you'll choose your services after login"
-      footer={<>Already have an account? <Link to="/login" className="font-semibold text-primary">Sign in</Link></>}
-    >
-      <motion.form
-        initial={{ opacity: 0, y: 12 }}
-        animate={{ opacity: 1, y: 0 }}
-        className="space-y-3"
-        onSubmit={form.handleSubmit(onSubmit)}
-      >
-        <Input placeholder="Full Name" {...form.register('fullName')} />
-        {form.formState.errors.fullName && <p className="text-xs text-red-500">{form.formState.errors.fullName.message}</p>}
-        <Input placeholder="Email" {...form.register('email')} />
-        {form.formState.errors.email && <p className="text-xs text-red-500">{form.formState.errors.email.message}</p>}
-        <Input placeholder="Phone Number" {...form.register('phone')} />
-        {form.formState.errors.phone && <p className="text-xs text-red-500">{form.formState.errors.phone.message}</p>}
-        <Input type="password" placeholder="Password" {...form.register('password')} />
-        {form.formState.errors.password && <p className="text-xs text-red-500">{form.formState.errors.password.message}</p>}
-        <Button className="w-full" type="submit" disabled={loading}>
-          {loading ? 'Submitting…' : 'Create Provider Account'}
-        </Button>
-      </motion.form>
-    </AuthShell>
-  )
-}
-
-function ProviderStatusTemplate({ title, message, actionText }) {
-  return (
-    <AuthShell title={title} subtitle={message}>
-      <Card className="text-sm text-muted-foreground">Your provider application status is updated in real-time in this portal.</Card>
-      <Button className="w-full">{actionText}</Button>
-    </AuthShell>
-  )
-}
-
-export function ProviderApplicationSubmittedPage() {
-  return <ProviderStatusTemplate title="Application Submitted" message="Thanks for applying. We have received your details." actionText="Go to Login" />
-}
-
-export function ProviderPendingApprovalPage() {
-  return <ProviderStatusTemplate title="Pending Approval" message="Verification team is reviewing your documents." actionText="Refresh Status" />
-}
-
-export function ProviderRejectedPage() {
-  return <ProviderStatusTemplate title="Application Rejected" message="Some details require correction before approval." actionText="Update Application" />
-}
-
-export function ProviderApprovedPage() {
-  return <ProviderStatusTemplate title="Application Approved" message="You are now live on SevaLink marketplace." actionText="Go to Provider Dashboard" />
-}
-
-export function ProviderForgotPasswordPage() {
-  const toast = useToast()
-  const dispatch = useDispatch()
-  const [email, setEmail] = useState('')
-  const [sent, setSent] = useState(false)
-
-  async function handleSubmit(e) {
-    e.preventDefault()
-    if (!email) return
-    const result = await dispatch(resetPassword({ email }))
-    if (resetPassword.fulfilled.match(result)) {
-      toast.success('Reset link sent!')
-      setSent(true)
-    } else {
-      toast.error(result.payload || 'Failed to send reset link')
-    }
-  }
-
-  return (
-    <AuthShell title="Provider Forgot Password" subtitle="Receive password reset instructions via email.">
-      <form onSubmit={handleSubmit} className="space-y-3">
-        <Input placeholder="Business email" type="email" value={email} onChange={(e) => setEmail(e.target.value)} />
-        <Button className="w-full" type="submit" disabled={sent}>
-          {sent ? 'Link Sent ✓' : 'Send Reset Link'}
-        </Button>
-      </form>
-    </AuthShell>
-  )
-}
-
-export function AdminLoginPage() {
-  return (
-    <AuthShell title="Sign In" subtitle="One login experience for customer, provider, and admin">
-      <SharedLoginContent />
-    </AuthShell>
-  )
-}
-
-export function AdminForgotPasswordPage() {
-  const toast = useToast()
-  const dispatch = useDispatch()
-  const [email, setEmail] = useState('')
-  const [sent, setSent] = useState(false)
-
-  async function handleSubmit(e) {
-    e.preventDefault()
-    if (!email) return
-    const result = await dispatch(resetPassword({ email }))
-    if (resetPassword.fulfilled.match(result)) {
-      toast.success('Recovery link sent!')
-      setSent(true)
-    } else {
-      toast.error(result.payload || 'Failed to send recovery link')
-    }
-  }
-
-  return (
-    <AuthShell title="Admin Password Recovery" subtitle="Request reset token via verified email.">
-      <form onSubmit={handleSubmit} className="space-y-3">
-        <Input placeholder="Admin email" type="email" value={email} onChange={(e) => setEmail(e.target.value)} />
-        <Button className="w-full" type="submit" disabled={sent}>
-          {sent ? 'Link Sent ✓' : 'Send Recovery Link'}
-        </Button>
-      </form>
+      <Button className="w-full" onClick={handleResend} disabled={secondsLeft > 0}>
+        {secondsLeft > 0 ? `Resend Email in ${formatCountdown(secondsLeft)}` : 'Resend Email'}
+      </Button>
+      <Button className="w-full" onClick={() => navigate('/login')}>Go to Login</Button>
     </AuthShell>
   )
 }

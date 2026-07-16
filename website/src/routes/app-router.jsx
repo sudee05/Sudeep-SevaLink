@@ -15,20 +15,11 @@ import {
   ServicesPage,
 } from '@/pages/public/public-pages'
 import {
-  AdminForgotPasswordPage,
-  AdminLoginPage,
   CustomerLoginPage,
   CustomerRegisterPage,
   EmailVerificationPage,
   ForgotPasswordPage,
   OtpPage,
-  ProviderApplicationSubmittedPage,
-  ProviderApprovedPage,
-  ProviderForgotPasswordPage,
-  ProviderLoginPage,
-  ProviderPendingApprovalPage,
-  ProviderRegisterPage,
-  ProviderRejectedPage,
   ResetPasswordPage,
 } from '@/pages/auth/auth-pages'
 import {
@@ -100,17 +91,6 @@ export function AppRouter() {
         <Route path="/reset-password" element={<ResetPasswordPage />} />
         <Route path="/otp" element={<OtpPage />} />
         <Route path="/verify-email" element={<EmailVerificationPage />} />
-
-        <Route path="/provider/login" element={<ProviderLoginPage />} />
-        <Route path="/provider/register" element={<ProviderRegisterPage />} />
-        <Route path="/provider/forgot-password" element={<ProviderForgotPasswordPage />} />
-        <Route path="/provider/application-submitted" element={<ProviderApplicationSubmittedPage />} />
-        <Route path="/provider/pending" element={<ProviderPendingApprovalPage />} />
-        <Route path="/provider/rejected" element={<ProviderRejectedPage />} />
-        <Route path="/provider/approved" element={<ProviderApprovedPage />} />
-
-        <Route path="/sevalink-admin/login" element={<AdminLoginPage />} />
-        <Route path="/sevalink-admin/forgot-password" element={<AdminForgotPasswordPage />} />
       </Route>
 
       {/* Customer Portal — protected, requires "customer" role */}
