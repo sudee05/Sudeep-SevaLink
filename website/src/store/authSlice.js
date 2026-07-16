@@ -54,6 +54,7 @@ export const signUpWithEmail = createAsyncThunk(
         options: {
           data: {
             full_name: fullName,
+            phone,
             role,
           },
         },
@@ -61,11 +62,15 @@ export const signUpWithEmail = createAsyncThunk(
       if (error) throw error
 
       // Update the profile with phone if provided
-      if (data.user && phone) {
+      if (data.user) {
         await supabase
           .from('profiles')
-          .update({ phone })
-          .eq('id', data.user.id)
+          .upsert({
+            id: data.user.id,
+            full_name: fullName,
+            phone: phone || '',
+            role,
+          })
       }
 
       const { data: profile } = await supabase

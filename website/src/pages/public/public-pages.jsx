@@ -508,7 +508,7 @@ export function ProvidersPage() {
     const matchesSearch =
       !q ||
       (provider.business_name || provider.name || '').toLowerCase().includes(q) ||
-      (provider.category || '').toLowerCase().includes(q)
+      (provider.services_label || provider.service_names?.join(' ') || '').toLowerCase().includes(q)
     const matchesLocation = !location || (provider.location || '').toLowerCase().includes(location.toLowerCase())
     return matchesSearch && matchesLocation
   })
@@ -565,7 +565,7 @@ export function ProviderDetailsPage() {
             <h1 className="text-2xl font-bold">{data.name}</h1>
             {data.verified && <Badge variant="success">Verified</Badge>}
           </div>
-          <p className="mt-1 text-muted-foreground">{data.category} • {data.location}</p>
+          <p className="mt-1 text-muted-foreground">{data.services_label || data.service_names?.join(', ') || 'Services not selected'} • {data.location}</p>
           <p className="mt-4 text-sm text-muted-foreground">{data.about}</p>
           <div className="mt-4 flex flex-wrap gap-2">
             {data.certificates.map((certificate) => <Badge key={certificate} variant="outline">{certificate}</Badge>)}

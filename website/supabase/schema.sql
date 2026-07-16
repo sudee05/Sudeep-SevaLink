@@ -74,7 +74,6 @@ create table public.providers (
   id uuid default uuid_generate_v4() primary key,
   user_id uuid references public.profiles(id) on delete cascade,
   business_name text not null,
-  category text default '',
   about text default '',
   image_url text default '',
   rating numeric(2,1) default 0,
@@ -94,6 +93,8 @@ alter table public.providers enable row level security;
 create policy "Approved providers are viewable by everyone"
   on public.providers for select using (
     verified = true
+    or status = 'approved'
+    or exists (select 1 from public.profiles where id = user_id and approval_status = 'approved')
     or (auth.uid() is not null and user_id = auth.uid())
     or exists (select 1 from public.profiles where id = auth.uid() and role = 'admin')
   );
@@ -390,10 +391,11 @@ create policy "Users can update own notifications"
 create or replace function public.handle_new_user()
 returns trigger as $$
 begin
-  insert into public.profiles (id, full_name, role)
+  insert into public.profiles (id, full_name, phone, role)
   values (
     new.id,
     coalesce(new.raw_user_meta_data ->> 'full_name', ''),
+    coalesce(new.raw_user_meta_data ->> 'phone', ''),
     coalesce(new.raw_user_meta_data ->> 'role', 'customer')
   );
   return new;

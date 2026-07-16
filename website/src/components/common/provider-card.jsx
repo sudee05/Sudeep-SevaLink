@@ -4,13 +4,16 @@ import { Badge } from '@/components/ui/badge'
 import { Card } from '@/components/ui/card'
 
 export function ProviderCard({ provider }) {
+  const providerName = provider.name || provider.business_name || 'Provider'
+  const servicesLabel = provider.services_label || provider.service_names?.join(', ') || 'Services not selected'
+
   return (
     <Card className="group space-y-4 transition hover:-translate-y-1 hover:shadow-lg">
       <div className="flex items-center gap-3">
-        <img src={provider.image} alt={provider.name} className="h-14 w-14 rounded-xl object-cover" />
+        <img src={provider.image} alt={providerName} className="h-14 w-14 rounded-xl object-cover" />
         <div>
-          <h3 className="font-semibold">{provider.name}</h3>
-          <p className="text-sm text-muted-foreground">{provider.category}</p>
+          <h3 className="font-semibold">{providerName}</h3>
+          <p className="text-sm text-muted-foreground">{servicesLabel}</p>
         </div>
       </div>
       <div className="flex flex-wrap gap-2">

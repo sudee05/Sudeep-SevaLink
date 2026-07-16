@@ -183,6 +183,7 @@ export function AdminProvidersPage() {
   const [actionId, setActionId] = useState(null) // id of provider being actioned
   const [search, setSearch] = useState('')
   const [filterStatus, setFilterStatus] = useState('')
+  const [selectedProvider, setSelectedProvider] = useState(null)
 
   useEffect(() => {
     if (status === 'idle') dispatch(fetchAdminSection('providers'))
@@ -194,7 +195,9 @@ export function AdminProvidersPage() {
       const q = search.toLowerCase()
       r = r.filter((x) =>
         (x.business_name || '').toLowerCase().includes(q) ||
-        (x.owner_name || '').toLowerCase().includes(q)
+        (x.owner_name || '').toLowerCase().includes(q) ||
+        (x.owner_phone || '').toLowerCase().includes(q) ||
+        (x.services_label || '').toLowerCase().includes(q)
       )
     }
     if (filterStatus) r = r.filter((x) => (x.approval_status || 'pending') === filterStatus)
@@ -273,6 +276,7 @@ export function AdminProvidersPage() {
           columns={[
             { key: 'business_name', label: 'Business Name', render: (row) => row.business_name || '-' },
             { key: 'owner_name', label: 'Owner', render: (row) => row.owner_name || row.profiles?.full_name || '-' },
+            { key: 'services', label: 'Services', render: (row) => row.services_label || '-' },
             { key: 'location', label: 'Location', render: (row) => row.location || '-' },
             { key: 'rating', label: 'Rating', render: (row) => Number(row.rating || 0).toFixed(1) },
             {
@@ -289,6 +293,9 @@ export function AdminProvidersPage() {
                 const s = row.approval_status || 'pending'
                 return (
                   <div className="flex gap-1">
+                    <Button size="sm" variant="outline" onClick={() => setSelectedProvider(row)}>
+                      View
+                    </Button>
                     {s !== 'approved' && (
                       <Button
                         size="sm"
@@ -328,6 +335,59 @@ export function AdminProvidersPage() {
       ) : (
         <EmptyState title="No providers found" />
       )}
+
+      <Modal
+        open={!!selectedProvider}
+        onClose={() => setSelectedProvider(null)}
+        title={selectedProvider?.business_name || 'Provider Details'}
+      >
+        {selectedProvider && (
+          <div className="space-y-4">
+            <div className="grid gap-3 sm:grid-cols-2">
+              <div className="rounded-xl border border-border p-3">
+                <p className="text-xs text-muted-foreground">Owner</p>
+                <p className="font-medium">{selectedProvider.owner_name || '-'}</p>
+              </div>
+              <div className="rounded-xl border border-border p-3">
+                <p className="text-xs text-muted-foreground">Phone</p>
+                <p className="font-medium">{selectedProvider.owner_phone || '-'}</p>
+              </div>
+              <div className="rounded-xl border border-border p-3">
+                <p className="text-xs text-muted-foreground">Location</p>
+                <p className="font-medium">{selectedProvider.location || '-'}</p>
+              </div>
+              <div className="rounded-xl border border-border p-3">
+                <p className="text-xs text-muted-foreground">Rating</p>
+                <p className="font-medium">{Number(selectedProvider.rating || 0).toFixed(1)}</p>
+              </div>
+              <div className="rounded-xl border border-border p-3">
+                <p className="text-xs text-muted-foreground">Profile Status</p>
+                <Badge variant={approvalVariant(selectedProvider.approval_status || 'pending')}>
+                  {selectedProvider.approval_status || 'pending'}
+                </Badge>
+              </div>
+              <div className="rounded-xl border border-border p-3">
+                <p className="text-xs text-muted-foreground">Provider Status</p>
+                <Badge variant={selectedProvider.verified ? 'success' : 'warning'}>
+                  {selectedProvider.status || (selectedProvider.verified ? 'approved' : 'pending')}
+                </Badge>
+              </div>
+            </div>
+            <div className="rounded-xl border border-border p-3">
+              <p className="text-xs text-muted-foreground">Services</p>
+              <p className="font-medium">{selectedProvider.services_label || '-'}</p>
+            </div>
+            <div className="rounded-xl border border-border p-3">
+              <p className="text-xs text-muted-foreground">Provider Record ID</p>
+              <p className="break-all font-mono text-xs">{selectedProvider.provider_record_id || '-'}</p>
+            </div>
+            <div className="rounded-xl border border-border p-3">
+              <p className="text-xs text-muted-foreground">Profile ID</p>
+              <p className="break-all font-mono text-xs">{selectedProvider.profile_id || selectedProvider.id}</p>
+            </div>
+          </div>
+        )}
+      </Modal>
     </motion.div>
   )
 }
@@ -691,7 +751,7 @@ export function AdminReportsPage() {
         ]} />
         <Card className="space-y-2">
           <h3 className="font-semibold">Top Insights</h3>
-          <p className="text-sm text-muted-foreground">Cleaning category grew 22% MoM.</p>
+          <p className="text-sm text-muted-foreground">Cleaning services grew 22% MoM.</p>
           <p className="text-sm text-muted-foreground">Provider acceptance SLA improved by 17%.</p>
           <p className="text-sm text-muted-foreground">Customer repeat bookings crossed 63%.</p>
         </Card>
@@ -720,7 +780,7 @@ const sectionConfig = {
     action: 'Request Changes',
     columns: [
       { key: 'business_name', label: 'Provider' },
-      { key: 'category', label: 'Category', render: (row) => row.category || '-' },
+      { key: 'services', label: 'Services', render: (row) => row.services_label || '-' },
       { key: 'location', label: 'Location', render: (row) => row.location || '-' },
       { key: 'status', label: 'Status', render: (row) => <Badge variant={row.verified ? 'success' : 'warning'}>{row.status || (row.verified ? 'approved' : 'pending')}</Badge> },
       { key: 'rating', label: 'Rating', render: (row) => Number(row.rating || 0).toFixed(1) },

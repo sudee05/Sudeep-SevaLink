@@ -122,6 +122,35 @@ export async function updateServiceRequestStatus(id, status) {
   if (error) throw error
 }
 
+async function getProviderServiceMap(providerIds) {
+  if (!providerIds.length) return {}
+
+  const { data, error } = await supabase
+    .from('provider_services')
+    .select('provider_id, services(name)')
+    .in('provider_id', providerIds)
+  if (error) throw error
+
+  return (data || []).reduce((map, row) => {
+    const serviceName = row.services?.name
+    if (!serviceName) return map
+    if (!map[row.provider_id]) map[row.provider_id] = []
+    map[row.provider_id].push(serviceName)
+    return map
+  }, {})
+}
+
+async function attachProviderServices(providers) {
+  const providerIds = providers.map((provider) => provider.id).filter(Boolean)
+  const serviceMap = await getProviderServiceMap(providerIds)
+
+  return providers.map((provider) => ({
+    ...provider,
+    service_names: serviceMap[provider.id] || [],
+    services_label: (serviceMap[provider.id] || []).join(', ') || '-',
+  }))
+}
+
 // (legacy stubs kept so other pages don't break)
 export async function getServiceById(id) {
   const { data, error } = await supabase
@@ -141,26 +170,33 @@ export async function getProviders() {
   const { data, error } = await supabase
     .from('providers')
     .select('*')
-    .eq('verified', true)
+    .or('verified.eq.true,status.eq.approved')
     .order('rating', { ascending: false })
   if (error) throw error
-  return data
+  return attachProviderServices(data || [])
 }
 
 export async function getProvidersByService(serviceId) {
   if (!serviceId) return []
 
-  const { data, error } = await supabase
+  const { data: providerServices, error: providerServicesError } = await supabase
     .from('provider_services')
-    .select('providers(*)')
+    .select('provider_id')
     .eq('service_id', serviceId)
+  if (providerServicesError) throw providerServicesError
+
+  const providerIds = (providerServices || []).map((row) => row.provider_id).filter(Boolean)
+  if (!providerIds.length) return []
+
+  const { data, error } = await supabase
+    .from('providers')
+    .select('*')
+    .in('id', providerIds)
+    .or('verified.eq.true,status.eq.approved')
+    .order('rating', { ascending: false })
   if (error) throw error
 
-  return (data || [])
-    .map((row) => row.providers)
-    .filter(Boolean)
-    .filter((provider) => provider.verified)
-    .sort((a, b) => Number(b.rating || 0) - Number(a.rating || 0))
+  return attachProviderServices(data || [])
 }
 
 export async function getProviderById(id) {
@@ -170,7 +206,8 @@ export async function getProviderById(id) {
     .eq('id', id)
     .single()
   if (error) throw error
-  return data
+  const [provider] = await attachProviderServices([data])
+  return provider
 }
 
 export async function getAllProviders() {
@@ -178,12 +215,12 @@ export async function getAllProviders() {
   // even if they haven't completed their business profile yet.
   const { data, error } = await supabase
     .from('profiles')
-    .select('*, providers(id, business_name, category, location, rating, verified, status)')
+    .select('*, providers(id, business_name, location, rating, verified, status)')
     .eq('role', 'provider')
     .order('created_at', { ascending: false })
   if (error) throw error
 
-  return (data || []).map((p) => {
+  const rows = (data || []).map((p) => {
     // providers can be an array (one-to-many) or null
     const biz = Array.isArray(p.providers) ? p.providers[0] : p.providers
     return {
@@ -202,6 +239,15 @@ export async function getAllProviders() {
       approval_status: p.approval_status || 'pending',
     }
   })
+
+  const providerIds = rows.map((row) => row.provider_record_id).filter(Boolean)
+  const serviceMap = await getProviderServiceMap(providerIds)
+
+  return rows.map((row) => ({
+    ...row,
+    service_names: serviceMap[row.provider_record_id] || [],
+    services_label: (serviceMap[row.provider_record_id] || []).join(', ') || '-',
+  }))
 }
 
 export async function updateProviderApproval(profileId, providerRecordId, status) {
