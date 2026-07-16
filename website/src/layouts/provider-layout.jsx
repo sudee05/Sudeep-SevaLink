@@ -10,6 +10,8 @@ import { motion } from 'framer-motion'
 import { ShieldCheck, Clock, XCircle, Briefcase, MapPin, FileText, ChevronRight } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import { Select } from '@/components/ui/select'
+import { LocationSelector } from '@/components/common/location-selector'
 
 // ── Step indicator ────────────────────────────────────────────
 
@@ -25,10 +27,18 @@ function StepDot({ n, active, done }) {
 
 // ── Business Profile Setup Form ───────────────────────────────
 
-function BusinessProfileSetup({ userId, profileName, onComplete }) {
+function BusinessProfileSetup({ userId, profileName, profilePhone, onComplete }) {
   const [step, setStep] = useState(1)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
+  const [services, setServices] = useState([])
+  const [servicesLoading, setServicesLoading] = useState(true)
+  const [selectedServiceId, setSelectedServiceId] = useState('')
+  const [showRequestForm, setShowRequestForm] = useState(false)
+  const [requestName, setRequestName] = useState('')
+  const [requestDescription, setRequestDescription] = useState('')
+  const [requestLoading, setRequestLoading] = useState(false)
+  const [requestDone, setRequestDone] = useState(false)
   const [form, setForm] = useState({
     business_name: '',
     location: '',
@@ -38,6 +48,50 @@ function BusinessProfileSetup({ userId, profileName, onComplete }) {
 
   const set = (k, v) => setForm((f) => ({ ...f, [k]: v }))
 
+  useEffect(() => {
+    supabase
+      .from('services')
+      .select('id, name, description')
+      .order('name')
+      .then(({ data }) => setServices(data || []))
+      .finally(() => setServicesLoading(false))
+  }, [])
+
+  async function handleServiceRequest(e) {
+    e.preventDefault()
+    if (!requestName.trim()) {
+      setError('Service name is required')
+      return
+    }
+
+    setRequestLoading(true)
+    setError('')
+    try {
+      const { error: requestError } = await supabase
+        .from('service_requests')
+        .insert({
+          user_id: userId,
+          provider_id: null,
+          phone: profilePhone || '',
+          service_name: requestName.trim(),
+          description: requestDescription.trim(),
+          status: 'pending',
+        })
+
+      if (requestError) {
+        setError(requestError.message)
+        return
+      }
+
+      setRequestDone(true)
+      setRequestName('')
+      setRequestDescription('')
+      setShowRequestForm(false)
+    } finally {
+      setRequestLoading(false)
+    }
+  }
+
   async function handleSubmit(e) {
     e.preventDefault()
     if (!form.business_name.trim()) { setError('Business name is required'); return }
@@ -46,7 +100,7 @@ function BusinessProfileSetup({ userId, profileName, onComplete }) {
     setLoading(true)
     setError('')
     try {
-      const { error: insertError } = await supabase
+      const { data: provider, error: insertError } = await supabase
         .from('providers')
         .insert({
           user_id: userId,
@@ -57,10 +111,22 @@ function BusinessProfileSetup({ userId, profileName, onComplete }) {
           verified: false,
           status: 'pending',
         })
+        .select('id')
+        .single()
 
       if (insertError) {
         setError(insertError.message)
       } else {
+        if (provider?.id && selectedServiceId) {
+          const { error: serviceError } = await supabase
+            .from('provider_services')
+            .insert({ provider_id: provider.id, service_id: selectedServiceId })
+
+          if (serviceError) {
+            setError(serviceError.message)
+            return
+          }
+        }
         onComplete()
       }
     } catch (e) {
@@ -127,12 +193,7 @@ function BusinessProfileSetup({ userId, profileName, onComplete }) {
                     <MapPin className="mr-1.5 inline h-4 w-4 text-primary" />
                     Service Area / Location <span className="text-red-500">*</span>
                   </label>
-                  <Input
-                    required
-                    placeholder="e.g. Bangalore, Karnataka"
-                    value={form.location}
-                    onChange={(e) => set('location', e.target.value)}
-                  />
+                  <LocationSelector required value={form.location} onChange={(location) => set('location', location)} />
                 </div>
                 {error && <p className="text-xs text-red-500">{error}</p>}
                 <Button
@@ -161,6 +222,64 @@ function BusinessProfileSetup({ userId, profileName, onComplete }) {
                 <p className="mb-4 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Step 2 of 3 — About Your Business</p>
                 <div>
                   <label className="mb-1 block text-sm font-medium">
+                    <Briefcase className="mr-1.5 inline h-4 w-4 text-primary" />
+                    Primary Service
+                  </label>
+                  <Select
+                    value={selectedServiceId}
+                    onChange={(e) => {
+                      setSelectedServiceId(e.target.value)
+                      setError('')
+                    }}
+                    disabled={servicesLoading}
+                    placeholder={servicesLoading ? 'Loading services...' : 'Select a service'}
+                    options={services.map((service) => ({
+                      label: service.name,
+                      value: service.id,
+                    }))}
+                  />
+                  <div className="mt-2 flex flex-wrap items-center gap-2">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => {
+                        setShowRequestForm((open) => !open)
+                        setRequestDone(false)
+                      }}
+                    >
+                      Request missing service
+                    </Button>
+                    {requestDone && (
+                      <span className="text-xs font-medium text-green-600">Request submitted for admin review.</span>
+                    )}
+                  </div>
+                </div>
+
+                {showRequestForm && (
+                  <div className="space-y-3 rounded-xl border border-border bg-muted/30 p-3">
+                    <p className="text-xs text-muted-foreground">
+                      Your user ID and phone number are attached automatically.
+                    </p>
+                    <Input
+                      placeholder="Service name"
+                      value={requestName}
+                      onChange={(e) => setRequestName(e.target.value)}
+                    />
+                    <textarea
+                      className="h-20 w-full resize-none rounded-xl border border-border bg-background px-4 py-3 text-sm outline-none transition focus:border-primary focus:ring-2 focus:ring-primary/20"
+                      placeholder="Short description"
+                      value={requestDescription}
+                      onChange={(e) => setRequestDescription(e.target.value)}
+                    />
+                    <Button type="button" size="sm" disabled={requestLoading || !requestName.trim()} onClick={handleServiceRequest}>
+                      {requestLoading ? 'Submitting...' : 'Submit Request'}
+                    </Button>
+                  </div>
+                )}
+
+                <div>
+                  <label className="mb-1 block text-sm font-medium">
                     <FileText className="mr-1.5 inline h-4 w-4 text-primary" />
                     About / Description
                   </label>
@@ -181,10 +300,22 @@ function BusinessProfileSetup({ userId, profileName, onComplete }) {
                 </div>
                 <div className="flex gap-2">
                   <Button type="button" variant="outline" className="flex-1" onClick={() => setStep(1)}>Back</Button>
-                  <Button type="button" className="flex-1" onClick={() => setStep(3)}>
+                  <Button
+                    type="button"
+                    className="flex-1"
+                    onClick={() => {
+                      if (!selectedServiceId && !requestDone) {
+                        setError('Select a service or submit a request for a missing one')
+                        return
+                      }
+                      setError('')
+                      setStep(3)
+                    }}
+                  >
                     Next <ChevronRight className="ml-1 h-4 w-4" />
                   </Button>
                 </div>
+                {error && <p className="text-xs text-red-500">{error}</p>}
               </motion.div>
             )}
 
@@ -199,8 +330,8 @@ function BusinessProfileSetup({ userId, profileName, onComplete }) {
                 <p className="mb-4 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Step 3 of 3 — Review & Submit</p>
                 <div className="space-y-2 rounded-xl border border-border bg-muted/40 p-4 text-sm">
                   <div className="flex justify-between"><span className="text-muted-foreground">Business</span><span className="font-semibold">{form.business_name}</span></div>
-                  <div className="flex justify-between"><span className="text-muted-foreground">Category</span><span className="font-semibold">{form.category}</span></div>
                   <div className="flex justify-between"><span className="text-muted-foreground">Location</span><span className="font-semibold">{form.location}</span></div>
+                  <div className="flex justify-between"><span className="text-muted-foreground">Service</span><span className="font-semibold">{services.find((service) => service.id === selectedServiceId)?.name || (requestDone ? 'Requested new service' : '-')}</span></div>
                   {form.experience && <div className="flex justify-between"><span className="text-muted-foreground">Experience</span><span className="font-semibold">{form.experience}</span></div>}
                 </div>
                 <div className="rounded-xl border border-primary/20 bg-primary/5 p-3">
@@ -321,6 +452,7 @@ export function ProviderLayout() {
       <BusinessProfileSetup
         userId={user?.id}
         profileName={profile?.full_name}
+        profilePhone={profile?.phone}
         onComplete={() => setProviderRecord({ id: 'pending', status: 'pending' })}
       />
     )

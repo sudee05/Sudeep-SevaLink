@@ -280,7 +280,6 @@ export function ProviderRegisterPage() {
     fullName: z.string().min(2, 'Full name is required'),
     email: z.string().email('Valid email is required'),
     phone: z.string().min(10, 'Valid phone is required'),
-    serviceType: z.string().min(1, 'Please select a service type'),
     password: z.string().min(6, 'Password must be at least 6 chars'),
   }), [])
   const form = useForm({
@@ -289,7 +288,6 @@ export function ProviderRegisterPage() {
       fullName: '',
       email: '',
       phone: '',
-      serviceType: '',
       password: '',
     },
   })
@@ -314,7 +312,7 @@ export function ProviderRegisterPage() {
   return (
     <AuthShell
       title="Service Provider Sign Up"
-      subtitle="Add basic details and choose your service type"
+      subtitle="Create your account — you'll choose your services after login"
       footer={<>Already have an account? <Link to="/login" className="font-semibold text-primary">Sign in</Link></>}
     >
       <motion.form
@@ -329,17 +327,6 @@ export function ProviderRegisterPage() {
         {form.formState.errors.email && <p className="text-xs text-red-500">{form.formState.errors.email.message}</p>}
         <Input placeholder="Phone Number" {...form.register('phone')} />
         {form.formState.errors.phone && <p className="text-xs text-red-500">{form.formState.errors.phone.message}</p>}
-        <Select
-          options={[
-            { label: 'Home Cleaning', value: 'home_cleaning' },
-            { label: 'Salon & Beauty', value: 'salon_beauty' },
-            { label: 'Repair & Maintenance', value: 'repair_maintenance' },
-            { label: 'Driver Services', value: 'driver_services' },
-          ]}
-          placeholder="Type of Service"
-          {...form.register('serviceType')}
-        />
-        {form.formState.errors.serviceType && <p className="text-xs text-red-500">{form.formState.errors.serviceType.message}</p>}
         <Input type="password" placeholder="Password" {...form.register('password')} />
         {form.formState.errors.password && <p className="text-xs text-red-500">{form.formState.errors.password.message}</p>}
         <Button className="w-full" type="submit" disabled={loading}>

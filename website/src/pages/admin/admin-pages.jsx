@@ -355,7 +355,7 @@ export function AdminServicesPage() {
     try {
       const { data } = await supabase
         .from('service_requests')
-        .select('*, providers(business_name)')
+        .select('*, profiles(full_name), providers(business_name)')
         .order('created_at', { ascending: false })
       setRequests(data || [])
     } finally {
@@ -397,7 +397,10 @@ export function AdminServicesPage() {
     try {
       if (action === 'approve') {
         // Add to master catalog
-        await supabase.from('services').insert({ name: req.name, description: req.description || '' })
+        await supabase.from('services').insert({
+          name: req.service_name || req.name,
+          description: req.description || '',
+        })
       }
       // Update request status
       await supabase.from('service_requests').update({ status: action === 'approve' ? 'approved' : 'denied' }).eq('id', req.id)
@@ -491,9 +494,10 @@ export function AdminServicesPage() {
         requests.length ? (
           <DataTable
             columns={[
-              { key: 'name', label: 'Requested Service', render: (r) => <span className="font-medium">{r.name}</span> },
+              { key: 'service_name', label: 'Requested Service', render: (r) => <span className="font-medium">{r.service_name || r.name}</span> },
               { key: 'description', label: 'Description', render: (r) => r.description || '-' },
-              { key: 'provider', label: 'Requested By', render: (r) => r.providers?.business_name || '-' },
+              { key: 'provider', label: 'Requested By', render: (r) => r.providers?.business_name || r.profiles?.full_name || '-' },
+              { key: 'phone', label: 'Phone', render: (r) => r.phone || '-' },
               { key: 'created_at', label: 'Date', render: (r) => formatDate(r.created_at) },
               {
                 key: 'status', label: 'Status',

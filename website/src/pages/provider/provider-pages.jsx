@@ -14,7 +14,6 @@ import { Textarea } from '@/components/ui/textarea'
 import { supabase } from '@/lib/supabase'
 import { formatCurrency, formatDate } from '@/utils/format'
 
-
 const mockTrend = [
   { month: 'Jan', revenue: 320000, bookings: 140 },
   { month: 'Feb', revenue: 360000, bookings: 158 },
@@ -29,6 +28,8 @@ const fade = {
   animate: { opacity: 1, y: 0 },
   transition: { duration: 0.3 },
 }
+
+// ── Dashboard ─────────────────────────────────────────────────
 
 export function ProviderDashboardPage() {
   const bookings = useBookingsQuery()
@@ -74,6 +75,8 @@ export function ProviderDashboardPage() {
   )
 }
 
+// ── Bookings ──────────────────────────────────────────────────
+
 export function ProviderBookingsPage() {
   const { data = [] } = useBookingsQuery()
 
@@ -104,12 +107,16 @@ export function ProviderBookingsPage() {
   )
 }
 
+// ── Services ──────────────────────────────────────────────────
+
 export function ProviderServicesPage() {
   const [catalog, setCatalog] = useState([])       // master list from services table
   const [enrolled, setEnrolled] = useState([])     // service IDs this provider has selected
   const [saving, setSaving] = useState(false)
   const [saved, setSaved] = useState(false)
   const [providerRecord, setProviderRecord] = useState(null)
+  const [userProfile, setUserProfile] = useState(null) // holds { id, phone } from profiles table
+
   // Request form
   const [reqName, setReqName] = useState('')
   const [reqDesc, setReqDesc] = useState('')
@@ -118,29 +125,39 @@ export function ProviderServicesPage() {
   const [tab, setTab] = useState('select') // 'select' | 'request'
 
   useEffect(() => {
-    // Load master catalog
+    // Load master service catalog
     supabase
       .from('services')
       .select('id, name, description')
       .order('name')
       .then(({ data }) => setCatalog(data || []))
 
-    // Get current provider record to know their ID
+    // Get current auth user → fetch their profile (phone) + provider record
     supabase.auth.getUser().then(({ data: { user } }) => {
       if (!user) return
+
+      // Fetch profile for user_id + phone (used in service_requests)
+      supabase
+        .from('profiles')
+        .select('id, full_name, phone')
+        .eq('id', user.id)
+        .maybeSingle()
+        .then(({ data: profile }) => setUserProfile(profile))
+
+      // Fetch provider record for provider_id
       supabase
         .from('providers')
         .select('id')
         .eq('user_id', user.id)
         .maybeSingle()
-        .then(({ data }) => {
-          if (!data) return
-          setProviderRecord(data)
-          // Load enrolled services
+        .then(({ data: provider }) => {
+          if (!provider) return
+          setProviderRecord(provider)
+          // Load already-enrolled services
           supabase
             .from('provider_services')
             .select('service_id')
-            .eq('provider_id', data.id)
+            .eq('provider_id', provider.id)
             .then(({ data: ps }) => setEnrolled((ps || []).map((r) => r.service_id)))
         })
     })
@@ -171,12 +188,14 @@ export function ProviderServicesPage() {
 
   async function handleRequest(e) {
     e.preventDefault()
-    if (!reqName.trim() || !providerRecord) return
+    if (!reqName.trim() || !providerRecord || !userProfile?.id) return
     setReqLoading(true)
     try {
       await supabase.from('service_requests').insert({
         provider_id: providerRecord.id,
-        name: reqName.trim(),
+        user_id: userProfile.id,                // auto from logged-in user
+        phone: userProfile?.phone || '',         // auto from profiles table
+        service_name: reqName.trim(),
         description: reqDesc.trim(),
         status: 'pending',
       })
@@ -195,7 +214,7 @@ export function ProviderServicesPage() {
         subtitle="Select the services you offer from the catalog, or request a new one."
       />
 
-      {/* Tabs */}
+      {/* Tab switcher */}
       <div className="flex gap-1 rounded-xl border border-border bg-muted/30 p-1 w-fit">
         {[
           { key: 'select', label: 'Select Services' },
@@ -213,6 +232,7 @@ export function ProviderServicesPage() {
         ))}
       </div>
 
+      {/* ── Select Services tab ── */}
       {tab === 'select' && (
         <Card>
           {catalog.length === 0 ? (
@@ -261,12 +281,24 @@ export function ProviderServicesPage() {
         </Card>
       )}
 
+      {/* ── Request New Service tab ── */}
       {tab === 'request' && (
         <Card>
           <h3 className="mb-1 font-semibold">Request a New Service Type</h3>
           <p className="mb-4 text-sm text-muted-foreground">
             Don't see your service in the catalog? Request it and our admin team will review it.
+            Your contact details are attached automatically.
           </p>
+
+          {/* Auto-filled info banner */}
+          {userProfile && (
+            <div className="mb-4 rounded-xl border border-border bg-muted/40 px-4 py-3 text-xs text-muted-foreground">
+              <span className="font-medium text-foreground">Submitting as: </span>
+              {userProfile.full_name}
+              {userProfile.phone && <> &nbsp;·&nbsp; {userProfile.phone}</>}
+            </div>
+          )}
+
           {reqDone ? (
             <motion.div
               initial={{ opacity: 0, y: 8 }}
@@ -281,7 +313,9 @@ export function ProviderServicesPage() {
           ) : (
             <form onSubmit={handleRequest} className="space-y-3">
               <div>
-                <label className="mb-1 block text-sm font-medium">Service Name <span className="text-red-500">*</span></label>
+                <label className="mb-1 block text-sm font-medium">
+                  Service Name <span className="text-red-500">*</span>
+                </label>
                 <Input
                   required
                   placeholder="e.g. Solar Panel Installation"
@@ -298,7 +332,7 @@ export function ProviderServicesPage() {
                   onChange={(e) => setReqDesc(e.target.value)}
                 />
               </div>
-              <Button type="submit" disabled={reqLoading || !reqName.trim()}>
+              <Button type="submit" disabled={reqLoading || !reqName.trim() || !userProfile?.id}>
                 {reqLoading ? 'Submitting…' : 'Submit Request'}
               </Button>
             </form>
@@ -309,6 +343,7 @@ export function ProviderServicesPage() {
   )
 }
 
+// ── Vehicles ──────────────────────────────────────────────────
 
 export function ProviderVehiclesPage() {
   const vehicles = [
@@ -332,6 +367,8 @@ export function ProviderVehiclesPage() {
     </motion.div>
   )
 }
+
+// ── Stub pages ────────────────────────────────────────────────
 
 export function ProviderPackagesPage() {
   return <ModuleCard title="Packages" subtitle="Bundle services for higher average order value." />

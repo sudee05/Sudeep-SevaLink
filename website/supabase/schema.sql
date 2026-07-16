@@ -141,7 +141,70 @@ create policy "Admins can delete services"
   );
 
 -- =============================================
--- 5. BOOKINGS
+-- 5. PROVIDER SERVICES
+-- =============================================
+create table public.provider_services (
+  id uuid default uuid_generate_v4() primary key,
+  provider_id uuid not null references public.providers(id) on delete cascade,
+  service_id uuid not null references public.services(id) on delete cascade,
+  created_at timestamptz default now(),
+  unique (provider_id, service_id)
+);
+
+alter table public.provider_services enable row level security;
+
+create policy "Provider services are viewable by owners and admins"
+  on public.provider_services for select using (
+    exists (select 1 from public.providers where id = provider_id and user_id = auth.uid())
+    or exists (select 1 from public.profiles where id = auth.uid() and role = 'admin')
+  );
+
+create policy "Providers can insert own services"
+  on public.provider_services for insert with check (
+    exists (select 1 from public.providers where id = provider_id and user_id = auth.uid())
+    or exists (select 1 from public.profiles where id = auth.uid() and role = 'admin')
+  );
+
+create policy "Providers can delete own services"
+  on public.provider_services for delete using (
+    exists (select 1 from public.providers where id = provider_id and user_id = auth.uid())
+    or exists (select 1 from public.profiles where id = auth.uid() and role = 'admin')
+  );
+
+-- =============================================
+-- 6. SERVICE REQUESTS
+-- =============================================
+create table public.service_requests (
+  id uuid default uuid_generate_v4() primary key,
+  provider_id uuid references public.providers(id) on delete set null,
+  user_id uuid not null references public.profiles(id) on delete cascade,
+  phone text default '',
+  service_name text not null,
+  description text default '',
+  status text not null default 'pending' check (status in ('pending', 'approved', 'denied')),
+  created_at timestamptz default now(),
+  updated_at timestamptz default now()
+);
+
+alter table public.service_requests enable row level security;
+
+create policy "Users and admins can view service requests"
+  on public.service_requests for select using (
+    auth.uid() = user_id
+    or exists (select 1 from public.providers where id = provider_id and user_id = auth.uid())
+    or exists (select 1 from public.profiles where id = auth.uid() and role = 'admin')
+  );
+
+create policy "Users can create service requests"
+  on public.service_requests for insert with check (auth.uid() = user_id);
+
+create policy "Admins can update service requests"
+  on public.service_requests for update using (
+    exists (select 1 from public.profiles where id = auth.uid() and role = 'admin')
+  );
+
+-- =============================================
+-- 7. BOOKINGS
 -- =============================================
 create table public.bookings (
   id uuid default uuid_generate_v4() primary key,
@@ -184,7 +247,7 @@ create policy "Authorized users can update bookings"
   );
 
 -- =============================================
--- 6. REVIEWS
+-- 8. REVIEWS
 -- =============================================
 create table public.reviews (
   id uuid default uuid_generate_v4() primary key,
@@ -210,7 +273,7 @@ create policy "Customers can update own reviews"
   on public.reviews for update using (auth.uid() = customer_id);
 
 -- =============================================
--- 7. DOCUMENTS (provider verification)
+-- 9. DOCUMENTS (provider verification)
 -- =============================================
 create table public.documents (
   id uuid default uuid_generate_v4() primary key,
@@ -237,7 +300,7 @@ create policy "Providers can insert own documents"
   );
 
 -- =============================================
--- 8. NOTIFICATIONS
+-- 10. NOTIFICATIONS
 -- =============================================
 create table public.notifications (
   id uuid default uuid_generate_v4() primary key,
@@ -266,7 +329,7 @@ create policy "Users can update own notifications"
   on public.notifications for update using (auth.uid() = user_id);
 
 -- =============================================
--- 9. AUTO-CREATE PROFILE TRIGGER
+-- 11. AUTO-CREATE PROFILE TRIGGER
 -- =============================================
 create or replace function public.handle_new_user()
 returns trigger as $$
@@ -286,7 +349,7 @@ create trigger on_auth_user_created
   for each row execute function public.handle_new_user();
 
 -- =============================================
--- 10. UPDATED_AT TRIGGER
+-- 12. UPDATED_AT TRIGGER
 -- =============================================
 create or replace function public.update_updated_at()
 returns trigger as $$
@@ -302,6 +365,8 @@ create trigger profiles_updated_at before update on public.profiles
 create trigger providers_updated_at before update on public.providers
   for each row execute function public.update_updated_at();
 
+create trigger service_requests_updated_at before update on public.service_requests
+  for each row execute function public.update_updated_at();
 
 create trigger bookings_updated_at before update on public.bookings
   for each row execute function public.update_updated_at();

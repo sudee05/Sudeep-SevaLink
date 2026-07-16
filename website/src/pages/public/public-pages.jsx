@@ -1,4 +1,5 @@
 import { motion } from 'framer-motion'
+import { useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { Search, SlidersHorizontal } from 'lucide-react'
 import { useCategoriesQuery, useProviderQuery, useProvidersQuery, useServiceQuery, useServicesQuery } from '@/hooks/use-queries'
@@ -9,6 +10,7 @@ import { Input } from '@/components/ui/input'
 import { Select } from '@/components/ui/select'
 import { ServiceCard } from '@/components/common/service-card'
 import { ProviderCard } from '@/components/common/provider-card'
+import { LocationSelector } from '@/components/common/location-selector'
 import { SectionHeader } from '@/components/common/section-header'
 import { LoadingGrid } from '@/components/ui/loading-grid'
 import { EmptyState } from '@/components/ui/empty-state'
@@ -25,6 +27,7 @@ export function LandingPage() {
   const categories = useCategoriesQuery()
   const services = useServicesQuery()
   const providers = useProvidersQuery()
+  const [location, setLocation] = useState('')
 
   return (
     <motion.div className="space-y-16" {...fade}>
@@ -33,9 +36,9 @@ export function LandingPage() {
           <Badge>Trusted by 1.9M households</Badge>
           <h1 className="text-4xl font-extrabold tracking-tight lg:text-5xl">Book premium home services in minutes.</h1>
           <p className="text-muted-foreground">SevaLink connects customers with verified experts for cleaning, repairs, beauty, and business support.</p>
-          <div className="grid gap-3 sm:grid-cols-[1fr_180px_140px]">
+          <div className="grid gap-3 sm:grid-cols-[1fr_2fr_140px]">
             <Input placeholder="Search services, providers..." />
-            <Select options={[{ label: 'Bengaluru', value: 'blr' }, { label: 'Mumbai', value: 'mum' }]} placeholder="Location" />
+            <LocationSelector value={location} onChange={setLocation} />
             <Button>
               <Search className="h-4 w-4" /> Search
             </Button>
@@ -165,14 +168,18 @@ export function CategoriesPage() {
 
 export function ServicesPage() {
   const { data, isLoading } = useServicesQuery()
+  const [location, setLocation] = useState('')
 
   return (
     <motion.div {...fade}>
       <SectionHeader title="Services" subtitle="Browse service types available on SevaLink." />
-      <div className="mb-5 grid gap-3 lg:grid-cols-4">
-        <Input className="lg:col-span-2" placeholder="Search services" />
+      <div className="mb-5 grid gap-3 lg:grid-cols-[1fr_2fr_160px]">
+        <Input placeholder="Search services" />
+        <LocationSelector className="lg:col-span-2" value={location} onChange={setLocation} />
+        <Button variant="outline">Filter</Button>
+      </div>
+      <div className="mb-5 grid gap-3 md:grid-cols-2">
         <Select placeholder="Category" options={[{ label: 'All', value: 'all' }]} />
-        <Select placeholder="Location" options={[{ label: 'All', value: 'all' }]} />
       </div>
       {isLoading ? <LoadingGrid /> : (
         <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
@@ -185,19 +192,29 @@ export function ServicesPage() {
 
 export function ProvidersPage() {
   const { data, isLoading } = useProvidersQuery()
+  const [location, setLocation] = useState('')
+  const [search, setSearch] = useState('')
+  const filteredProviders = (data || []).filter((provider) => {
+    const q = search.toLowerCase()
+    const matchesSearch =
+      !q ||
+      (provider.business_name || provider.name || '').toLowerCase().includes(q) ||
+      (provider.category || '').toLowerCase().includes(q)
+    const matchesLocation = !location || (provider.location || '').toLowerCase().includes(location.toLowerCase())
+    return matchesSearch && matchesLocation
+  })
 
   return (
     <motion.div {...fade}>
       <SectionHeader title="Service Providers" subtitle="Browse provider profiles, ratings, certificates and recent work." />
-      <div className="mb-5 grid gap-3 md:grid-cols-4">
-        <Input placeholder="Search providers" />
-        <Select placeholder="Speciality" options={[{ label: 'All', value: 'all' }]} />
-        <Select placeholder="Experience" options={[{ label: '3+ years', value: '3' }]} />
-        <Select placeholder="Sort" options={[{ label: 'Top rated', value: 'rating' }]} />
+      <div className="mb-5 grid gap-3 lg:grid-cols-[1fr_2fr_160px]">
+        <Input placeholder="Search providers" value={search} onChange={(event) => setSearch(event.target.value)} />
+        <LocationSelector value={location} onChange={setLocation} />
+        <Button variant="outline" onClick={() => { setSearch(''); setLocation('') }}>Reset</Button>
       </div>
       {isLoading ? <LoadingGrid /> : (
         <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
-          {data?.map((provider) => <ProviderCard key={provider.id} provider={provider} />)}
+          {filteredProviders.map((provider) => <ProviderCard key={provider.id} provider={provider} />)}
         </div>
       )}
     </motion.div>
@@ -266,6 +283,7 @@ export function ProviderDetailsPage() {
 
 export function SearchPage() {
   const { data, isLoading } = useServicesQuery()
+  const [location, setLocation] = useState('')
 
   if (isLoading) return <LoadingGrid />
 
@@ -275,7 +293,7 @@ export function SearchPage() {
       <Card className="grid gap-3 lg:grid-cols-6">
         <Input className="lg:col-span-2" placeholder="What service are you looking for?" />
         <Select placeholder="Category" options={[{ label: 'All', value: 'all' }]} />
-        <Select placeholder="Location" options={[{ label: 'All', value: 'all' }]} />
+        <LocationSelector value={location} onChange={setLocation} />
         <Select placeholder="Price" options={[{ label: 'Under ₹1500', value: '1500' }]} />
         <Select placeholder="Sort" options={[{ label: 'Recommended', value: 'rec' }]} />
       </Card>

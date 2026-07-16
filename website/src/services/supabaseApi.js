@@ -91,17 +91,24 @@ export async function setProviderServices(providerId, serviceIds) {
 
 // ── Service Requests (provider requests new service type) ──────
 
-export async function submitServiceRequest(providerId, { name, description }) {
+export async function submitServiceRequest(providerId, { userId, phone, serviceName, name, description }) {
   const { error } = await supabase
     .from('service_requests')
-    .insert({ provider_id: providerId, name, description, status: 'pending' })
+    .insert({
+      provider_id: providerId || null,
+      user_id: userId || null,
+      phone: phone || '',
+      service_name: serviceName || name,
+      description,
+      status: 'pending',
+    })
   if (error) throw error
 }
 
 export async function getServiceRequests() {
   const { data, error } = await supabase
     .from('service_requests')
-    .select('*, providers(business_name)')
+    .select('*, profiles(full_name), providers(business_name)')
     .order('created_at', { ascending: false })
   if (error) throw error
   return data || []
