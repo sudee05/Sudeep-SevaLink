@@ -522,41 +522,6 @@ export function CustomerBookingDetailsPage() {
   )
 }
 
-export function CustomerInvoicesPage() {
-  const { data = [] } = useBookingsQuery()
-
-  return (
-    <motion.div {...fade}>
-      <SectionHeader title="Invoices" subtitle="All receipts and GST invoices in one place." />
-      <DataTable
-        columns={[
-          { key: 'booking_code', label: 'Invoice ID', render: (row) => row.booking_code || row.id },
-          { key: 'service', label: 'Service' },
-          { key: 'amount', label: 'Amount', render: (row) => formatCurrency(row.amount) },
-          { key: 'date', label: 'Issued On', render: (row) => formatDate(row.date) },
-          { key: 'download', label: 'Download', render: () => <Button size="sm" variant="outline"><Receipt className="h-3 w-3" /> PDF</Button> },
-        ]}
-        rows={data}
-      />
-    </motion.div>
-  )
-}
-
-export function CustomerWishlistPage() {
-  const { data = [] } = useServicesQuery()
-
-  return (
-    <motion.div className="space-y-5" {...fade}>
-      <SectionHeader title="Wishlist" subtitle="Saved services and providers." />
-      {data.length ? (
-        <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
-          {data.slice(0, 3).map((service) => <ServiceCard key={service.id} service={service} />)}
-        </div>
-      ) : <EmptyState title="Wishlist is empty" />}
-    </motion.div>
-  )
-}
-
 export function CustomerNotificationsPage() {
   const profile = useSelector(selectProfile)
   const queryClient = useQueryClient()
@@ -677,38 +642,6 @@ export function CustomerProfilePage() {
             <Button type="button" variant="outline" onClick={handleLogout}>Logout</Button>
           </div>
         </form>
-      </Card>
-    </motion.div>
-  )
-}
-
-export function CustomerSettingsPage() {
-  return (
-    <motion.div className="space-y-4" {...fade}>
-      <SectionHeader title="Settings" subtitle="Notification preferences, security and account management." />
-      <Card className="space-y-4">
-        <div className="flex items-center justify-between rounded-xl border border-border p-3"><p>Email Notifications</p><Button size="sm">Enabled</Button></div>
-        <div className="flex items-center justify-between rounded-xl border border-border p-3"><p>SMS Alerts</p><Button size="sm" variant="outline">Disabled</Button></div>
-        <div className="flex items-center justify-between rounded-xl border border-border p-3"><p>Two-Factor Authentication</p><Button size="sm">Enabled</Button></div>
-      </Card>
-    </motion.div>
-  )
-}
-
-export function BookingNewPage() {
-  return (
-    <motion.div className="space-y-5" {...fade}>
-      <SectionHeader title="Booking Form" subtitle="Choose date, time, address and requirements." />
-      <Card className="grid gap-3 md:grid-cols-2">
-        <Input type="date" />
-        <Input type="time" />
-        <Input placeholder="Service address" className="md:col-span-2" />
-        <Textarea className="md:col-span-2" placeholder="Special instructions" />
-        <Card className="md:col-span-2">
-          <p className="text-sm text-muted-foreground">Summary</p>
-          <p className="font-semibold">Select a service from the dashboard to create a live booking.</p>
-        </Card>
-        <Link to="/customer"><Button className="w-full md:col-span-2">Back to Services</Button></Link>
       </Card>
     </motion.div>
   )

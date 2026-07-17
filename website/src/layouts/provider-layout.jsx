@@ -468,7 +468,7 @@ export function ProviderLayout() {
     <div className="flex min-h-screen">
       <PortalSidebar title="Provider Studio" nav={providerNav} />
       <section className="flex min-h-screen flex-1 flex-col">
-        <PortalTopbar title="Service Provider Dashboard" />
+        <PortalTopbar title="Service Provider Dashboard" notificationPath="/provider/notifications" />
         <div className="page-enter flex-1 p-4 lg:p-6">
           <Outlet />
         </div>

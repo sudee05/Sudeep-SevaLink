@@ -26,31 +26,24 @@ import {
 } from '@/pages/auth/auth-pages'
 import {
   BookingFailedPage,
-  BookingNewPage,
   BookingPaymentPage,
   BookingSuccessPage,
   BookingTrackingPage,
   CustomerBookingDetailsPage,
   CustomerBookingsPage,
   CustomerDashboardPage,
-  CustomerInvoicesPage,
   CustomerNotificationsPage,
   CustomerProfilePage,
-  CustomerSettingsPage,
-  CustomerWishlistPage,
 } from '@/pages/customer/customer-pages'
 import {
   ProviderAnalyticsPage,
+  ProviderBookingDetailsPage,
   ProviderBookingsPage,
-  ProviderCalendarPage,
   ProviderDashboardPage,
-  ProviderPackagesPage,
-  ProviderPaymentsPage,
+  ProviderNotificationsPage,
   ProviderProfilePage,
   ProviderReviewsPage,
   ProviderServicesPage,
-  ProviderSettingsPage,
-  ProviderVehiclesPage,
 } from '@/pages/provider/provider-pages'
 import {
   AdminBookingsPage,
@@ -121,12 +114,8 @@ export function AppRouter() {
         <Route path="bookings" element={<CustomerBookingsPage />} />
         <Route path="bookings/:id" element={<CustomerBookingDetailsPage />} />
         <Route path="booking/:id" element={<CustomerBookingDetailsPage />} />
-        <Route path="wishlist" element={<CustomerWishlistPage />} />
         <Route path="notifications" element={<CustomerNotificationsPage />} />
-        <Route path="invoices" element={<CustomerInvoicesPage />} />
         <Route path="profile" element={<CustomerProfilePage />} />
-        <Route path="settings" element={<CustomerSettingsPage />} />
-        <Route path="booking/new" element={<BookingNewPage />} />
         <Route path="booking/payment" element={<BookingPaymentPage />} />
         <Route path="booking/success" element={<BookingSuccessPage />} />
         <Route path="booking/failed" element={<BookingFailedPage />} />
@@ -144,15 +133,12 @@ export function AppRouter() {
       >
         <Route index element={<ProviderDashboardPage />} />
         <Route path="bookings" element={<ProviderBookingsPage />} />
+        <Route path="bookings/:id" element={<ProviderBookingDetailsPage />} />
         <Route path="services" element={<ProviderServicesPage />} />
-        <Route path="vehicles" element={<ProviderVehiclesPage />} />
-        <Route path="packages" element={<ProviderPackagesPage />} />
-        <Route path="calendar" element={<ProviderCalendarPage />} />
         <Route path="analytics" element={<ProviderAnalyticsPage />} />
-        <Route path="payments" element={<ProviderPaymentsPage />} />
         <Route path="reviews" element={<ProviderReviewsPage />} />
+        <Route path="notifications" element={<ProviderNotificationsPage />} />
         <Route path="profile" element={<ProviderProfilePage />} />
-        <Route path="settings" element={<ProviderSettingsPage />} />
       </Route>
 
       {/* Admin Console — protected, requires "admin" role */}

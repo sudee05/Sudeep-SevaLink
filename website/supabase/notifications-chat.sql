@@ -315,8 +315,15 @@ insert into storage.buckets (id, name, public)
 values ('chat-attachments', 'chat-attachments', false)
 on conflict (id) do nothing;
 
+insert into storage.buckets (id, name, public)
+values ('provider-images', 'provider-images', true)
+on conflict (id) do nothing;
+
 drop policy if exists "Chat participants can upload attachments" on storage.objects;
 drop policy if exists "Chat participants can read attachments" on storage.objects;
+drop policy if exists "Providers can upload business images" on storage.objects;
+drop policy if exists "Providers can update business images" on storage.objects;
+drop policy if exists "Anyone can view provider business images" on storage.objects;
 
 create policy "Chat participants can upload attachments"
   on storage.objects for insert with check (
@@ -337,6 +344,21 @@ create policy "Chat participants can read attachments"
         and (c.customer_id = auth.uid() or c.provider_id = auth.uid())
     )
   );
+
+create policy "Providers can upload business images"
+  on storage.objects for insert with check (
+    bucket_id = 'provider-images'
+    and auth.uid()::text = (storage.foldername(name))[1]
+  );
+
+create policy "Providers can update business images"
+  on storage.objects for update using (
+    bucket_id = 'provider-images'
+    and auth.uid()::text = (storage.foldername(name))[1]
+  );
+
+create policy "Anyone can view provider business images"
+  on storage.objects for select using (bucket_id = 'provider-images');
 
 do $$
 begin

@@ -2,7 +2,7 @@ import { NavLink } from 'react-router-dom'
 
 export function PortalSidebar({ title, nav }) {
   return (
-    <aside className="hidden w-64 shrink-0 border-r border-border/70 bg-card/80 p-4 lg:block">
+    <aside className="sticky top-0 hidden h-screen w-64 shrink-0 overflow-y-auto border-r border-border/70 bg-card/80 p-4 lg:block">
       <h3 className="mb-4 px-2 text-sm font-semibold uppercase tracking-wide text-muted-foreground">{title}</h3>
       <nav className="space-y-1">
         {nav.map((item) => {

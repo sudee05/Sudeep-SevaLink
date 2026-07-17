@@ -2,6 +2,10 @@ import { useEffect } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 import { supabase } from '@/lib/supabase'
 
+function uniqueChannelName(prefix, id) {
+  return `${prefix}:${id}:${crypto.randomUUID()}`
+}
+
 export function useRealtimeNotifications(userId) {
   const queryClient = useQueryClient()
 
@@ -9,7 +13,7 @@ export function useRealtimeNotifications(userId) {
     if (!userId) return undefined
 
     const channel = supabase
-      .channel(`notifications:${userId}`)
+      .channel(uniqueChannelName('notifications', userId))
       .on(
         'postgres_changes',
         {
@@ -35,7 +39,7 @@ export function useRealtimeConversation(conversationId, userId) {
     if (!conversationId) return undefined
 
     const channel = supabase
-      .channel(`messages:${conversationId}`)
+      .channel(uniqueChannelName('messages', conversationId))
       .on(
         'postgres_changes',
         {
@@ -64,7 +68,7 @@ export function useRealtimeConversations(userId) {
     if (!userId) return undefined
 
     const channel = supabase
-      .channel(`conversations:${userId}`)
+      .channel(uniqueChannelName('conversations', userId))
       .on('postgres_changes', { event: '*', schema: 'public', table: 'conversations' }, () => {
         queryClient.invalidateQueries({ queryKey: ['conversations', userId] })
       })

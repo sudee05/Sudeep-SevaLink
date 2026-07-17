@@ -219,6 +219,61 @@ export async function getProviderById(id) {
   return provider
 }
 
+export async function getProviderByUserId(userId) {
+  const { data, error } = await supabase
+    .from('providers')
+    .select('*')
+    .eq('user_id', userId)
+    .maybeSingle()
+  if (error) throw error
+  return data
+}
+
+export async function upsertProviderProfile(userId, payload) {
+  const providerPayload = {
+    user_id: userId,
+    business_name: payload.business_name,
+    about: payload.about || '',
+    image_url: payload.image_url || '',
+    experience: payload.experience || '',
+    certificates: payload.certificates || [],
+    location: payload.location || '',
+  }
+
+  const existing = await getProviderByUserId(userId)
+  if (existing?.id) {
+    const { data, error } = await supabase
+      .from('providers')
+      .update(providerPayload)
+      .eq('id', existing.id)
+      .select()
+      .single()
+    if (error) throw error
+    return data
+  }
+
+  const { data, error } = await supabase
+    .from('providers')
+    .insert(providerPayload)
+    .select()
+    .single()
+  if (error) throw error
+  return data
+}
+
+export async function uploadProviderImage({ userId, file }) {
+  const extension = file.name.includes('.') ? file.name.split('.').pop() : 'jpg'
+  const path = `${userId}/profile-${Date.now()}.${extension}`
+  const { error } = await supabase.storage.from('provider-images').upload(path, file, {
+    cacheControl: '3600',
+    upsert: true,
+  })
+  if (error) throw error
+
+  const { data } = supabase.storage.from('provider-images').getPublicUrl(path)
+  return data.publicUrl
+}
+
 export async function getAllProviders() {
   // Query profiles with role='provider' — this shows ALL provider users
   // even if they haven't completed their business profile yet.
@@ -346,13 +401,25 @@ export async function getBookings() {
 }
 
 export async function getBookingById(id) {
-  const { data, error } = await supabase
-    .from('bookings')
-    .select('*')
-    .eq('id', id)
-    .single()
+  try {
+    const { data, error } = await supabase
+      .from('bookings')
+      .select(
+        `*,
+        customer:profiles!bookings_customer_id_fkey(full_name, phone, avatar_url),
+        provider:providers!bookings_provider_id_fkey(business_name, image_url, location),
+        service:services!bookings_service_id_fkey(name)`
+      )
+      .eq('id', id)
+      .single()
+    if (!error) return normalizeBooking(data)
+  } catch {
+    // fall through
+  }
+
+  const { data, error } = await supabase.from('bookings').select('*').eq('id', id).single()
   if (error) throw error
-  return data
+  return normalizeBooking(data)
 }
 
 export async function getCustomerBookings(customerId) {

@@ -145906,6 +145906,7 @@ window.onload = function () {
     var countySel = document.getElementById("countySel"),
     stateSel = document.getElementById("stateSel"),
     districtSel = document.getElementById("districtSel");
+    if (!countySel || !stateSel || !districtSel) return;
     for (var country in stateObject) {
     countySel.options[countySel.options.length] = new Option(country, country);
 }
