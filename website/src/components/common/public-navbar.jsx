@@ -35,7 +35,7 @@ export function PublicNavbar() {
           <Button variant="outline" size="icon" className="border-slate-200 bg-white dark:border-border dark:bg-card md:hidden">
             <Menu className="h-4 w-4" />
           </Button>
-          <Link to="/register" className="hidden md:inline-flex">
+          <Link to="/register?type=provider" className="hidden md:inline-flex">
             <Button variant="outline" className="rounded-xl border-blue-200 bg-white text-blue-700 hover:bg-blue-50">
               Become a Provider
             </Button>

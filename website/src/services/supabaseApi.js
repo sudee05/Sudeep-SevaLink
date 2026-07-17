@@ -196,7 +196,16 @@ export async function getProvidersByService(serviceId) {
     .order('rating', { ascending: false })
   if (error) throw error
 
-  return attachProviderServices(data || [])
+  if (data?.length) return attachProviderServices(data)
+
+  const { data: fallbackData, error: fallbackError } = await supabase
+    .from('providers')
+    .select('*')
+    .in('id', providerIds)
+    .order('rating', { ascending: false })
+  if (fallbackError) throw fallbackError
+
+  return attachProviderServices(fallbackData || [])
 }
 
 export async function getProviderById(id) {
@@ -388,6 +397,18 @@ export async function updateBookingStatus(id, status) {
   return data
 }
 
+export async function requestBookingReschedule(id) {
+  return updateBookingStatus(id, 'reschedule_requested')
+}
+
+export async function acceptBookingReschedule(id) {
+  return updateBookingStatus(id, 'reschedule_accepted')
+}
+
+export async function rejectBookingReschedule(id) {
+  return updateBookingStatus(id, 'reschedule_rejected')
+}
+
 export async function createBookingFeedback(feedback) {
   const { data, error } = await supabase
     .from('booking_feedback')
@@ -498,16 +519,131 @@ export async function getNotifications(userId) {
   const { data, error } = await supabase
     .from('notifications')
     .select('*')
-    .eq('user_id', userId)
+    .or(`receiver_id.eq.${userId},user_id.eq.${userId}`)
     .order('created_at', { ascending: false })
   if (error) throw error
-  return data
+  return (data || []).map((notification) => ({
+    ...notification,
+    is_read: notification.is_read ?? notification.read ?? false,
+    receiver_id: notification.receiver_id || notification.user_id,
+  }))
 }
 
 export async function markNotificationRead(id) {
   const { error } = await supabase
     .from('notifications')
-    .update({ read: true })
+    .update({ is_read: true, read: true })
     .eq('id', id)
   if (error) throw error
+}
+
+export async function markAllNotificationsRead(userId) {
+  const { error } = await supabase
+    .from('notifications')
+    .update({ is_read: true, read: true })
+    .or(`receiver_id.eq.${userId},user_id.eq.${userId}`)
+  if (error) throw error
+}
+
+// ── Realtime Chat ─────────────────────────────────────────────
+
+export function isBookingChatEnabled(status) {
+  return ['accepted', 'confirmed', 'in_progress', 'completed'].includes(status)
+}
+
+export async function getConversationByBooking(bookingId) {
+  const { data, error } = await supabase
+    .from('conversations')
+    .select('*')
+    .eq('booking_id', bookingId)
+    .maybeSingle()
+  if (error) throw error
+  return data
+}
+
+export async function ensureConversationForBooking(bookingId) {
+  const { data, error } = await supabase.rpc('ensure_booking_conversation', { p_booking_id: bookingId })
+  if (error) throw error
+  if (!data) return getConversationByBooking(bookingId)
+  const { data: conversation, error: conversationError } = await supabase
+    .from('conversations')
+    .select('*')
+    .eq('id', data)
+    .single()
+  if (conversationError) throw conversationError
+  return conversation
+}
+
+export async function getConversations(userId) {
+  const { data, error } = await supabase
+    .from('conversations')
+    .select('*, bookings(booking_code, service_title, status), messages(message, attachment_type, is_read, sender_id, created_at)')
+    .or(`customer_id.eq.${userId},provider_id.eq.${userId}`)
+    .order('updated_at', { ascending: false })
+  if (error) throw error
+
+  return (data || []).map((conversation) => {
+    const messages = conversation.messages || []
+    const latestMessage = messages.sort((a, b) => new Date(b.created_at) - new Date(a.created_at))[0]
+    return {
+      ...conversation,
+      latest_message: latestMessage?.message || (latestMessage?.attachment_type ? 'Attachment' : ''),
+      latest_message_at: latestMessage?.created_at || conversation.updated_at || conversation.created_at,
+      unread_count: messages.filter((message) => message.sender_id !== userId && !message.is_read).length,
+    }
+  })
+}
+
+export async function getMessages(conversationId) {
+  const { data, error } = await supabase
+    .from('messages')
+    .select('*')
+    .eq('conversation_id', conversationId)
+    .order('created_at', { ascending: true })
+  if (error) throw error
+  return data || []
+}
+
+export async function sendMessage({ conversationId, senderId, message, attachmentUrl, attachmentPath, attachmentType }) {
+  const { data, error } = await supabase
+    .from('messages')
+    .insert({
+      conversation_id: conversationId,
+      sender_id: senderId,
+      message: message || '',
+      attachment_url: attachmentUrl || null,
+      attachment_path: attachmentPath || null,
+      attachment_type: attachmentType || null,
+    })
+    .select()
+    .single()
+  if (error) throw error
+  return data
+}
+
+export async function markConversationRead(conversationId, userId) {
+  const { error } = await supabase
+    .from('messages')
+    .update({ is_read: true, read_at: new Date().toISOString() })
+    .eq('conversation_id', conversationId)
+    .neq('sender_id', userId)
+    .eq('is_read', false)
+  if (error) throw error
+}
+
+export async function uploadChatAttachment({ conversationId, file }) {
+  const extension = file.name.includes('.') ? file.name.split('.').pop() : 'bin'
+  const path = `${conversationId}/${crypto.randomUUID()}.${extension}`
+  const { error } = await supabase.storage.from('chat-attachments').upload(path, file, {
+    cacheControl: '3600',
+    upsert: false,
+  })
+  if (error) throw error
+
+  const { data } = await supabase.storage.from('chat-attachments').createSignedUrl(path, 60 * 60 * 24 * 7)
+  return {
+    path,
+    url: data?.signedUrl || '',
+    type: file.type,
+  }
 }

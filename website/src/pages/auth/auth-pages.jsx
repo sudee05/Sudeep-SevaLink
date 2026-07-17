@@ -17,6 +17,7 @@ import {
   selectAuthLoading,
   clearError,
 } from '@/store/authSlice'
+import { useSearchParams } from "react-router-dom";
 
 function AuthShell({ title, subtitle, children, footer }) {
   return (
@@ -77,11 +78,13 @@ function LoginForm() {
 }
 
 function RegisterForm() {
+  const [searchParams] = useSearchParams();
+  const type = searchParams.get("type") || "customer";
   const toast = useToast()
   const dispatch = useDispatch()
   const navigate = useNavigate()
   const loading = useSelector(selectAuthLoading)
-  const [accountType, setAccountType] = useState('customer')
+  const [accountType, setAccountType] = useState(type)
   const schema = useMemo(() => z.object({
     name: z.string().min(2, 'Full name is required'),
     email: z.string().email('Enter a valid email'),
@@ -118,11 +121,10 @@ function RegisterForm() {
             key={option.value}
             type="button"
             onClick={() => setAccountType(option.value)}
-            className={`rounded-lg px-3 py-2 text-sm font-semibold transition ${
-              accountType === option.value
-                ? 'bg-card text-foreground shadow-sm'
-                : 'text-muted-foreground hover:text-foreground'
-            }`}
+            className={`rounded-lg px-3 py-2 text-sm font-semibold transition ${accountType === option.value
+              ? 'bg-card text-foreground shadow-sm'
+              : 'text-muted-foreground hover:text-foreground'
+              }`}
           >
             {option.label}
           </button>

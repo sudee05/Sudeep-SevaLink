@@ -1,10 +1,11 @@
-import { Link, useParams } from 'react-router-dom'
+import { Link, useNavigate, useParams } from 'react-router-dom'
 import { motion } from 'framer-motion'
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
-import { useSelector } from 'react-redux'
-import { CalendarCheck, Clock3, CreditCard, Heart, MapPin, Receipt, Sparkles } from 'lucide-react'
-import { useBookingsQuery, useProvidersByServiceQuery, useServicesQuery } from '@/hooks/use-queries'
+import { useDispatch, useSelector } from 'react-redux'
+import { CalendarCheck, CheckCheck, Clock3, CreditCard, Heart, Image, MapPin, Paperclip, Receipt, Send, Sparkles, X } from 'lucide-react'
+import { useBookingsQuery, useConversationByBookingQuery, useMessagesQuery, useNotificationsQuery, useProvidersByServiceQuery, useServicesQuery } from '@/hooks/use-queries'
+import { useRealtimeConversation, useRealtimeNotifications } from '@/hooks/use-realtime'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
@@ -17,8 +18,21 @@ import { DataTable } from '@/components/common/data-table'
 import { SectionHeader } from '@/components/common/section-header'
 import { ServiceCard } from '@/components/common/service-card'
 import { formatCurrency, formatDate } from '@/utils/format'
-import { selectProfile } from '@/store/authSlice'
-import { createBooking, createBookingComplaint, createBookingFeedback } from '@/services/supabaseApi'
+import { selectProfile, selectUser, setAuth, signOut } from '@/store/authSlice'
+import {
+  createBooking,
+  createBookingComplaint,
+  createBookingFeedback,
+  ensureConversationForBooking,
+  isBookingChatEnabled,
+  markAllNotificationsRead,
+  markConversationRead,
+  markNotificationRead,
+  sendMessage,
+  updateBookingStatus,
+  updateProfile,
+  uploadChatAttachment,
+} from '@/services/supabaseApi'
 import { useToast } from '@/hooks/use-toast'
 
 const fade = {
@@ -31,6 +45,171 @@ function bookingStatusVariant(status) {
   if (status === 'completed') return 'success'
   if (status === 'cancelled') return 'danger'
   return 'warning'
+}
+
+function BookingModal({ bookingForm, bookingMutation, bookingProvider, onClose, onSubmit, selectedService, setBookingForm }) {
+  if (!bookingProvider) return null
+
+  const providerName = bookingProvider.business_name || bookingProvider.name || 'Provider'
+  const providerPrice = bookingProvider.price || bookingProvider.starting_price || bookingProvider.base_price
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/55 px-4 py-6 backdrop-blur-sm">
+      <div className="w-full max-w-2xl rounded-2xl border border-border bg-card p-5 shadow-2xl">
+        <div className="mb-5 flex items-start justify-between gap-4">
+          <div>
+            <p className="text-sm font-medium text-primary">{selectedService?.name}</p>
+            <h2 className="text-xl font-bold">Book {providerName}</h2>
+            <p className="mt-1 text-sm text-muted-foreground">
+              {Number(providerPrice || 0) ? formatCurrency(providerPrice) : 'Price TBD'} | {bookingProvider.location || 'Location not added'}
+            </p>
+          </div>
+          <Button type="button" variant="ghost" size="icon" onClick={onClose} aria-label="Close booking form">
+            <X className="h-5 w-5" />
+          </Button>
+        </div>
+        <form className="grid gap-3 md:grid-cols-2" onSubmit={onSubmit}>
+          <Input required type="date" value={bookingForm.booking_date} onChange={(event) => setBookingForm((form) => ({ ...form, booking_date: event.target.value }))} />
+          <Input required type="time" value={bookingForm.booking_time} onChange={(event) => setBookingForm((form) => ({ ...form, booking_time: event.target.value }))} />
+          <Input required placeholder="Service address" className="md:col-span-2" value={bookingForm.address} onChange={(event) => setBookingForm((form) => ({ ...form, address: event.target.value }))} />
+          <Textarea placeholder="Special instructions" className="md:col-span-2" value={bookingForm.notes} onChange={(event) => setBookingForm((form) => ({ ...form, notes: event.target.value }))} />
+          <div className="flex flex-wrap gap-2 md:col-span-2">
+            <Button type="submit" disabled={bookingMutation.isPending}>{bookingMutation.isPending ? 'Booking...' : 'Confirm Booking'}</Button>
+            <Button type="button" variant="outline" onClick={onClose}>Cancel</Button>
+          </div>
+        </form>
+      </div>
+    </div>
+  )
+}
+
+function BookingChatPanel({ booking, userId }) {
+  const queryClient = useQueryClient()
+  const messagesEndRef = useRef(null)
+  const fileInputRef = useRef(null)
+  const [message, setMessage] = useState('')
+  const [attachment, setAttachment] = useState(null)
+  const chatEnabled = isBookingChatEnabled(booking?.status)
+  const conversationQuery = useConversationByBookingQuery(booking?.id)
+  const conversation = conversationQuery.data
+  const messagesQuery = useMessagesQuery(conversation?.id)
+  const messages = messagesQuery.data || []
+
+  useRealtimeConversation(conversation?.id, userId)
+
+  useEffect(() => {
+    if (!chatEnabled || conversation || !booking?.id) return
+    ensureConversationForBooking(booking.id).then(() => {
+      queryClient.invalidateQueries({ queryKey: ['conversation', 'booking', booking.id] })
+    })
+  }, [booking?.id, chatEnabled, conversation, queryClient])
+
+  useEffect(() => {
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
+  }, [messages.length])
+
+  useEffect(() => {
+    if (!conversation?.id || !userId || !messages.length) return
+    markConversationRead(conversation.id, userId).then(() => {
+      queryClient.invalidateQueries({ queryKey: ['messages', conversation.id] })
+    })
+  }, [conversation?.id, messages.length, queryClient, userId])
+
+  const sendMutation = useMutation({
+    mutationFn: async () => {
+      if (!conversation?.id || !userId) return null
+      let uploaded = null
+      if (attachment) {
+        uploaded = await uploadChatAttachment({ conversationId: conversation.id, file: attachment })
+      }
+      return sendMessage({
+        conversationId: conversation.id,
+        senderId: userId,
+        message: message.trim(),
+        attachmentUrl: uploaded?.url,
+        attachmentPath: uploaded?.path,
+        attachmentType: uploaded?.type,
+      })
+    },
+    onSuccess: () => {
+      setMessage('')
+      setAttachment(null)
+      if (fileInputRef.current) fileInputRef.current.value = ''
+      queryClient.invalidateQueries({ queryKey: ['messages', conversation?.id] })
+    },
+  })
+
+  function handleSubmit(event) {
+    event.preventDefault()
+    if (!message.trim() && !attachment) return
+    sendMutation.mutate()
+  }
+
+  if (!chatEnabled) {
+    return (
+      <Card className="text-sm text-muted-foreground">
+        Chat will be available after provider accepts the booking.
+      </Card>
+    )
+  }
+
+  return (
+    <Card className="space-y-4">
+      <SectionHeader title="Chat" subtitle="Realtime customer and provider messages for this booking." />
+      <div className="h-80 space-y-3 overflow-y-auto rounded-xl border border-border bg-muted/20 p-3">
+        {messagesQuery.isLoading || conversationQuery.isLoading ? (
+          <p className="py-10 text-center text-sm text-muted-foreground">Loading conversation...</p>
+        ) : messages.length ? (
+          messages.map((item) => {
+            const mine = item.sender_id === userId
+            return (
+              <div key={item.id} className={`flex ${mine ? 'justify-end' : 'justify-start'}`}>
+                <div className={`max-w-[80%] rounded-2xl px-4 py-2 text-sm ${mine ? 'bg-primary text-white' : 'bg-card border border-border'}`}>
+                  {item.attachment_url && (
+                    <a href={item.attachment_url} target="_blank" rel="noreferrer" className="mb-2 block overflow-hidden rounded-xl border border-border/50">
+                      {item.attachment_type?.startsWith('image/') ? (
+                        <img src={item.attachment_url} alt="Chat attachment" className="max-h-56 w-full object-cover" />
+                      ) : (
+                        <span className="flex items-center gap-2 p-3">
+                          <Paperclip className="h-4 w-4" /> Attachment
+                        </span>
+                      )}
+                    </a>
+                  )}
+                  {item.message && <p>{item.message}</p>}
+                  <div className={`mt-1 flex items-center justify-end gap-1 text-[11px] ${mine ? 'text-white/75' : 'text-muted-foreground'}`}>
+                    {formatDate(item.created_at)}
+                    {mine && item.is_read && <CheckCheck className="h-3 w-3" />}
+                  </div>
+                </div>
+              </div>
+            )
+          })
+        ) : (
+          <p className="py-10 text-center text-sm text-muted-foreground">No messages yet.</p>
+        )}
+        <div ref={messagesEndRef} />
+      </div>
+      <form className="flex flex-wrap items-center gap-2" onSubmit={handleSubmit}>
+        <input
+          ref={fileInputRef}
+          type="file"
+          accept="image/*"
+          className="hidden"
+          onChange={(event) => setAttachment(event.target.files?.[0] || null)}
+        />
+        <Button type="button" variant="outline" size="icon" onClick={() => fileInputRef.current?.click()} aria-label="Attach image">
+          <Image className="h-4 w-4" />
+        </Button>
+        <Input className="min-w-0 flex-1" placeholder="Type a message" value={message} onChange={(event) => setMessage(event.target.value)} />
+        <Button type="submit" disabled={sendMutation.isPending || (!message.trim() && !attachment)}>
+          <Send className="h-4 w-4" />
+          {sendMutation.isPending ? 'Sending...' : 'Send'}
+        </Button>
+        {attachment && <span className="w-full text-xs text-muted-foreground">{attachment.name}</span>}
+      </form>
+    </Card>
+  )
 }
 
 export function CustomerDashboardPage() {
@@ -104,24 +283,46 @@ export function CustomerDashboardPage() {
       <Card>
         <SectionHeader title="Choose a Service" subtitle="Start by selecting what you need." />
         {services.isLoading ? <LoadingGrid count={3} /> : (
-          <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
-            {(services.data || []).map((service) => (
-              <button
-                key={service.id}
-                type="button"
-                onClick={() => {
-                  setSelectedService(service)
-                  setBookingProvider(null)
-                }}
-                className={`rounded-xl border p-4 text-left transition hover:border-primary ${
-                  selectedService?.id === service.id ? 'border-primary bg-primary/5' : 'border-border'
-                }`}
-              >
-                <p className="font-semibold">{service.name}</p>
-                <p className="mt-1 line-clamp-2 text-sm text-muted-foreground">{service.description || 'Available service'}</p>
-              </button>
-            ))}
-          </div>
+          selectedService ? (
+            <div className="flex">
+              <div className="inline-flex max-w-full items-center gap-3 rounded-full border border-primary bg-primary/10 px-4 py-2 text-left shadow-sm ring-2 ring-primary/20">
+                <span className="min-w-0">
+                  <span className="block truncate text-sm font-semibold text-primary">{selectedService.name}</span>
+                  <span className="block truncate text-xs text-muted-foreground">{selectedService.description || 'Available service'}</span>
+                </span>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setSelectedService(null)
+                    setBookingProvider(null)
+                    setLocation('')
+                    setMaxPrice('')
+                  }}
+                  className="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-primary text-white transition hover:bg-primary/90 focus:outline-none focus:ring-2 focus:ring-primary/30"
+                  aria-label="Deselect service"
+                >
+                  <X className="h-4 w-4" />
+                </button>
+              </div>
+            </div>
+          ) : (
+            <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+              {(services.data || []).map((service) => (
+                <button
+                  key={service.id}
+                  type="button"
+                  onClick={() => {
+                    setSelectedService(service)
+                    setBookingProvider(null)
+                  }}
+                  className="rounded-xl border border-border p-4 text-left opacity-100 transition duration-200 hover:border-primary hover:shadow-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
+                >
+                  <p className="font-semibold">{service.name}</p>
+                  <p className="mt-1 line-clamp-2 text-sm text-muted-foreground">{service.description || 'Available service'}</p>
+                </button>
+              ))}
+            </div>
+          )
         )}
       </Card>
 
@@ -157,28 +358,24 @@ export function CustomerDashboardPage() {
                 )
               })}
             </div>
-          ) : <EmptyState title="No providers found" description="Try another service or clear your filters." />}
+          ) : (
+            <EmptyState
+              title="No providers found"
+              description="If this service has an approved provider, update Supabase policies so customers can read provider_services and approved providers."
+            />
+          )}
         </Card>
       )}
 
-      {bookingProvider && (
-        <Card>
-          <SectionHeader
-            title={`Book ${bookingProvider.business_name || bookingProvider.name}`}
-            subtitle="Choose the date and time when the service is needed."
-          />
-          <form className="grid gap-3 md:grid-cols-2" onSubmit={handleBookingSubmit}>
-            <Input required type="date" value={bookingForm.booking_date} onChange={(event) => setBookingForm((form) => ({ ...form, booking_date: event.target.value }))} />
-            <Input required type="time" value={bookingForm.booking_time} onChange={(event) => setBookingForm((form) => ({ ...form, booking_time: event.target.value }))} />
-            <Input required placeholder="Service address" className="md:col-span-2" value={bookingForm.address} onChange={(event) => setBookingForm((form) => ({ ...form, address: event.target.value }))} />
-            <Textarea placeholder="Special instructions" className="md:col-span-2" value={bookingForm.notes} onChange={(event) => setBookingForm((form) => ({ ...form, notes: event.target.value }))} />
-            <div className="flex gap-2 md:col-span-2">
-              <Button type="submit" disabled={bookingMutation.isPending}>{bookingMutation.isPending ? 'Booking...' : 'Confirm Booking'}</Button>
-              <Button type="button" variant="outline" onClick={() => setBookingProvider(null)}>Cancel</Button>
-            </div>
-          </form>
-        </Card>
-      )}
+      <BookingModal
+        bookingForm={bookingForm}
+        bookingMutation={bookingMutation}
+        bookingProvider={bookingProvider}
+        onClose={() => setBookingProvider(null)}
+        onSubmit={handleBookingSubmit}
+        selectedService={selectedService}
+        setBookingForm={setBookingForm}
+      />
     </motion.div>
   )
 }
@@ -209,6 +406,7 @@ export function CustomerBookingDetailsPage() {
   const { data = [] } = useBookingsQuery()
   const profile = useSelector(selectProfile)
   const toast = useToast()
+  const queryClient = useQueryClient()
   const [feedback, setFeedback] = useState({ rating: '5', comment: '' })
   const [complaint, setComplaint] = useState({ subject: '', comment: '' })
   const booking = data.find((item) => item.id === id) || data[0]
@@ -229,6 +427,15 @@ export function CustomerBookingDetailsPage() {
       setComplaint({ subject: '', comment: '' })
     },
     onError: (error) => toast.error(error.message || 'Could not submit complaint'),
+  })
+
+  const statusMutation = useMutation({
+    mutationFn: (status) => updateBookingStatus(booking.id, status),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['bookings'] })
+      toast.success('Booking updated.')
+    },
+    onError: (error) => toast.error(error.message || 'Could not update booking'),
   })
 
   if (!booking) return <EmptyState title="No booking found" />
@@ -270,9 +477,16 @@ export function CustomerBookingDetailsPage() {
         </Card>
         <Card className="space-y-3">
           <h3 className="font-semibold">Actions</h3>
-          <Button className="w-full">Reschedule</Button>
+          {booking.status === 'reschedule_requested' && (
+            <>
+              <Button className="w-full" disabled={statusMutation.isPending} onClick={() => statusMutation.mutate('reschedule_accepted')}>Accept Reschedule</Button>
+              <Button variant="outline" className="w-full" disabled={statusMutation.isPending} onClick={() => statusMutation.mutate('reschedule_rejected')}>Reject Reschedule</Button>
+            </>
+          )}
           <Button variant="outline" className="w-full">Download Invoice</Button>
-          <Button variant="danger" className="w-full">Cancel Booking</Button>
+          {!['completed', 'cancelled', 'rejected'].includes(booking.status) && (
+            <Button variant="danger" className="w-full" disabled={statusMutation.isPending} onClick={() => statusMutation.mutate('cancelled')}>Cancel Booking</Button>
+          )}
         </Card>
       </div>
       <div className="grid gap-4 lg:grid-cols-2">
@@ -303,6 +517,7 @@ export function CustomerBookingDetailsPage() {
           </form>
         </Card>
       </div>
+      <BookingChatPanel booking={booking} userId={profile?.id} />
     </motion.div>
   )
 }
@@ -343,31 +558,125 @@ export function CustomerWishlistPage() {
 }
 
 export function CustomerNotificationsPage() {
-  const notifications = [
-    'Provider has accepted your booking',
-    'Payment reminder for pending booking',
-    'Special discount on selected services this week',
-  ]
+  const profile = useSelector(selectProfile)
+  const queryClient = useQueryClient()
+  const notifications = useNotificationsQuery(profile?.id)
+
+  useRealtimeNotifications(profile?.id)
+
+  const markReadMutation = useMutation({
+    mutationFn: markNotificationRead,
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['notifications', profile?.id] }),
+  })
+
+  const markAllReadMutation = useMutation({
+    mutationFn: () => markAllNotificationsRead(profile.id),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['notifications', profile?.id] }),
+  })
+
+  const unreadCount = (notifications.data || []).filter((notification) => !notification.is_read).length
 
   return (
     <motion.div className="space-y-4" {...fade}>
-      <SectionHeader title="Notifications" subtitle="Real-time service and booking alerts." />
-      {notifications.map((note) => <Card key={note}>{note}</Card>)}
+      <SectionHeader
+        title="Notifications"
+        subtitle="Realtime service, booking, approval, and chat alerts."
+        action={
+          unreadCount ? (
+            <Button size="sm" variant="outline" disabled={markAllReadMutation.isPending} onClick={() => markAllReadMutation.mutate()}>
+              Mark all read
+            </Button>
+          ) : null
+        }
+      />
+      {notifications.isLoading ? <LoadingGrid count={3} /> : (notifications.data || []).length ? (
+        <div className="space-y-3">
+          {notifications.data.map((notification) => (
+            <Card key={notification.id} className={`flex items-start justify-between gap-4 ${notification.is_read ? 'opacity-70' : ''}`}>
+              <div>
+                <div className="flex flex-wrap items-center gap-2">
+                  <h3 className="font-semibold">{notification.title}</h3>
+                  {!notification.is_read && <Badge variant="secondary">New</Badge>}
+                </div>
+                <p className="mt-1 text-sm text-muted-foreground">{notification.message}</p>
+                <p className="mt-2 text-xs text-muted-foreground">{formatDate(notification.created_at)}</p>
+              </div>
+              {!notification.is_read && (
+                <Button size="sm" variant="outline" disabled={markReadMutation.isPending} onClick={() => markReadMutation.mutate(notification.id)}>
+                  Mark read
+                </Button>
+              )}
+            </Card>
+          ))}
+        </div>
+      ) : (
+        <EmptyState title="No notifications" description="Booking and approval updates will appear here." />
+      )}
     </motion.div>
   )
 }
 
 export function CustomerProfilePage() {
+  const dispatch = useDispatch()
+  const navigate = useNavigate()
+  const profile = useSelector(selectProfile)
+  const user = useSelector(selectUser)
+  const toast = useToast()
+  const [profileForm, setProfileForm] = useState({
+    full_name: '',
+    email: '',
+    phone: '',
+    avatar_url: '',
+  })
+
+  useEffect(() => {
+    setProfileForm({
+      full_name: profile?.full_name || '',
+      email: user?.email || profile?.email || '',
+      phone: profile?.phone || '',
+      avatar_url: profile?.avatar_url || '',
+    })
+  }, [profile, user])
+
+  const profileMutation = useMutation({
+    mutationFn: (updates) => updateProfile(profile.id, updates),
+    onSuccess: (updatedProfile) => {
+      dispatch(setAuth({ user, profile: updatedProfile }))
+      toast.success('Profile updated.')
+    },
+    onError: (error) => toast.error(error.message || 'Could not update profile'),
+  })
+
+  async function handleLogout() {
+    await dispatch(signOut())
+    navigate('/login', { replace: true })
+  }
+
+  function handleProfileSubmit(event) {
+    event.preventDefault()
+    if (!profile?.id) return
+
+    profileMutation.mutate({
+      full_name: profileForm.full_name,
+      phone: profileForm.phone,
+      avatar_url: profileForm.avatar_url,
+    })
+  }
+
   return (
     <motion.div className="space-y-4" {...fade}>
-      <SectionHeader title="Profile" subtitle="Manage personal details and addresses." />
-      <Card className="grid gap-3 md:grid-cols-2">
-        <Input defaultValue="Priya Sharma" />
-        <Input defaultValue="priya@email.com" />
-        <Input defaultValue="+91 98765 43210" />
-        <Input defaultValue="Bengaluru" />
-        <Textarea className="md:col-span-2" defaultValue="HSR Layout, Bengaluru" />
-        <Button className="md:col-span-2">Save Profile</Button>
+      <SectionHeader title="Profile" subtitle="Manage your Supabase profile details and account session." />
+      <Card>
+        <form className="grid gap-3 md:grid-cols-2" onSubmit={handleProfileSubmit}>
+          <Input required placeholder="Full name" value={profileForm.full_name} onChange={(event) => setProfileForm((form) => ({ ...form, full_name: event.target.value }))} />
+          <Input placeholder="Email" value={profileForm.email} disabled />
+          <Input placeholder="Phone" value={profileForm.phone} onChange={(event) => setProfileForm((form) => ({ ...form, phone: event.target.value }))} />
+          <Input placeholder="Avatar URL" value={profileForm.avatar_url} onChange={(event) => setProfileForm((form) => ({ ...form, avatar_url: event.target.value }))} />
+          <div className="flex flex-wrap gap-2 md:col-span-2">
+            <Button type="submit" disabled={profileMutation.isPending}>{profileMutation.isPending ? 'Saving...' : 'Save Profile'}</Button>
+            <Button type="button" variant="outline" onClick={handleLogout}>Logout</Button>
+          </div>
+        </form>
       </Card>
     </motion.div>
   )

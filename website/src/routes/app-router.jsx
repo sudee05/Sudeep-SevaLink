@@ -120,6 +120,7 @@ export function AppRouter() {
         <Route index element={<CustomerDashboardPage />} />
         <Route path="bookings" element={<CustomerBookingsPage />} />
         <Route path="bookings/:id" element={<CustomerBookingDetailsPage />} />
+        <Route path="booking/:id" element={<CustomerBookingDetailsPage />} />
         <Route path="wishlist" element={<CustomerWishlistPage />} />
         <Route path="notifications" element={<CustomerNotificationsPage />} />
         <Route path="invoices" element={<CustomerInvoicesPage />} />

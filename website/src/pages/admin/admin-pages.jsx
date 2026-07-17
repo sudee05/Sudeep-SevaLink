@@ -294,7 +294,7 @@ export function AdminProvidersPage() {
                 return (
                   <div className="flex gap-1">
                     <Button size="sm" variant="outline" onClick={() => setSelectedProvider(row)}>
-                      View
+                      View Details
                     </Button>
                     {s !== 'approved' && (
                       <Button

@@ -5,11 +5,9 @@ import {
   CircleUser,
   ClipboardList,
   FileText,
-  Heart,
   LayoutDashboard,
   MessageSquareWarning,
   Package,
-  Receipt,
   Settings,
   ShieldCheck,
   Sparkles,
@@ -21,11 +19,6 @@ import {
 export const customerNav = [
   { label: 'Dashboard', path: '/customer', icon: LayoutDashboard },
   { label: 'Bookings', path: '/customer/bookings', icon: ClipboardList },
-  { label: 'Wishlist', path: '/customer/wishlist', icon: Heart },
-  { label: 'Invoices', path: '/customer/invoices', icon: Receipt },
-  { label: 'Notifications', path: '/customer/notifications', icon: Sparkles },
-  { label: 'Profile', path: '/customer/profile', icon: CircleUser },
-  { label: 'Settings', path: '/customer/settings', icon: Settings },
 ]
 
 export const providerNav = [

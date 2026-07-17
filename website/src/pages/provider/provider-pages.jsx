@@ -1,5 +1,6 @@
 import { motion } from 'framer-motion'
 import { useEffect, useState } from 'react'
+import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { Calendar, CheckCircle2, CircleDollarSign, Clock, Plus } from 'lucide-react'
 import { useBookingsQuery } from '@/hooks/use-queries'
 import { BookingBarChart, RevenueAreaChart } from '@/components/charts/revenue-booking-chart'
@@ -12,6 +13,7 @@ import { Card } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
 import { supabase } from '@/lib/supabase'
+import { updateBookingStatus } from '@/services/supabaseApi'
 import { formatCurrency, formatDate } from '@/utils/format'
 
 const mockTrend = [
@@ -27,6 +29,37 @@ const fade = {
   initial: { opacity: 0, y: 10 },
   animate: { opacity: 1, y: 0 },
   transition: { duration: 0.3 },
+}
+
+function ProviderBookingActions({ booking }) {
+  const queryClient = useQueryClient()
+  const statusMutation = useMutation({
+    mutationFn: (status) => updateBookingStatus(booking.id, status),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['bookings'] }),
+  })
+
+  const busy = statusMutation.isPending
+
+  if (booking.status === 'completed' || booking.status === 'cancelled' || booking.status === 'rejected') {
+    return <span className="text-xs text-muted-foreground capitalize">{booking.status}</span>
+  }
+
+  return (
+    <div className="flex flex-wrap gap-1">
+      {booking.status === 'pending' && (
+        <>
+          <Button size="sm" disabled={busy} onClick={() => statusMutation.mutate('accepted')}>Accept</Button>
+          <Button size="sm" variant="danger" disabled={busy} onClick={() => statusMutation.mutate('rejected')}>Reject</Button>
+        </>
+      )}
+      {['pending', 'accepted', 'confirmed'].includes(booking.status) && (
+        <Button size="sm" variant="outline" disabled={busy} onClick={() => statusMutation.mutate('reschedule_requested')}>Reschedule</Button>
+      )}
+      {['accepted', 'confirmed', 'in_progress'].includes(booking.status) && (
+        <Button size="sm" disabled={busy} onClick={() => statusMutation.mutate('completed')}>Complete</Button>
+      )}
+    </div>
+  )
 }
 
 // ── Dashboard ─────────────────────────────────────────────────
@@ -60,12 +93,7 @@ export function ProviderDashboardPage() {
             {
               key: 'action',
               label: 'Action',
-              render: () => (
-                <div className="flex gap-1">
-                  <Button size="sm">Accept</Button>
-                  <Button size="sm" variant="outline">Reschedule</Button>
-                </div>
-              ),
+              render: (row) => <ProviderBookingActions booking={row} />,
             },
           ]}
           rows={bookings.data || []}
@@ -93,12 +121,7 @@ export function ProviderBookingsPage() {
           {
             key: 'manage',
             label: 'Manage',
-            render: () => (
-              <div className="flex gap-1">
-                <Button size="sm">Complete</Button>
-                <Button size="sm" variant="outline">Reject</Button>
-              </div>
-            ),
+            render: (row) => <ProviderBookingActions booking={row} />,
           },
         ]}
         rows={data}
@@ -112,6 +135,7 @@ export function ProviderBookingsPage() {
 export function ProviderServicesPage() {
   const [catalog, setCatalog] = useState([])       // master list from services table
   const [enrolled, setEnrolled] = useState([])     // service IDs this provider has selected
+  const [primaryServiceId, setPrimaryServiceId] = useState(null)
   const [saving, setSaving] = useState(false)
   const [saved, setSaved] = useState(false)
   const [providerRecord, setProviderRecord] = useState(null)
@@ -158,12 +182,19 @@ export function ProviderServicesPage() {
             .from('provider_services')
             .select('service_id')
             .eq('provider_id', provider.id)
-            .then(({ data: ps }) => setEnrolled((ps || []).map((r) => r.service_id)))
+            .order('created_at', { ascending: true })
+            .then(({ data: ps }) => {
+              const serviceIds = (ps || []).map((r) => r.service_id)
+              setEnrolled(serviceIds)
+              setPrimaryServiceId(serviceIds[0] || null)
+            })
         })
     })
   }, [])
 
   function toggleService(id) {
+    if (id === primaryServiceId) return
+
     setEnrolled((prev) =>
       prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]
     )
@@ -174,12 +205,18 @@ export function ProviderServicesPage() {
     if (!providerRecord) return
     setSaving(true)
     try {
+      const servicesToSave = primaryServiceId
+        ? [primaryServiceId, ...enrolled.filter((serviceId) => serviceId !== primaryServiceId)]
+        : enrolled
+
       await supabase.from('provider_services').delete().eq('provider_id', providerRecord.id)
-      if (enrolled.length) {
+      if (servicesToSave.length) {
         await supabase.from('provider_services').insert(
-          enrolled.map((service_id) => ({ provider_id: providerRecord.id, service_id }))
+          servicesToSave.map((service_id) => ({ provider_id: providerRecord.id, service_id }))
         )
       }
+      setEnrolled(servicesToSave)
+      setPrimaryServiceId(servicesToSave[0] || null)
       setSaved(true)
     } finally {
       setSaving(false)
@@ -242,18 +279,31 @@ export function ProviderServicesPage() {
               <p className="mb-3 text-sm text-muted-foreground">
                 {enrolled.length} of {catalog.length} services selected
               </p>
+              {primaryServiceId && (
+                <div className="mb-4 rounded-xl border border-primary/20 bg-primary/5 px-4 py-3 text-sm">
+                  <span className="font-semibold text-foreground">Primary service: </span>
+                  <span className="text-muted-foreground">
+                    {catalog.find((service) => service.id === primaryServiceId)?.name || 'Selected service'}
+                  </span>
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    This service is locked because it is the provider's primary service. Other selected services can be changed.
+                  </p>
+                </div>
+              )}
               <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
                 {catalog.map((svc) => {
                   const checked = enrolled.includes(svc.id)
+                  const isPrimary = svc.id === primaryServiceId
                   return (
                     <button
                       key={svc.id}
                       onClick={() => toggleService(svc.id)}
+                      disabled={isPrimary}
                       className={`flex items-start gap-3 rounded-xl border p-4 text-left transition-all hover:shadow-sm ${
                         checked
                           ? 'border-primary bg-primary/5 ring-1 ring-primary/30'
                           : 'border-border bg-background hover:border-primary/40'
-                      }`}
+                      } ${isPrimary ? 'cursor-not-allowed opacity-90' : ''}`}
                     >
                       <div className={`mt-0.5 h-5 w-5 shrink-0 rounded-md border-2 flex items-center justify-center transition-colors ${
                         checked ? 'border-primary bg-primary' : 'border-border'
@@ -261,7 +311,10 @@ export function ProviderServicesPage() {
                         {checked && <span className="text-white text-xs font-bold">✓</span>}
                       </div>
                       <div>
-                        <p className="text-sm font-semibold text-foreground">{svc.name}</p>
+                        <div className="flex flex-wrap items-center gap-2">
+                          <p className="text-sm font-semibold text-foreground">{svc.name}</p>
+                          {isPrimary && <Badge variant="secondary">Primary</Badge>}
+                        </div>
                         {svc.description && (
                           <p className="mt-0.5 text-xs text-muted-foreground line-clamp-2">{svc.description}</p>
                         )}

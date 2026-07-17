@@ -13,6 +13,9 @@ import {
   searchServices,
   getServiceReviews,
   getNotifications,
+  getConversationByBooking,
+  getConversations,
+  getMessages,
 } from '@/services/supabaseApi'
 
 export function useCategoriesQuery() {
@@ -92,6 +95,30 @@ export function useNotificationsQuery(userId) {
     queryKey: ['notifications', userId],
     queryFn: () => getNotifications(userId),
     enabled: Boolean(userId),
+  })
+}
+
+export function useConversationByBookingQuery(bookingId) {
+  return useQuery({
+    queryKey: ['conversation', 'booking', bookingId],
+    queryFn: () => getConversationByBooking(bookingId),
+    enabled: Boolean(bookingId),
+  })
+}
+
+export function useConversationsQuery(userId) {
+  return useQuery({
+    queryKey: ['conversations', userId],
+    queryFn: () => getConversations(userId),
+    enabled: Boolean(userId),
+  })
+}
+
+export function useMessagesQuery(conversationId) {
+  return useQuery({
+    queryKey: ['messages', conversationId],
+    queryFn: () => getMessages(conversationId),
+    enabled: Boolean(conversationId),
   })
 }
 

@@ -93,28 +93,28 @@ const featuredPros = [
   {
     title: 'Elite Deep Cleaning',
     rating: '4.9',
-    price: '$85.00',
+    price: '₹85.00',
     image: cleaningImage,
     text: 'Complete sanitation and organization for luxury homes and recurring care.',
   },
   {
     title: 'In-Home Nursing',
     rating: '5.0',
-    price: '$120.00',
+    price: '₹820.00',
     image: nurseImage,
     text: 'Specialized home care for recovery, elder support, and daily comfort.',
   },
   {
     title: 'Premium Relocation',
     rating: '4.8',
-    price: '$250.00',
+    price: '₹2250.00',
     image: relocationImage,
     text: 'Full-service white glove moving for homes, offices, and delicate items.',
   },
   {
     title: 'IT & Cybersecurity',
     rating: '4.9',
-    price: '$95.00',
+    price: '₹395.00',
     image: providerGrowthImage,
     text: 'Home network audits, device protection, and professional troubleshooting.',
   },
@@ -169,9 +169,11 @@ export function LandingPage() {
               <div className="rounded-2xl border border-slate-100 px-1 py-1">
                 <LocationSelector value={location} onChange={setLocation} />
               </div>
+              <Link to="/register">
               <Button className="h-full rounded-2xl bg-blue-700 px-6 text-white hover:bg-blue-800">
                 Get Started
               </Button>
+              </Link>
             </div>
             <div className="flex flex-wrap items-center gap-6">
               <div className="flex items-center gap-3">
@@ -182,7 +184,7 @@ export function LandingPage() {
                 </div>
                 <p className="text-sm text-slate-500">Trusted ecosystem</p>
               </div>
-              <Link to="/register" className="inline-flex items-center gap-1 text-sm font-semibold text-blue-700 hover:text-blue-800">
+              <Link to="/register?type=provider" className="inline-flex items-center gap-1 text-sm font-semibold text-blue-700 hover:text-blue-800">
                 Register your business
                 <ArrowRight className="h-4 w-4" />
               </Link>
@@ -292,7 +294,7 @@ export function LandingPage() {
                 <h3 className="text-2xl font-black leading-tight">List your service</h3>
                 <p className="text-sm text-blue-100">Open your own category today and start getting verified demand.</p>
               </div>
-              <Link to="/register">
+              <Link to="/register?type=provider">
                 <Button className="rounded-2xl bg-white text-blue-700 hover:bg-blue-50">Join Now</Button>
               </Link>
             </article>
@@ -332,7 +334,7 @@ export function LandingPage() {
                 )
               })}
             </div>
-            <Link to="/register">
+            <Link to="/register?type=provider">
               <Button className="rounded-2xl bg-emerald-400 px-8 text-slate-950 hover:bg-emerald-300">Join as a Pro</Button>
             </Link>
           </div>
@@ -374,9 +376,11 @@ export function LandingPage() {
                       <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-400">Starts from</p>
                       <p className="text-xl font-black text-slate-950">{item.price}</p>
                     </div>
+                    <Link to="/login">
                     <Button variant="outline" className="rounded-2xl border-blue-200 text-blue-700 hover:bg-blue-50">
                       Book Now
                     </Button>
+                    </Link>
                   </div>
                 </div>
               </article>
@@ -433,7 +437,7 @@ export function LandingPage() {
             <Link to="/services">
               <Button className="rounded-2xl bg-white px-8 text-blue-700 hover:bg-blue-50">Start Booking</Button>
             </Link>
-            <Link to="/register">
+            <Link to="/register?type=provider">
               <Button variant="outline" className="rounded-2xl border-white/30 bg-transparent px-8 text-white hover:bg-white/10">
                 Join as Provider
               </Button>
