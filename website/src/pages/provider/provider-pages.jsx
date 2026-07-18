@@ -2,7 +2,7 @@ import { motion } from 'framer-motion'
 import { useEffect, useMemo, useState } from 'react'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { Link, useParams } from 'react-router-dom'
-import { Bell, Calendar, CheckCircle2, CircleDollarSign, Clock, Upload } from 'lucide-react'
+import { Bell, Calendar, CheckCircle2, CircleDollarSign, Clock, Upload, X } from 'lucide-react'
 import { useBookingsQuery, useNotificationsQuery, useProviderBookingsQuery } from '@/hooks/use-queries'
 import { useRealtimeNotifications } from '@/hooks/use-realtime'
 import { BookingBarChart, RevenueAreaChart } from '@/components/charts/revenue-booking-chart'
@@ -46,8 +46,12 @@ function ProviderBookingActions({ booking }) {
 
   const busy = statusMutation.isPending
 
-  if (booking.status === 'completed' || booking.status === 'cancelled' || booking.status === 'rejected') {
-    return <span className="text-xs text-muted-foreground capitalize">{booking.status}</span>
+  if (booking.status === 'completed') {
+    return <Badge variant="success" className="capitalize">completed</Badge>
+  }
+
+  if (booking.status === 'cancelled' || booking.status === 'rejected') {
+    return <Badge variant="outline" className="capitalize">{booking.status}</Badge>
   }
 
   return (
@@ -62,7 +66,7 @@ function ProviderBookingActions({ booking }) {
         <Button size="sm" variant="outline" disabled={busy} onClick={() => statusMutation.mutate('reschedule_requested')}>Reschedule</Button>
       )}
       {['accepted', 'confirmed', 'in_progress'].includes(booking.status) && (
-        <Button size="sm" disabled={busy} onClick={() => statusMutation.mutate('completed')}>Complete</Button>
+        <Button size="sm" variant="success" disabled={busy} onClick={() => statusMutation.mutate('completed')}>Complete</Button>
       )}
     </div>
   )
@@ -156,7 +160,7 @@ export function ProviderDashboardPage() {
             { key: 'customer', label: 'Customer' },
             { key: 'service', label: 'Service' },
             { key: 'date', label: 'Time', render: (row) => formatDate(row.date) },
-            { key: 'status', label: 'Status', render: (row) => <Badge variant={row.status === 'Completed' ? 'success' : 'warning'}>{row.status}</Badge> },
+            { key: 'status', label: 'Status', render: (row) => <Badge variant={row.status === 'completed' ? 'success' : 'warning'} className="capitalize">{row.status}</Badge> },
             {
               key: 'action',
               label: 'Action',
@@ -359,6 +363,18 @@ export function ProviderServicesPage() {
     setSaved(false)
   }
 
+  function removeService(id) {
+    if (id === primaryServiceId) return
+
+    setEnrolled((prev) => prev.filter((serviceId) => serviceId !== id))
+    setPrices((prev) => {
+      const next = { ...prev }
+      delete next[id]
+      return next
+    })
+    setSaved(false)
+  }
+
   async function handleSave() {
     if (!providerRecord) return
     setSaving(true)
@@ -428,79 +444,112 @@ export function ProviderServicesPage() {
 
       {/* ── Select Services tab ── */}
       {tab === 'select' && (
-        <Card>
-          {catalog.length === 0 ? (
-            <p className="text-sm text-muted-foreground text-center py-8">No services available yet. Check back soon.</p>
-          ) : (
-            <>
-              <p className="mb-3 text-sm text-muted-foreground">
-                {enrolled.length} of {catalog.length} services selected
-              </p>
-              {primaryServiceId && (
-                <div className="mb-4 rounded-xl border border-primary/20 bg-primary/5 px-4 py-3 text-sm">
-                  <span className="font-semibold text-foreground">Primary service: </span>
-                  <span className="text-muted-foreground">
-                    {catalog.find((service) => service.id === primaryServiceId)?.name || 'Selected service'}
-                  </span>
-                  <p className="mt-1 text-xs text-muted-foreground">
-                    This service is locked because it is the provider's primary service. Other selected services can be changed.
-                  </p>
-                </div>
-              )}
-              <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-                {catalog.map((svc) => {
-                  const checked = enrolled.includes(svc.id)
-                  const isPrimary = svc.id === primaryServiceId
-                  return (
-                    <div
-                      key={svc.id}
-                      className={`space-y-3 rounded-xl border p-4 text-left transition-all hover:shadow-sm ${
-                        checked
-                          ? 'border-primary bg-primary/5 ring-1 ring-primary/30'
-                          : 'border-border bg-background hover:border-primary/40'
-                      } ${isPrimary ? 'opacity-90' : ''}`}
-                    >
-                      <div>
-                        <div className="flex items-center justify-between gap-2">
-                          <p className="text-sm font-semibold text-foreground">{svc.name}</p>
-                          {isPrimary && <Badge variant="secondary">Primary</Badge>}
+        <div className="space-y-4">
+          <Card className="space-y-4">
+            <SectionHeader
+              title="My Services"
+              subtitle="Set a price for each selected service. The primary service stays locked."
+            />
+            {enrolled.length === 0 ? (
+              <EmptyState title="No services selected" description="Add services from the catalog below to get started." />
+            ) : (
+              <>
+                {primaryServiceId && (
+                  <div className="rounded-xl border border-primary/20 bg-primary/5 px-4 py-3 text-sm">
+                    <span className="font-semibold text-foreground">Primary service: </span>
+                    <span className="text-muted-foreground">
+                      {catalog.find((service) => service.id === primaryServiceId)?.name || 'Selected service'}
+                    </span>
+                    <p className="mt-1 text-xs text-muted-foreground">
+                      This service is locked because it is the provider's primary service.
+                    </p>
+                  </div>
+                )}
+
+                <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+                  {enrolled.map((serviceId) => {
+                    const svc = catalog.find((service) => service.id === serviceId)
+                    if (!svc) return null
+                    const isPrimary = serviceId === primaryServiceId
+                    return (
+                      <div key={svc.id} className="space-y-3 rounded-xl border border-border bg-background p-4">
+                        <div className="flex items-start justify-between gap-3">
+                          <div className="min-w-0">
+                            <div className="flex items-center gap-2">
+                              <p className="truncate text-sm font-semibold text-foreground">{svc.name}</p>
+                              {isPrimary && <Badge variant="secondary">Primary</Badge>}
+                            </div>
+                            {svc.description && (
+                              <p className="mt-0.5 line-clamp-2 text-xs text-muted-foreground">{svc.description}</p>
+                            )}
+                          </div>
+                          {!isPrimary && (
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="icon"
+                              onClick={() => removeService(serviceId)}
+                              aria-label={`Remove ${svc.name}`}
+                            >
+                              <X className="h-4 w-4" />
+                            </Button>
+                          )}
                         </div>
+
+                        <div>
+                          <label className="mb-1 block text-xs font-medium text-muted-foreground">Service price</label>
+                          <Input
+                            type="number"
+                            min="0"
+                            step="0.01"
+                            placeholder="Set price"
+                            value={prices[svc.id] ?? ''}
+                            onChange={(event) => setPrices((prev) => ({ ...prev, [svc.id]: event.target.value }))}
+                          />
+                        </div>
+                      </div>
+                    )
+                  })}
+                </div>
+
+                <div className="flex items-center gap-3">
+                  <Button onClick={handleSave} disabled={saving}>
+                    {saving ? 'Saving…' : 'Save My Services'}
+                  </Button>
+                  {saved && <span className="text-sm font-medium text-green-600">✓ Saved successfully!</span>}
+                </div>
+              </>
+            )}
+          </Card>
+
+          <Card className="space-y-4">
+            <SectionHeader
+              title="Add More Services"
+              subtitle="Choose from the remaining catalog to expand what you offer."
+            />
+            {catalog.filter((service) => !enrolled.includes(service.id)).length === 0 ? (
+              <EmptyState title="No more services to add" description="You’ve already selected every service in the catalog." />
+            ) : (
+              <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                {catalog
+                  .filter((service) => !enrolled.includes(service.id))
+                  .map((svc) => (
+                    <div key={svc.id} className="space-y-3 rounded-xl border border-border bg-background p-4">
+                      <div>
+                        <p className="text-sm font-semibold text-foreground">{svc.name}</p>
                         {svc.description && (
-                          <p className="mt-0.5 text-xs text-muted-foreground line-clamp-2">{svc.description}</p>
+                          <p className="mt-0.5 line-clamp-2 text-xs text-muted-foreground">{svc.description}</p>
                         )}
                       </div>
-                      {checked && (
-                        <Input
-                          type="number"
-                          min="0"
-                          step="0.01"
-                          placeholder="Service price"
-                          value={prices[svc.id] ?? ''}
-                          onChange={(event) => setPrices((prev) => ({ ...prev, [svc.id]: event.target.value }))}
-                        />
-                      )}
-                      <Button
-                        type="button"
-                        variant={checked ? 'outline' : 'default'}
-                        className="w-full"
-                        onClick={() => toggleService(svc.id)}
-                        disabled={isPrimary}
-                      >
-                        {checked ? 'Remove service' : 'Add service'}
+                      <Button type="button" className="w-full" onClick={() => toggleService(svc.id)}>
+                        Add service
                       </Button>
                     </div>
-                  )
-                })}
+                  ))}
               </div>
-              <div className="mt-4 flex items-center gap-3">
-                <Button onClick={handleSave} disabled={saving}>
-                  {saving ? 'Saving…' : 'Save My Services'}
-                </Button>
-                {saved && <span className="text-sm text-green-600 font-medium">✓ Saved successfully!</span>}
-              </div>
-            </>
-          )}
-        </Card>
+            )}
+          </Card>
+        </div>
       )}
 
       {/* ── Request New Service tab ── */}
@@ -866,4 +915,3 @@ function ModuleCard({ title, subtitle }) {
     </motion.div>
   )
 }
-
