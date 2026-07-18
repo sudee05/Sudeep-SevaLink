@@ -69,13 +69,12 @@ export async function deleteService(id) {
 // ── Provider Services (enrollment) ────────────────────────────
 
 export async function getProviderServices(providerId) {
-  // Returns service IDs the provider has enrolled in
   const { data, error } = await supabase
     .from('provider_services')
-    .select('service_id')
+    .select('service_id, price')
     .eq('provider_id', providerId)
   if (error) throw error
-  return (data || []).map((r) => r.service_id)
+  return data || []
 }
 
 export async function setProviderServices(providerId, serviceIds) {
@@ -84,7 +83,19 @@ export async function setProviderServices(providerId, serviceIds) {
   await supabase.from('provider_services').delete().eq('provider_id', providerId)
   if (!serviceIds.length) return
   // 2. Insert new
-  const rows = serviceIds.map((service_id) => ({ provider_id: providerId, service_id }))
+  const rows = serviceIds.map((service_id) => ({ provider_id: providerId, service_id, price: 0 }))
+  const { error } = await supabase.from('provider_services').insert(rows)
+  if (error) throw error
+}
+
+export async function setProviderServiceRows(providerId, serviceRows) {
+  await supabase.from('provider_services').delete().eq('provider_id', providerId)
+  if (!serviceRows.length) return
+  const rows = serviceRows.map(({ service_id, price }) => ({
+    provider_id: providerId,
+    service_id,
+    price: Number(price || 0),
+  }))
   const { error } = await supabase.from('provider_services').insert(rows)
   if (error) throw error
 }
@@ -127,7 +138,7 @@ async function getProviderServiceMap(providerIds) {
 
   const { data, error } = await supabase
     .from('provider_services')
-    .select('provider_id, services(name)')
+    .select('provider_id, service_id, price, services(name)')
     .in('provider_id', providerIds)
   if (error) throw error
 
@@ -135,7 +146,7 @@ async function getProviderServiceMap(providerIds) {
     const serviceName = row.services?.name
     if (!serviceName) return map
     if (!map[row.provider_id]) map[row.provider_id] = []
-    map[row.provider_id].push(serviceName)
+    map[row.provider_id].push({ service_id: row.service_id, name: serviceName, price: Number(row.price || 0) })
     return map
   }, {})
 }
@@ -146,8 +157,10 @@ async function attachProviderServices(providers) {
 
   return providers.map((provider) => ({
     ...provider,
-    service_names: serviceMap[provider.id] || [],
-    services_label: (serviceMap[provider.id] || []).join(', ') || '-',
+    service_names: (serviceMap[provider.id] || []).map((row) => row.name),
+    service_rows: serviceMap[provider.id] || [],
+    services_label: (serviceMap[provider.id] || []).map((row) => row.name).join(', ') || '-',
+    service_price: (serviceMap[provider.id] || [])[0]?.price || 0,
   }))
 }
 
@@ -181,7 +194,7 @@ export async function getProvidersByService(serviceId) {
 
   const { data: providerServices, error: providerServicesError } = await supabase
     .from('provider_services')
-    .select('provider_id')
+    .select('provider_id, price')
     .eq('service_id', serviceId)
   if (providerServicesError) throw providerServicesError
 
@@ -196,7 +209,18 @@ export async function getProvidersByService(serviceId) {
     .order('rating', { ascending: false })
   if (error) throw error
 
-  if (data?.length) return attachProviderServices(data)
+  const servicePriceMap = (providerServices || []).reduce((map, row) => {
+    map[row.provider_id] = Number(row.price || 0)
+    return map
+  }, {})
+
+  if (data?.length) {
+    const attached = await attachProviderServices(data)
+    return attached.map((provider) => ({
+      ...provider,
+      price: servicePriceMap[provider.id] || provider.service_price || 0,
+    }))
+  }
 
   const { data: fallbackData, error: fallbackError } = await supabase
     .from('providers')
@@ -205,7 +229,11 @@ export async function getProvidersByService(serviceId) {
     .order('rating', { ascending: false })
   if (fallbackError) throw fallbackError
 
-  return attachProviderServices(fallbackData || [])
+  const attachedFallback = await attachProviderServices(fallbackData || [])
+  return attachedFallback.map((provider) => ({
+    ...provider,
+    price: servicePriceMap[provider.id] || provider.service_price || 0,
+  }))
 }
 
 export async function getProviderById(id) {
@@ -482,7 +510,12 @@ export async function createBookingFeedback(feedback) {
     .insert(feedback)
     .select()
     .single()
-  if (error) throw error
+  if (error) {
+    if (isMissingBookingFeedbackTableError(error)) {
+      throw new Error('Feedback is not enabled in the database yet. Run the booking feedback SQL patch in Supabase.')
+    }
+    throw error
+  }
   return data
 }
 
@@ -502,8 +535,15 @@ export async function getProviderFeedback(providerId) {
     .select('*, profiles(full_name), bookings(booking_code, service_title)')
     .eq('provider_id', providerId)
     .order('created_at', { ascending: false })
-  if (error) throw error
+  if (error) {
+    if (isMissingBookingFeedbackTableError(error)) return []
+    throw error
+  }
   return data || []
+}
+
+function isMissingBookingFeedbackTableError(error) {
+  return error?.code === '42P01' || error?.message?.includes("booking_feedback")
 }
 
 // ── Reviews ───────────────────────────────────────────────────

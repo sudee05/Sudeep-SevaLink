@@ -34,6 +34,7 @@ function BusinessProfileSetup({ userId, profileName, profilePhone, onComplete })
   const [services, setServices] = useState([])
   const [servicesLoading, setServicesLoading] = useState(true)
   const [selectedServiceId, setSelectedServiceId] = useState('')
+  const [selectedServicePrice, setSelectedServicePrice] = useState('')
   const [showRequestForm, setShowRequestForm] = useState(false)
   const [requestName, setRequestName] = useState('')
   const [requestDescription, setRequestDescription] = useState('')
@@ -96,6 +97,7 @@ function BusinessProfileSetup({ userId, profileName, profilePhone, onComplete })
     e.preventDefault()
     if (!form.business_name.trim()) { setError('Business name is required'); return }
     if (!form.location.trim()) { setError('Location is required'); return }
+    if (!selectedServiceId && !showRequestForm) { setError('Select a primary service or request a missing one'); return }
 
     setLoading(true)
     setError('')
@@ -120,7 +122,7 @@ function BusinessProfileSetup({ userId, profileName, profilePhone, onComplete })
         if (provider?.id && selectedServiceId) {
           const { error: serviceError } = await supabase
             .from('provider_services')
-            .insert({ provider_id: provider.id, service_id: selectedServiceId })
+            .insert({ provider_id: provider.id, service_id: selectedServiceId, price: Number(selectedServicePrice || 0) })
 
           if (serviceError) {
             setError(serviceError.message)
@@ -229,6 +231,7 @@ function BusinessProfileSetup({ userId, profileName, profilePhone, onComplete })
                     value={selectedServiceId}
                     onChange={(e) => {
                       setSelectedServiceId(e.target.value)
+                      setSelectedServicePrice('')
                       setError('')
                     }}
                     disabled={servicesLoading}
@@ -238,6 +241,18 @@ function BusinessProfileSetup({ userId, profileName, profilePhone, onComplete })
                       value: service.id,
                     }))}
                   />
+                  <div className="mt-3">
+                    <label className="mb-1 block text-sm font-medium">Primary Service Price</label>
+                    <Input
+                      type="number"
+                      min="0"
+                      step="0.01"
+                      placeholder="Price for this service"
+                      value={selectedServicePrice}
+                      onChange={(e) => setSelectedServicePrice(e.target.value)}
+                      disabled={!selectedServiceId}
+                    />
+                  </div>
                   <div className="mt-2 flex flex-wrap items-center gap-2">
                     <Button
                       type="button"
@@ -332,6 +347,7 @@ function BusinessProfileSetup({ userId, profileName, profilePhone, onComplete })
                   <div className="flex justify-between"><span className="text-muted-foreground">Business</span><span className="font-semibold">{form.business_name}</span></div>
                   <div className="flex justify-between"><span className="text-muted-foreground">Location</span><span className="font-semibold">{form.location}</span></div>
                   <div className="flex justify-between"><span className="text-muted-foreground">Service</span><span className="font-semibold">{services.find((service) => service.id === selectedServiceId)?.name || (requestDone ? 'Requested new service' : '-')}</span></div>
+                  <div className="flex justify-between"><span className="text-muted-foreground">Price</span><span className="font-semibold">{selectedServiceId ? `₹${Number(selectedServicePrice || 0).toFixed(2)}` : '-'}</span></div>
                   {form.experience && <div className="flex justify-between"><span className="text-muted-foreground">Experience</span><span className="font-semibold">{form.experience}</span></div>}
                 </div>
                 <div className="rounded-xl border border-primary/20 bg-primary/5 p-3">

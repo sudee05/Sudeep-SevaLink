@@ -2,7 +2,7 @@ import { motion } from 'framer-motion'
 import { useEffect, useMemo, useState } from 'react'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { Link, useParams } from 'react-router-dom'
-import { Bell, Calendar, CheckCircle2, CircleDollarSign, Clock, Plus, Upload } from 'lucide-react'
+import { Bell, Calendar, CheckCircle2, CircleDollarSign, Clock, Upload } from 'lucide-react'
 import { useBookingsQuery, useNotificationsQuery, useProviderBookingsQuery } from '@/hooks/use-queries'
 import { useRealtimeNotifications } from '@/hooks/use-realtime'
 import { BookingBarChart, RevenueAreaChart } from '@/components/charts/revenue-booking-chart'
@@ -20,9 +20,11 @@ import { LoadingGrid } from '@/components/ui/loading-grid'
 import { supabase } from '@/lib/supabase'
 import {
   getBookingById,
+  getProviderFeedback,
   getProviderByUserId,
   markAllNotificationsRead,
   markNotificationRead,
+  setProviderServiceRows,
   updateBookingStatus,
   uploadProviderImage,
   upsertProviderProfile,
@@ -90,11 +92,7 @@ export function ProviderDashboardPage() {
 
       setProviderRecord(provider)
       if (provider?.id) {
-        const { data: feedback } = await supabase
-          .from('booking_feedback')
-          .select('rating')
-          .eq('provider_id', provider.id)
-
+        const feedback = await getProviderFeedback(provider.id)
         const ratings = (feedback || []).map((item) => Number(item.rating)).filter(Boolean)
         const feedbackAverage = ratings.length ? ratings.reduce((sum, rating) => sum + rating, 0) / ratings.length : 0
         setAverageRating(feedbackAverage || Number(provider.rating || 0))
@@ -109,7 +107,7 @@ export function ProviderDashboardPage() {
     }
   }, [])
 
-  const providerBookings = bookings.data || []
+  const providerBookings = useMemo(() => bookings.data || [], [bookings.data])
   const dashboardStats = useMemo(() => {
     const today = new Date().toDateString()
     const todaysBookings = providerBookings.filter((booking) => new Date(booking.date).toDateString() === today).length
@@ -291,6 +289,7 @@ export function ProviderBookingDetailsPage() {
 export function ProviderServicesPage() {
   const [catalog, setCatalog] = useState([])       // master list from services table
   const [enrolled, setEnrolled] = useState([])     // service IDs this provider has selected
+  const [prices, setPrices] = useState({})
   const [primaryServiceId, setPrimaryServiceId] = useState(null)
   const [saving, setSaving] = useState(false)
   const [saved, setSaved] = useState(false)
@@ -336,12 +335,14 @@ export function ProviderServicesPage() {
           // Load already-enrolled services
           supabase
             .from('provider_services')
-            .select('service_id')
+            .select('service_id, price')
             .eq('provider_id', provider.id)
             .order('created_at', { ascending: true })
             .then(({ data: ps }) => {
               const serviceIds = (ps || []).map((r) => r.service_id)
+              const priceMap = Object.fromEntries((ps || []).map((r) => [r.service_id, String(r.price ?? 0)]))
               setEnrolled(serviceIds)
+              setPrices(priceMap)
               setPrimaryServiceId(serviceIds[0] || null)
             })
         })
@@ -354,6 +355,7 @@ export function ProviderServicesPage() {
     setEnrolled((prev) =>
       prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]
     )
+    setPrices((prev) => (prev[id] ? prev : { ...prev, [id]: '0' }))
     setSaved(false)
   }
 
@@ -361,18 +363,17 @@ export function ProviderServicesPage() {
     if (!providerRecord) return
     setSaving(true)
     try {
-      const servicesToSave = primaryServiceId
+      const orderedServiceIds = primaryServiceId
         ? [primaryServiceId, ...enrolled.filter((serviceId) => serviceId !== primaryServiceId)]
         : enrolled
+      const serviceRows = orderedServiceIds.map((service_id) => ({
+        service_id,
+        price: Number(prices[service_id] || 0),
+      }))
 
-      await supabase.from('provider_services').delete().eq('provider_id', providerRecord.id)
-      if (servicesToSave.length) {
-        await supabase.from('provider_services').insert(
-          servicesToSave.map((service_id) => ({ provider_id: providerRecord.id, service_id }))
-        )
-      }
-      setEnrolled(servicesToSave)
-      setPrimaryServiceId(servicesToSave[0] || null)
+      await setProviderServiceRows(providerRecord.id, serviceRows)
+      setEnrolled(orderedServiceIds)
+      setPrimaryServiceId(orderedServiceIds[0] || null)
       setSaved(true)
     } finally {
       setSaving(false)
@@ -446,28 +447,21 @@ export function ProviderServicesPage() {
                   </p>
                 </div>
               )}
-              <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+              <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
                 {catalog.map((svc) => {
                   const checked = enrolled.includes(svc.id)
                   const isPrimary = svc.id === primaryServiceId
                   return (
-                    <button
+                    <div
                       key={svc.id}
-                      onClick={() => toggleService(svc.id)}
-                      disabled={isPrimary}
-                      className={`flex items-start gap-3 rounded-xl border p-4 text-left transition-all hover:shadow-sm ${
+                      className={`space-y-3 rounded-xl border p-4 text-left transition-all hover:shadow-sm ${
                         checked
                           ? 'border-primary bg-primary/5 ring-1 ring-primary/30'
                           : 'border-border bg-background hover:border-primary/40'
-                      } ${isPrimary ? 'cursor-not-allowed opacity-90' : ''}`}
+                      } ${isPrimary ? 'opacity-90' : ''}`}
                     >
-                      <div className={`mt-0.5 h-5 w-5 shrink-0 rounded-md border-2 flex items-center justify-center transition-colors ${
-                        checked ? 'border-primary bg-primary' : 'border-border'
-                      }`}>
-                        {checked && <span className="text-white text-xs font-bold">✓</span>}
-                      </div>
                       <div>
-                        <div className="flex flex-wrap items-center gap-2">
+                        <div className="flex items-center justify-between gap-2">
                           <p className="text-sm font-semibold text-foreground">{svc.name}</p>
                           {isPrimary && <Badge variant="secondary">Primary</Badge>}
                         </div>
@@ -475,7 +469,26 @@ export function ProviderServicesPage() {
                           <p className="mt-0.5 text-xs text-muted-foreground line-clamp-2">{svc.description}</p>
                         )}
                       </div>
-                    </button>
+                      {checked && (
+                        <Input
+                          type="number"
+                          min="0"
+                          step="0.01"
+                          placeholder="Service price"
+                          value={prices[svc.id] ?? ''}
+                          onChange={(event) => setPrices((prev) => ({ ...prev, [svc.id]: event.target.value }))}
+                        />
+                      )}
+                      <Button
+                        type="button"
+                        variant={checked ? 'outline' : 'default'}
+                        className="w-full"
+                        onClick={() => toggleService(svc.id)}
+                        disabled={isPrimary}
+                      >
+                        {checked ? 'Remove service' : 'Add service'}
+                      </Button>
+                    </div>
                   )
                 })}
               </div>
@@ -623,15 +636,11 @@ export function ProviderReviewsPage() {
         return
       }
 
-      const { data } = await supabase
-        .from('booking_feedback')
-        .select('*, profiles(full_name), bookings(booking_code, service_title)')
-        .eq('provider_id', provider.id)
-        .order('created_at', { ascending: false })
+      const feedbackRows = await getProviderFeedback(provider.id)
 
       if (active) {
         setProviderRecord(provider)
-        setFeedback(data || [])
+        setFeedback(feedbackRows)
         setLoading(false)
       }
     }
@@ -726,7 +735,6 @@ export function ProviderNotificationsPage() {
 
 export function ProviderProfilePage() {
   const [userId, setUserId] = useState(null)
-  const [profile, setProfile] = useState(null)
   const [form, setForm] = useState({
     business_name: '',
     phone: '',
@@ -758,7 +766,6 @@ export function ProviderProfilePage() {
 
       if (active) {
         setUserId(user.id)
-        setProfile(userProfile)
         setForm({
           business_name: provider?.business_name || userProfile?.full_name || '',
           phone: userProfile?.phone || '',
