@@ -259,7 +259,7 @@ export function ProviderBookingDetailsPage() {
     <motion.div className="space-y-4" {...fade}>
       <SectionHeader title={`Booking ${booking.booking_code || booking.id}`} subtitle="View booking details, status actions, and customer messages." />
       <div className="grid gap-4 lg:grid-cols-2">
-        <Card className="space-y-3">
+        <Card className="space-y-3 relative">
           <h3 className="font-semibold">Booking Details</h3>
           <p className="text-sm text-muted-foreground">Customer: {booking.customer_name || booking.customer || '-'}</p>
           <p className="text-sm text-muted-foreground">Phone: {booking.customer_phone || '-'}</p>
@@ -268,18 +268,18 @@ export function ProviderBookingDetailsPage() {
           <p className="text-sm text-muted-foreground">Address: {booking.address || '-'}</p>
           <p className="text-sm text-muted-foreground">Notes: {booking.notes || '-'}</p>
           <Badge variant={booking.status === 'completed' ? 'success' : booking.status === 'cancelled' || booking.status === 'rejected' ? 'danger' : 'warning'}>{booking.status}</Badge>
-        </Card>
-        <Card className="space-y-3">
-          <h3 className="font-semibold">Manage Booking</h3>
-          <ProviderBookingActions booking={booking} />
+        <div className=' absolute top-4 right-4'> 
+           <ProviderBookingActions booking={booking} />
           {booking.status === 'accepted' && (
             <Button disabled={statusMutation.isPending} onClick={() => statusMutation.mutate('in_progress')}>
               Mark In Progress
             </Button>
           )}
-        </Card>
+          </div>
+        </Card> 
+         <BookingChatPanel booking={booking} userId={userId} />
       </div>
-      <BookingChatPanel booking={booking} userId={userId} />
+    
     </motion.div>
   )
 }
