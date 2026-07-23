@@ -29,7 +29,7 @@ export function PortalTopbar({ title, nav = [], notificationPath }) {
           <Logo title={title} />
         </div>
         {nav.length > 0 && (
-          <nav className="order-3 flex w-full items-center gap-1 overflow-x-auto lg:order-none lg:w-auto">
+          <nav className="order-3 flex w-full items-center gap-1 overflow-x-auto lg:order-0 lg:w-auto">
             {nav.map((item) => {
               const Icon = item.icon
               return (

@@ -192,8 +192,8 @@ export function LandingPage() {
           </div>
 
           <div className="relative">
-            <div className="overflow-hidden rounded-[2rem] border border-blue-100 bg-white p-2 shadow-[0_28px_80px_rgba(44,77,193,0.18)]">
-              <img src={heroConsultation} alt="Professional consultation" className="h-[320px] w-full rounded-[1.5rem] object-cover sm:h-[430px] lg:h-[520px]" />
+            <div className="overflow-hidden rounded-4xl border border-blue-100 bg-white p-2 shadow-[0_28px_80px_rgba(44,77,193,0.18)]">
+              <img src={heroConsultation} alt="Professional consultation" className="h-80 w-full rounded-3xl object-cover sm:h-107.5 lg:h-130" />
             </div>
             <div className="absolute -bottom-5 left-5 rounded-2xl border border-emerald-100 bg-white px-4 py-3 shadow-xl">
               <div className="flex items-center gap-3">
@@ -275,11 +275,11 @@ export function LandingPage() {
               <ArrowRight className="h-4 w-4" />
             </Link>
           </div>
-          <div className="grid auto-rows-[220px] gap-4 md:grid-cols-4">
+          <div className="grid auto-rows-55 gap-4 md:grid-cols-4">
             {popularCategories.map((category) => (
               <article key={category.title} className={`group relative overflow-hidden rounded-[1.8rem] ${category.className}`}>
                 <img src={category.image} alt={category.title} className="h-full w-full object-cover transition duration-500 group-hover:scale-105" />
-                <div className="absolute inset-0 bg-gradient-to-t from-black/75 via-black/20 to-transparent" />
+                <div className="absolute inset-0 bg-linear-to-t from-black/75 via-black/20 to-transparent" />
                 <div className="absolute inset-x-0 bottom-0 p-5 text-white">
                   <h3 className="text-xl font-bold">{category.title}</h3>
                   <p className="mt-1 text-sm text-white/80">{category.subtitle}</p>
@@ -338,8 +338,8 @@ export function LandingPage() {
               <Button className="rounded-2xl bg-emerald-400 px-8 text-slate-950 hover:bg-emerald-300">Join as a Pro</Button>
             </Link>
           </div>
-          <div className="relative rounded-[2rem] border border-white/10 bg-white/6 p-4 shadow-2xl backdrop-blur-sm">
-            <img src={providerGrowthImage} alt="Provider dashboard" className="h-[420px] w-full rounded-[1.6rem] object-cover" />
+          <div className="relative rounded-4xl border border-white/10 bg-white/6 p-4 shadow-2xl backdrop-blur-sm">
+            <img src={providerGrowthImage} alt="Provider dashboard" className="h-105 w-full rounded-[1.6rem] object-cover" />
             <div className="absolute bottom-8 left-8 rounded-2xl bg-white px-4 py-3 text-slate-900 shadow-xl">
               <div className="flex items-center gap-3">
                 <img src={markImage} alt="Mark Sterling" className="h-11 w-11 rounded-full object-cover" />
