@@ -336,8 +336,9 @@ export async function getAllProviders() {
 
   return rows.map((row) => ({
     ...row,
-    service_names: serviceMap[row.provider_record_id] || [],
-    services_label: (serviceMap[row.provider_record_id] || []).join(", ") || "-",
+    service_names: (serviceMap[row.provider_record_id] || []).map((service) => service.name),
+    service_rows: serviceMap[row.provider_record_id] || [],
+    services_label: (serviceMap[row.provider_record_id] || []).map((service) => service.name).join(", ") || "-",
   }));
 }
 

@@ -286,7 +286,11 @@ export function AdminProvidersPage() {
           columns={[
             { key: "business_name", label: "Business Name", render: (row) => row.business_name || "-" },
             { key: "owner_name", label: "Owner", render: (row) => row.owner_name || row.profiles?.full_name || "-" },
-            { key: "services", label: "Services", render: (row) => row.services_label || "-" },
+            {
+              key: "services",
+              label: "Services",
+              render: (row) => row.service_names?.[0]?.name || row.service_names?.[0] || row.services_label || "-",
+            },
             { key: "location", label: "Location", render: (row) => row.location || "-" },
             { key: "rating", label: "Rating", render: (row) => Number(row.rating || 0).toFixed(1) },
             {

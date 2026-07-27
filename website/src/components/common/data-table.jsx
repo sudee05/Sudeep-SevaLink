@@ -2,6 +2,7 @@ import { Card } from '@/components/ui/card'
 import { cn } from '@/lib/utils'
 
 export function DataTable({ columns, rows }) {
+ 
   return (
     <Card className="overflow-hidden p-0">
       <div className="overflow-x-auto">
