@@ -1,23 +1,24 @@
-import { motion } from 'framer-motion'
-import { useEffect, useMemo, useState } from 'react'
-import { useMutation, useQueryClient } from '@tanstack/react-query'
-import { Link, useParams } from 'react-router-dom'
-import { Bell, Calendar, CheckCircle2, CircleDollarSign, Clock, Upload, X } from 'lucide-react'
-import { useBookingsQuery, useNotificationsQuery, useProviderBookingsQuery } from '@/hooks/use-queries'
-import { useRealtimeNotifications } from '@/hooks/use-realtime'
-import { BookingBarChart, RevenueAreaChart } from '@/components/charts/revenue-booking-chart'
-import { BookingChatPanel } from '@/components/common/booking-chat-panel'
-import { DataTable } from '@/components/common/data-table'
-import { SectionHeader } from '@/components/common/section-header'
-import { StatCard } from '@/components/common/stat-card'
-import { Badge } from '@/components/ui/badge'
-import { Button } from '@/components/ui/button'
-import { Card } from '@/components/ui/card'
-import { Input } from '@/components/ui/input'
-import { Textarea } from '@/components/ui/textarea'
-import { EmptyState } from '@/components/ui/empty-state'
-import { LoadingGrid } from '@/components/ui/loading-grid'
-import { supabase } from '@/lib/supabase'
+import { motion } from "framer-motion";
+import { useEffect, useMemo, useState } from "react";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { Link, useParams } from "react-router-dom";
+import { Bell, Calendar, CheckCircle2, CircleDollarSign, Clock, Upload, X } from "lucide-react";
+import { useBookingsQuery, useNotificationsQuery, useProviderBookingsQuery } from "@/hooks/use-queries";
+import { useRealtimeNotifications } from "@/hooks/use-realtime";
+import { BookingBarChart, RevenueAreaChart } from "@/components/charts/revenue-booking-chart";
+import { BookingChatPanel } from "@/components/common/booking-chat-panel";
+import { DataTable } from "@/components/common/data-table";
+import { SectionHeader } from "@/components/common/section-header";
+import { StatCard } from "@/components/common/stat-card";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Card } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
+import { EmptyState } from "@/components/ui/empty-state";
+import { LoadingGrid } from "@/components/ui/loading-grid";
+import { Select } from "@/components/ui/select";
+import { supabase } from "@/lib/supabase";
 import {
   getBookingById,
   getProviderFeedback,
@@ -28,107 +29,131 @@ import {
   updateBookingStatus,
   uploadProviderImage,
   upsertProviderProfile,
-} from '@/services/supabaseApi'
-import { formatCurrency, formatDate } from '@/utils/format'
+} from "@/services/supabaseApi";
+import { formatCurrency, formatDate } from "@/utils/format";
 
 const fade = {
   initial: { opacity: 0, y: 10 },
   animate: { opacity: 1, y: 0 },
   transition: { duration: 0.3 },
-}
+};
 
 function ProviderBookingActions({ booking }) {
-  const queryClient = useQueryClient()
+  const queryClient = useQueryClient();
   const statusMutation = useMutation({
     mutationFn: (status) => updateBookingStatus(booking.id, status),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['bookings'] }),
-  })
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["bookings"] }),
+  });
 
-  const busy = statusMutation.isPending
+  const busy = statusMutation.isPending;
 
-  if (booking.status === 'completed') {
-    return <Badge variant="success" className="capitalize">completed</Badge>
+  if (booking.status === "completed") {
+    return (
+      <Badge variant="success" className="capitalize">
+        completed
+      </Badge>
+    );
   }
 
-  if (booking.status === 'cancelled' || booking.status === 'rejected') {
-    return <Badge variant="outline" className="capitalize">{booking.status}</Badge>
+  if (booking.status === "cancelled" || booking.status === "rejected") {
+    return (
+      <Badge variant="outline" className="capitalize">
+        {booking.status}
+      </Badge>
+    );
   }
 
   return (
     <div className="flex flex-wrap gap-1">
-      {booking.status === 'pending' && (
+      {booking.status === "pending" && (
         <>
-          <Button size="sm" disabled={busy} onClick={() => statusMutation.mutate('accepted')}>Accept</Button>
-          <Button size="sm" variant="danger" disabled={busy} onClick={() => statusMutation.mutate('rejected')}>Reject</Button>
+          <Button size="sm" disabled={busy} onClick={() => statusMutation.mutate("accepted")}>
+            Accept
+          </Button>
+          <Button size="sm" variant="danger" disabled={busy} onClick={() => statusMutation.mutate("rejected")}>
+            Reject
+          </Button>
         </>
       )}
-      {['pending', 'accepted', 'confirmed'].includes(booking.status) && (
-        <Button size="sm" variant="outline" disabled={busy} onClick={() => statusMutation.mutate('reschedule_requested')}>Reschedule</Button>
+      {["pending", "accepted", "confirmed"].includes(booking.status) && (
+        <Button
+          size="sm"
+          variant="outline"
+          disabled={busy}
+          onClick={() => statusMutation.mutate("reschedule_requested")}>
+          Reschedule
+        </Button>
       )}
-      {['accepted', 'confirmed', 'in_progress'].includes(booking.status) && (
-        <Button size="sm" variant="success" disabled={busy} onClick={() => statusMutation.mutate('completed')}>Complete</Button>
+      {["accepted", "confirmed", "in_progress"].includes(booking.status) && (
+        <Button size="sm" variant="success" disabled={busy} onClick={() => statusMutation.mutate("completed")}>
+          Complete
+        </Button>
       )}
     </div>
-  )
+  );
 }
 
 // ── Dashboard ─────────────────────────────────────────────────
 
 export function ProviderDashboardPage() {
-  const [providerRecord, setProviderRecord] = useState(null)
-  const [averageRating, setAverageRating] = useState(0)
-  const [loadingProvider, setLoadingProvider] = useState(true)
-  const bookings = useProviderBookingsQuery(providerRecord?.id)
+  const [providerRecord, setProviderRecord] = useState(null);
+  const [averageRating, setAverageRating] = useState(0);
+  const [loadingProvider, setLoadingProvider] = useState(true);
+  const bookings = useProviderBookingsQuery(providerRecord?.id);
 
   useEffect(() => {
-    let active = true
+    let active = true;
 
     async function loadProviderDashboard() {
-      setLoadingProvider(true)
-      const { data: { user } } = await supabase.auth.getUser()
+      setLoadingProvider(true);
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
       if (!user) {
-        if (active) setLoadingProvider(false)
-        return
+        if (active) setLoadingProvider(false);
+        return;
       }
 
-      const provider = await getProviderByUserId(user.id)
-      if (!active) return
+      const provider = await getProviderByUserId(user.id);
+      if (!active) return;
 
-      setProviderRecord(provider)
+      setProviderRecord(provider);
       if (provider?.id) {
-        const feedback = await getProviderFeedback(provider.id)
-        const ratings = (feedback || []).map((item) => Number(item.rating)).filter(Boolean)
-        const feedbackAverage = ratings.length ? ratings.reduce((sum, rating) => sum + rating, 0) / ratings.length : 0
-        setAverageRating(feedbackAverage || Number(provider.rating || 0))
+        const feedback = await getProviderFeedback(provider.id);
+        const ratings = (feedback || []).map((item) => Number(item.rating)).filter(Boolean);
+        const feedbackAverage = ratings.length ? ratings.reduce((sum, rating) => sum + rating, 0) / ratings.length : 0;
+        setAverageRating(feedbackAverage || Number(provider.rating || 0));
       }
 
-      setLoadingProvider(false)
+      setLoadingProvider(false);
     }
 
-    loadProviderDashboard()
+    loadProviderDashboard();
     return () => {
-      active = false
-    }
-  }, [])
+      active = false;
+    };
+  }, []);
 
-  const providerBookings = useMemo(() => bookings.data || [], [bookings.data])
+  const providerBookings = useMemo(() => bookings.data || [], [bookings.data]);
   const dashboardStats = useMemo(() => {
-    const today = new Date().toDateString()
-    const todaysBookings = providerBookings.filter((booking) => new Date(booking.date).toDateString() === today).length
-    const pendingBookings = providerBookings.filter((booking) => ['pending', 'reschedule_requested'].includes(booking.status)).length
-    const completedBookings = providerBookings.filter((booking) => booking.status === 'completed').length
+    const today = new Date().toDateString();
+    const todaysBookings = providerBookings.filter((booking) => new Date(booking.date).toDateString() === today).length;
+    const pendingBookings = providerBookings.filter((booking) =>
+      ["pending", "reschedule_requested"].includes(booking.status),
+    ).length;
+    const completedBookings = providerBookings.filter((booking) => booking.status === "completed").length;
     const revenue = providerBookings
-      .filter((booking) => booking.status === 'completed')
-      .reduce((sum, booking) => sum + Number(booking.amount || 0), 0)
+      .filter((booking) => booking.status === "completed")
+      .reduce((sum, booking) => sum + Number(booking.amount || 0), 0);
 
     const monthlyMap = providerBookings.reduce((map, booking) => {
-      const date = new Date(booking.date || booking.created_at)
-      const month = date.toLocaleString('en-US', { month: 'short' })
-      if (!map[month]) map[month] = { month, revenue: 0, bookings: 0 }
-      map[month].bookings += 1
-      map[month].revenue += Number(booking.amount || 0)
-      return map
-    }, {})
+      const date = new Date(booking.date || booking.created_at);
+      const month = date.toLocaleString("en-US", { month: "short" });
+      if (!map[month]) map[month] = { month, revenue: 0, bookings: 0 };
+      map[month].bookings += 1;
+      map[month].revenue += Number(booking.amount || 0);
+      return map;
+    }, {});
 
     return {
       todaysBookings,
@@ -136,18 +161,41 @@ export function ProviderDashboardPage() {
       completedBookings,
       revenue,
       trend: Object.values(monthlyMap),
-    }
-  }, [providerBookings])
+    };
+  }, [providerBookings]);
 
   return (
     <motion.div className="space-y-6" {...fade}>
-      <SectionHeader title="Business Overview" subtitle="Manage jobs, revenue, and client experience from one dashboard." />
+      <SectionHeader
+        title="Business Overview"
+        subtitle="Manage jobs, revenue, and client experience from one dashboard."
+      />
       <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-5">
-        <StatCard label="Today's Bookings" value={loadingProvider || bookings.isLoading ? '...' : dashboardStats.todaysBookings} icon={Calendar} />
-        <StatCard label="Pending Requests" value={loadingProvider || bookings.isLoading ? '...' : dashboardStats.pendingBookings} icon={Clock} />
-        <StatCard label="Completed Jobs" value={loadingProvider || bookings.isLoading ? '...' : dashboardStats.completedBookings} icon={CheckCircle2} />
-        <StatCard label="Revenue" value={loadingProvider || bookings.isLoading ? '...' : formatCurrency(dashboardStats.revenue)} icon={CircleDollarSign} />
-        <StatCard label="Average Rating" value={loadingProvider ? '...' : Number(averageRating || 0).toFixed(1)} icon={CheckCircle2} />
+        <StatCard
+          label="Today's Bookings"
+          value={loadingProvider || bookings.isLoading ? "..." : dashboardStats.todaysBookings}
+          icon={Calendar}
+        />
+        <StatCard
+          label="Pending Requests"
+          value={loadingProvider || bookings.isLoading ? "..." : dashboardStats.pendingBookings}
+          icon={Clock}
+        />
+        <StatCard
+          label="Completed Jobs"
+          value={loadingProvider || bookings.isLoading ? "..." : dashboardStats.completedBookings}
+          icon={CheckCircle2}
+        />
+        <StatCard
+          label="Revenue"
+          value={loadingProvider || bookings.isLoading ? "..." : formatCurrency(dashboardStats.revenue)}
+          icon={CircleDollarSign}
+        />
+        <StatCard
+          label="Average Rating"
+          value={loadingProvider ? "..." : Number(averageRating || 0).toFixed(1)}
+          icon={CheckCircle2}
+        />
       </div>
       <div className="grid gap-4 xl:grid-cols-2">
         <RevenueAreaChart data={dashboardStats.trend} />
@@ -157,17 +205,27 @@ export function ProviderDashboardPage() {
         <SectionHeader title="Recent Bookings" subtitle="Accept, reject, or reschedule incoming jobs." />
         <DataTable
           columns={[
-            { key: 'customer', label: 'Customer' },
-            { key: 'service', label: 'Service' },
-            { key: 'date', label: 'Time', render: (row) => formatDate(row.date) },
-            { key: 'status', label: 'Status', render: (row) => <Badge variant={row.status === 'completed' ? 'success' : 'warning'} className="capitalize">{row.status}</Badge> },
+            { key: "customer", label: "Customer" },
+            { key: "service", label: "Service" },
+            { key: "date", label: "Time", render: (row) => formatDate(row.date) },
             {
-              key: 'action',
-              label: 'Action',
+              key: "status",
+              label: "Status",
+              render: (row) => (
+                <Badge variant={row.status === "completed" ? "success" : "warning"} className="capitalize">
+                  {row.status}
+                </Badge>
+              ),
+            },
+            {
+              key: "action",
+              label: "Action",
               render: (row) => (
                 <div className="flex flex-wrap gap-1">
                   <Link to={`/provider/bookings/${row.id}`}>
-                    <Button size="sm" variant="outline">View</Button>
+                    <Button size="sm" variant="outline">
+                      View
+                    </Button>
                   </Link>
                   <ProviderBookingActions booking={row} />
                 </div>
@@ -178,30 +236,32 @@ export function ProviderDashboardPage() {
         />
       </Card>
     </motion.div>
-  )
+  );
 }
 
 // ── Bookings ──────────────────────────────────────────────────
 
 export function ProviderBookingsPage() {
-  const { data = [] } = useBookingsQuery()
+  const { data = [] } = useBookingsQuery();
 
   return (
     <motion.div className="space-y-4" {...fade}>
       <SectionHeader title="Bookings" subtitle="View details, timelines, and invoices." />
       <DataTable
         columns={[
-          { key: 'customer', label: 'Customer' },
-          { key: 'address', label: 'Address' },
-          { key: 'date', label: 'Scheduled', render: (row) => formatDate(row.date) },
-          { key: 'amount', label: 'Amount', render: (row) => formatCurrency(row.amount) },
+          { key: "customer", label: "Customer" },
+          { key: "address", label: "Address" },
+          { key: "date", label: "Scheduled", render: (row) => formatDate(row.date) },
+          { key: "amount", label: "Amount", render: (row) => formatCurrency(row.amount) },
           {
-            key: 'manage',
-            label: 'Manage',
+            key: "manage",
+            label: "Manage",
             render: (row) => (
               <div className="flex flex-wrap gap-1">
                 <Link to={`/provider/bookings/${row.id}`}>
-                  <Button size="sm" variant="outline">View Details</Button>
+                  <Button size="sm" variant="outline">
+                    View Details
+                  </Button>
                 </Link>
                 <ProviderBookingActions booking={row} />
               </div>
@@ -211,209 +271,242 @@ export function ProviderBookingsPage() {
         rows={data}
       />
     </motion.div>
-  )
+  );
 }
 
 export function ProviderBookingDetailsPage() {
-  const { id } = useParams()
-  const queryClient = useQueryClient()
-  const [userId, setUserId] = useState(null)
-  const [booking, setBooking] = useState(null)
-  const [loading, setLoading] = useState(true)
+  const { id } = useParams();
+  const queryClient = useQueryClient();
+  const [userId, setUserId] = useState(null);
+  const [booking, setBooking] = useState(null);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    let active = true
+    let active = true;
 
     async function loadBooking() {
-      setLoading(true)
-      const { data: { user } } = await supabase.auth.getUser()
-      if (!active) return
-      setUserId(user?.id || null)
+      setLoading(true);
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+      if (!active) return;
+      setUserId(user?.id || null);
 
       if (!id) {
-        setLoading(false)
-        return
+        setLoading(false);
+        return;
       }
 
-      const data = await getBookingById(id)
+      const data = await getBookingById(id);
       if (active) {
-        setBooking(data)
-        setLoading(false)
+        setBooking(data);
+        setLoading(false);
       }
     }
 
-    loadBooking()
+    loadBooking();
     return () => {
-      active = false
-    }
-  }, [id])
+      active = false;
+    };
+  }, [id]);
 
   const statusMutation = useMutation({
     mutationFn: (status) => updateBookingStatus(booking.id, status),
     onSuccess: (updatedBooking) => {
-      setBooking((current) => ({ ...current, ...updatedBooking }))
-      queryClient.invalidateQueries({ queryKey: ['bookings'] })
+      setBooking((current) => ({ ...current, ...updatedBooking }));
+      queryClient.invalidateQueries({ queryKey: ["bookings"] });
     },
-  })
+  });
 
-  if (loading) return <LoadingGrid count={2} />
-  if (!booking) return <EmptyState title="Booking not found" />
+  if (loading) return <LoadingGrid count={2} />;
+  if (!booking) return <EmptyState title="Booking not found" />;
 
   return (
     <motion.div className="space-y-4" {...fade}>
-      <SectionHeader title={`Booking ${booking.booking_code || booking.id}`} subtitle="View booking details, status actions, and customer messages." />
+      <SectionHeader
+        title={`Booking ${booking.booking_code || booking.id}`}
+        subtitle="View booking details, status actions, and customer messages."
+      />
       <div className="grid gap-4 lg:grid-cols-2">
         <Card className="space-y-3 relative">
           <h3 className="font-semibold">Booking Details</h3>
-          <p className="text-sm text-muted-foreground">Customer: {booking.customer_name || booking.customer || '-'}</p>
-          <p className="text-sm text-muted-foreground">Phone: {booking.customer_phone || '-'}</p>
-          <p className="text-sm text-muted-foreground">Service: {booking.service_title || booking.service || '-'}</p>
+          <p className="text-sm text-muted-foreground">Customer: {booking.customer_name || booking.customer || "-"}</p>
+          <p className="text-sm text-muted-foreground">Phone: {booking.customer_phone || "-"}</p>
+          <p className="text-sm text-muted-foreground">Service: {booking.service_title || booking.service || "-"}</p>
           <p className="text-sm text-muted-foreground">Scheduled: {formatDate(booking.date)}</p>
-          <p className="text-sm text-muted-foreground">Address: {booking.address || '-'}</p>
-          <p className="text-sm text-muted-foreground">Notes: {booking.notes || '-'}</p>
-          <Badge variant={booking.status === 'completed' ? 'success' : booking.status === 'cancelled' || booking.status === 'rejected' ? 'danger' : 'warning'}>{booking.status}</Badge>
-        <div className=' absolute top-4 right-4'> 
-           <ProviderBookingActions booking={booking} />
-          {booking.status === 'accepted' && (
-            <Button disabled={statusMutation.isPending} onClick={() => statusMutation.mutate('in_progress')}>
-              Mark In Progress
-            </Button>
-          )}
+          <p className="text-sm text-muted-foreground">Address: {booking.address || "-"}</p>
+          <p className="text-sm text-muted-foreground">Notes: {booking.notes || "-"}</p>
+          <Badge
+            variant={
+              booking.status === "completed"
+                ? "success"
+                : booking.status === "cancelled" || booking.status === "rejected"
+                  ? "danger"
+                  : "warning"
+            }>
+            {booking.status}
+          </Badge>
+          <div className=" absolute top-4 right-4">
+            <ProviderBookingActions booking={booking} />
+            {booking.status === "accepted" && (
+              <Button disabled={statusMutation.isPending} onClick={() => statusMutation.mutate("in_progress")}>
+                Mark In Progress
+              </Button>
+            )}
           </div>
-        </Card> 
-         <BookingChatPanel booking={booking} userId={userId} />
+        </Card>
+        <BookingChatPanel booking={booking} userId={userId} />
       </div>
-    
     </motion.div>
-  )
+  );
 }
 
 // ── Services ──────────────────────────────────────────────────
 
 export function ProviderServicesPage() {
-  const [catalog, setCatalog] = useState([])       // master list from services table
-  const [enrolled, setEnrolled] = useState([])     // service IDs this provider has selected
-  const [prices, setPrices] = useState({})
-  const [primaryServiceId, setPrimaryServiceId] = useState(null)
-  const [saving, setSaving] = useState(false)
-  const [saved, setSaved] = useState(false)
-  const [providerRecord, setProviderRecord] = useState(null)
-  const [userProfile, setUserProfile] = useState(null) // holds { id, phone } from profiles table
+  const [categories, setCategories] = useState([]);
+  const [catalog, setCatalog] = useState([]); // master list from services table
+  const [enrolled, setEnrolled] = useState([]); // service IDs this provider has selected
+  const [prices, setPrices] = useState({});
+  const [primaryServiceId, setPrimaryServiceId] = useState(null);
+  const [saving, setSaving] = useState(false);
+  const [saved, setSaved] = useState(false);
+  const [providerRecord, setProviderRecord] = useState(null);
+  const [userProfile, setUserProfile] = useState(null); // holds { id, phone } from profiles table
+  const [selectedCategoryId, setSelectedCategoryId] = useState("");
 
   // Request form
-  const [reqName, setReqName] = useState('')
-  const [reqDesc, setReqDesc] = useState('')
-  const [reqLoading, setReqLoading] = useState(false)
-  const [reqDone, setReqDone] = useState(false)
-  const [tab, setTab] = useState('select') // 'select' | 'request'
+  const [reqCategory, setReqCategory] = useState("");
+  const [reqName, setReqName] = useState("");
+  const [reqDesc, setReqDesc] = useState("");
+  const [reqLoading, setReqLoading] = useState(false);
+  const [reqDone, setReqDone] = useState(false);
+  const [tab, setTab] = useState("select"); // 'select' | 'request'
 
   useEffect(() => {
-    // Load master service catalog
-    supabase
-      .from('services')
-      .select('id, name, description')
-      .order('name')
-      .then(({ data }) => setCatalog(data || []))
+    // Load master categories and service catalog
+    Promise.all([
+      supabase.from("categories").select("id, name").order("name"),
+      supabase
+        .from("services")
+        .select("id, name, description, category_id, category:categories(id, name)")
+        .order("name"),
+    ]).then(([{ data: categoryData }, { data: serviceData }]) => {
+      setCategories(categoryData || []);
+      setCatalog(
+        (serviceData || []).map((service) => ({
+          ...service,
+          category_name: service.category?.name || "",
+        })),
+      );
+    });
 
     // Get current auth user → fetch their profile (phone) + provider record
     supabase.auth.getUser().then(({ data: { user } }) => {
-      if (!user) return
+      if (!user) return;
 
       // Fetch profile for user_id + phone (used in service_requests)
       supabase
-        .from('profiles')
-        .select('id, full_name, phone')
-        .eq('id', user.id)
+        .from("profiles")
+        .select("id, full_name, phone")
+        .eq("id", user.id)
         .maybeSingle()
-        .then(({ data: profile }) => setUserProfile(profile))
+        .then(({ data: profile }) => setUserProfile(profile));
 
       // Fetch provider record for provider_id
       supabase
-        .from('providers')
-        .select('id')
-        .eq('user_id', user.id)
+        .from("providers")
+        .select("id")
+        .eq("user_id", user.id)
         .maybeSingle()
         .then(({ data: provider }) => {
-          if (!provider) return
-          setProviderRecord(provider)
+          if (!provider) return;
+          setProviderRecord(provider);
           // Load already-enrolled services
           supabase
-            .from('provider_services')
-            .select('service_id, price')
-            .eq('provider_id', provider.id)
-            .order('created_at', { ascending: true })
+            .from("provider_services")
+            .select("service_id, price")
+            .eq("provider_id", provider.id)
+            .order("created_at", { ascending: true })
             .then(({ data: ps }) => {
-              const serviceIds = (ps || []).map((r) => r.service_id)
-              const priceMap = Object.fromEntries((ps || []).map((r) => [r.service_id, String(r.price ?? 0)]))
-              setEnrolled(serviceIds)
-              setPrices(priceMap)
-              setPrimaryServiceId(serviceIds[0] || null)
-            })
-        })
-    })
-  }, [])
+              const serviceIds = (ps || []).map((r) => r.service_id);
+              const priceMap = Object.fromEntries((ps || []).map((r) => [r.service_id, String(r.price ?? 0)]));
+              setEnrolled(serviceIds);
+              setPrices(priceMap);
+              setPrimaryServiceId(serviceIds[0] || null);
+            });
+        });
+    });
+  }, []);
+
+  const addableByCategory = useMemo(() => {
+    if (!selectedCategoryId) return [];
+    return catalog.filter(
+      (service) => String(service.category_id) === String(selectedCategoryId) && !enrolled.includes(service.id),
+    );
+  }, [catalog, enrolled, selectedCategoryId]);
 
   function toggleService(id) {
-    if (id === primaryServiceId) return
+    if (id === primaryServiceId) return;
 
-    setEnrolled((prev) =>
-      prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]
-    )
-    setPrices((prev) => (prev[id] ? prev : { ...prev, [id]: '0' }))
-    setSaved(false)
+    setEnrolled((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]));
+    setPrices((prev) => (prev[id] ? prev : { ...prev, [id]: "0" }));
+    setSaved(false);
   }
 
   function removeService(id) {
-    if (id === primaryServiceId) return
+    if (id === primaryServiceId) return;
 
-    setEnrolled((prev) => prev.filter((serviceId) => serviceId !== id))
+    setEnrolled((prev) => prev.filter((serviceId) => serviceId !== id));
     setPrices((prev) => {
-      const next = { ...prev }
-      delete next[id]
-      return next
-    })
-    setSaved(false)
+      const next = { ...prev };
+      delete next[id];
+      return next;
+    });
+    setSaved(false);
   }
 
   async function handleSave() {
-    if (!providerRecord) return
-    setSaving(true)
+    if (!providerRecord) return;
+    setSaving(true);
     try {
       const orderedServiceIds = primaryServiceId
         ? [primaryServiceId, ...enrolled.filter((serviceId) => serviceId !== primaryServiceId)]
-        : enrolled
+        : enrolled;
       const serviceRows = orderedServiceIds.map((service_id) => ({
         service_id,
         price: Number(prices[service_id] || 0),
-      }))
+      }));
 
-      await setProviderServiceRows(providerRecord.id, serviceRows)
-      setEnrolled(orderedServiceIds)
-      setPrimaryServiceId(orderedServiceIds[0] || null)
-      setSaved(true)
+      await setProviderServiceRows(providerRecord.id, serviceRows);
+      setEnrolled(orderedServiceIds);
+      setPrimaryServiceId(orderedServiceIds[0] || null);
+      setSaved(true);
     } finally {
-      setSaving(false)
+      setSaving(false);
     }
   }
 
   async function handleRequest(e) {
-    e.preventDefault()
-    if (!reqName.trim() || !providerRecord || !userProfile?.id) return
-    setReqLoading(true)
+    e.preventDefault();
+    if (!reqName.trim() || !providerRecord || !userProfile?.id) return;
+    setReqLoading(true);
     try {
-      await supabase.from('service_requests').insert({
+      await supabase.from("service_requests").insert({
         provider_id: providerRecord.id,
-        user_id: userProfile.id,                // auto from logged-in user
-        phone: userProfile?.phone || '',         // auto from profiles table
+        user_id: userProfile.id, // auto from logged-in user
+        phone: userProfile?.phone || "", // auto from profiles table
+        category_id: reqCategory || null,
         service_name: reqName.trim(),
         description: reqDesc.trim(),
-        status: 'pending',
-      })
-      setReqDone(true)
-      setReqName('')
-      setReqDesc('')
+        status: "pending",
+      });
+      setReqDone(true);
+      setReqName("");
+      setReqDesc("");
+      setReqCategory("");
     } finally {
-      setReqLoading(false)
+      setReqLoading(false);
     }
   }
 
@@ -427,23 +520,22 @@ export function ProviderServicesPage() {
       {/* Tab switcher */}
       <div className="flex gap-1 rounded-xl border border-border bg-muted/30 p-1 w-fit">
         {[
-          { key: 'select', label: 'Select Services' },
-          { key: 'request', label: 'Request New Service' },
+          { key: "select", label: "Select Services" },
+          { key: "request", label: "Request New Service" },
         ].map((t) => (
           <button
             key={t.key}
             onClick={() => setTab(t.key)}
             className={`rounded-lg px-4 py-1.5 text-sm font-medium transition-all ${
-              tab === t.key ? 'bg-card text-foreground shadow' : 'text-muted-foreground hover:text-foreground'
-            }`}
-          >
+              tab === t.key ? "bg-card text-foreground shadow" : "text-muted-foreground hover:text-foreground"
+            }`}>
             {t.label}
           </button>
         ))}
       </div>
 
       {/* ── Select Services tab ── */}
-      {tab === 'select' && (
+      {tab === "select" && (
         <div className="space-y-4">
           <Card className="space-y-4">
             <SectionHeader
@@ -451,14 +543,17 @@ export function ProviderServicesPage() {
               subtitle="Set a price for each selected service. The primary service stays locked."
             />
             {enrolled.length === 0 ? (
-              <EmptyState title="No services selected" description="Add services from the catalog below to get started." />
+              <EmptyState
+                title="No services selected"
+                description="Add services from the catalog below to get started."
+              />
             ) : (
               <>
                 {primaryServiceId && (
                   <div className="rounded-xl border border-primary/20 bg-primary/5 px-4 py-3 text-sm">
                     <span className="font-semibold text-foreground">Primary service: </span>
                     <span className="text-muted-foreground">
-                      {catalog.find((service) => service.id === primaryServiceId)?.name || 'Selected service'}
+                      {catalog.find((service) => service.id === primaryServiceId)?.name || "Selected service"}
                     </span>
                     <p className="mt-1 text-xs text-muted-foreground">
                       This service is locked because it is the provider's primary service.
@@ -468,9 +563,9 @@ export function ProviderServicesPage() {
 
                 <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
                   {enrolled.map((serviceId) => {
-                    const svc = catalog.find((service) => service.id === serviceId)
-                    if (!svc) return null
-                    const isPrimary = serviceId === primaryServiceId
+                    const svc = catalog.find((service) => service.id === serviceId);
+                    if (!svc) return null;
+                    const isPrimary = serviceId === primaryServiceId;
                     return (
                       <div key={svc.id} className="space-y-3 rounded-xl border border-border bg-background p-4">
                         <div className="flex items-start justify-between gap-3">
@@ -479,6 +574,9 @@ export function ProviderServicesPage() {
                               <p className="truncate text-sm font-semibold text-foreground">{svc.name}</p>
                               {isPrimary && <Badge variant="secondary">Primary</Badge>}
                             </div>
+                            <p className="text-xs text-muted-foreground">
+                              {svc.category?.name || svc.category_name || "Uncategorized"}
+                            </p>
                             {svc.description && (
                               <p className="mt-0.5 line-clamp-2 text-xs text-muted-foreground">{svc.description}</p>
                             )}
@@ -489,8 +587,7 @@ export function ProviderServicesPage() {
                               variant="ghost"
                               size="icon"
                               onClick={() => removeService(serviceId)}
-                              aria-label={`Remove ${svc.name}`}
-                            >
+                              aria-label={`Remove ${svc.name}`}>
                               <X className="h-4 w-4" />
                             </Button>
                           )}
@@ -503,18 +600,18 @@ export function ProviderServicesPage() {
                             min="0"
                             step="0.01"
                             placeholder="Set price"
-                            value={prices[svc.id] ?? ''}
+                            value={prices[svc.id] ?? ""}
                             onChange={(event) => setPrices((prev) => ({ ...prev, [svc.id]: event.target.value }))}
                           />
                         </div>
                       </div>
-                    )
+                    );
                   })}
                 </div>
 
                 <div className="flex items-center gap-3">
                   <Button onClick={handleSave} disabled={saving}>
-                    {saving ? 'Saving…' : 'Save My Services'}
+                    {saving ? "Saving…" : "Save My Services"}
                   </Button>
                   {saved && <span className="text-sm font-medium text-green-600">✓ Saved successfully!</span>}
                 </div>
@@ -525,27 +622,48 @@ export function ProviderServicesPage() {
           <Card className="space-y-4">
             <SectionHeader
               title="Add More Services"
-              subtitle="Choose from the remaining catalog to expand what you offer."
+              subtitle="Choose a category first, then add services from that category."
             />
-            {catalog.filter((service) => !enrolled.includes(service.id)).length === 0 ? (
-              <EmptyState title="No more services to add" description="You’ve already selected every service in the catalog." />
+            <div className="grid gap-3 md:grid-cols-2">
+              <Select
+                value={selectedCategoryId}
+                onChange={(event) => setSelectedCategoryId(event.target.value)}
+                placeholder="Select a category"
+                options={categories.map((category) => ({ label: category.name, value: category.id }))}
+              />
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => setSelectedCategoryId("")}
+                disabled={!selectedCategoryId}>
+                Clear category
+              </Button>
+            </div>
+            {!selectedCategoryId ? (
+              <EmptyState title="Choose a category" description="Select a category to see matching services." />
+            ) : addableByCategory.length === 0 ? (
+              <EmptyState
+                title="No more services to add"
+                description="You’ve already selected every service in this category."
+              />
             ) : (
               <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-                {catalog
-                  .filter((service) => !enrolled.includes(service.id))
-                  .map((svc) => (
-                    <div key={svc.id} className="space-y-3 rounded-xl border border-border bg-background p-4">
-                      <div>
-                        <p className="text-sm font-semibold text-foreground">{svc.name}</p>
-                        {svc.description && (
-                          <p className="mt-0.5 line-clamp-2 text-xs text-muted-foreground">{svc.description}</p>
-                        )}
-                      </div>
-                      <Button type="button" className="w-full" onClick={() => toggleService(svc.id)}>
-                        Add service
-                      </Button>
+                {addableByCategory.map((svc) => (
+                  <div key={svc.id} className="space-y-3 rounded-xl border border-border bg-background p-4">
+                    <div>
+                      <p className="text-sm font-semibold text-foreground">{svc.name}</p>
+                      <p className="text-xs text-muted-foreground">
+                        {svc.category?.name || svc.category_name || "Uncategorized"}
+                      </p>
+                      {svc.description && (
+                        <p className="mt-0.5 line-clamp-2 text-xs text-muted-foreground">{svc.description}</p>
+                      )}
                     </div>
-                  ))}
+                    <Button type="button" className="w-full" onClick={() => toggleService(svc.id)}>
+                      Add service
+                    </Button>
+                  </div>
+                ))}
               </div>
             )}
           </Card>
@@ -553,12 +671,12 @@ export function ProviderServicesPage() {
       )}
 
       {/* ── Request New Service tab ── */}
-      {tab === 'request' && (
+      {tab === "request" && (
         <Card>
           <h3 className="mb-1 font-semibold">Request a New Service Type</h3>
           <p className="mb-4 text-sm text-muted-foreground">
-            Don't see your service in the catalog? Request it and our admin team will review it.
-            Your contact details are attached automatically.
+            Don't see your service in the catalog? Request it and our admin team will review it. Your contact details
+            are attached automatically.
           </p>
 
           {/* Auto-filled info banner */}
@@ -574,8 +692,7 @@ export function ProviderServicesPage() {
             <motion.div
               initial={{ opacity: 0, y: 8 }}
               animate={{ opacity: 1, y: 0 }}
-              className="rounded-xl border border-green-200 bg-green-50 p-4 text-sm text-green-700 dark:border-green-800 dark:bg-green-900/20 dark:text-green-400"
-            >
+              className="rounded-xl border border-green-200 bg-green-50 p-4 text-sm text-green-700 dark:border-green-800 dark:bg-green-900/20 dark:text-green-400">
               ✓ Request submitted! Our team will review it within 1–2 business days.
               <Button variant="outline" className="mt-3 block" onClick={() => setReqDone(false)}>
                 Submit another
@@ -583,6 +700,15 @@ export function ProviderServicesPage() {
             </motion.div>
           ) : (
             <form onSubmit={handleRequest} className="space-y-3">
+              <div>
+                <label className="mb-1 block text-sm font-medium">Category</label>
+                <Select
+                  value={reqCategory}
+                  onChange={(event) => setReqCategory(event.target.value)}
+                  placeholder="Select a category"
+                  options={categories.map((category) => ({ label: category.name, value: category.id }))}
+                />
+              </div>
               <div>
                 <label className="mb-1 block text-sm font-medium">
                   Service Name <span className="text-red-500">*</span>
@@ -604,44 +730,44 @@ export function ProviderServicesPage() {
                 />
               </div>
               <Button type="submit" disabled={reqLoading || !reqName.trim() || !userProfile?.id}>
-                {reqLoading ? 'Submitting…' : 'Submit Request'}
+                {reqLoading ? "Submitting…" : "Submit Request"}
               </Button>
             </form>
           )}
         </Card>
       )}
     </motion.div>
-  )
+  );
 }
 
 export function ProviderAnalyticsPage() {
-  const [providerRecord, setProviderRecord] = useState(null)
-  const bookings = useProviderBookingsQuery(providerRecord?.id)
+  const [providerRecord, setProviderRecord] = useState(null);
+  const bookings = useProviderBookingsQuery(providerRecord?.id);
 
   useEffect(() => {
-    let active = true
+    let active = true;
     supabase.auth.getUser().then(async ({ data: { user } }) => {
-      if (!user) return
-      const provider = await getProviderByUserId(user.id)
-      if (active) setProviderRecord(provider)
-    })
+      if (!user) return;
+      const provider = await getProviderByUserId(user.id);
+      if (active) setProviderRecord(provider);
+    });
     return () => {
-      active = false
-    }
-  }, [])
+      active = false;
+    };
+  }, []);
 
   const trend = useMemo(() => {
     const monthlyMap = (bookings.data || []).reduce((map, booking) => {
-      const date = new Date(booking.date || booking.created_at)
-      const month = date.toLocaleString('en-US', { month: 'short' })
-      if (!map[month]) map[month] = { month, revenue: 0, bookings: 0 }
-      map[month].bookings += 1
-      map[month].revenue += Number(booking.amount || 0)
-      return map
-    }, {})
+      const date = new Date(booking.date || booking.created_at);
+      const month = date.toLocaleString("en-US", { month: "short" });
+      if (!map[month]) map[month] = { month, revenue: 0, bookings: 0 };
+      map[month].bookings += 1;
+      map[month].revenue += Number(booking.amount || 0);
+      return map;
+    }, {});
 
-    return Object.values(monthlyMap)
-  }, [bookings.data])
+    return Object.values(monthlyMap);
+  }, [bookings.data]);
 
   return (
     <motion.div className="space-y-4" {...fade}>
@@ -651,69 +777,69 @@ export function ProviderAnalyticsPage() {
         <BookingBarChart data={trend} />
       </div>
     </motion.div>
-  )
+  );
 }
 
 export function ProviderReviewsPage() {
-  const [providerRecord, setProviderRecord] = useState(null)
-  const [feedback, setFeedback] = useState([])
-  const [loading, setLoading] = useState(true)
+  const [providerRecord, setProviderRecord] = useState(null);
+  const [feedback, setFeedback] = useState([]);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    let active = true
+    let active = true;
 
     async function loadFeedback() {
-      setLoading(true)
-      const { data: { user } } = await supabase.auth.getUser()
+      setLoading(true);
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
       if (!user) {
-        if (active) setLoading(false)
-        return
+        if (active) setLoading(false);
+        return;
       }
 
-      const { data: provider } = await supabase
-        .from('providers')
-        .select('id')
-        .eq('user_id', user.id)
-        .maybeSingle()
+      const { data: provider } = await supabase.from("providers").select("id").eq("user_id", user.id).maybeSingle();
 
       if (!provider) {
         if (active) {
-          setProviderRecord(null)
-          setFeedback([])
-          setLoading(false)
+          setProviderRecord(null);
+          setFeedback([]);
+          setLoading(false);
         }
-        return
+        return;
       }
 
-      const feedbackRows = await getProviderFeedback(provider.id)
+      const feedbackRows = await getProviderFeedback(provider.id);
 
       if (active) {
-        setProviderRecord(provider)
-        setFeedback(feedbackRows)
-        setLoading(false)
+        setProviderRecord(provider);
+        setFeedback(feedbackRows);
+        setLoading(false);
       }
     }
 
-    loadFeedback()
+    loadFeedback();
     return () => {
-      active = false
-    }
-  }, [])
+      active = false;
+    };
+  }, []);
 
   return (
     <motion.div className="space-y-4" {...fade}>
       <SectionHeader title="Reviews" subtitle="Customer feedback for your completed bookings." />
-      {loading ? <LoadingGrid count={3} /> : !providerRecord ? (
+      {loading ? (
+        <LoadingGrid count={3} />
+      ) : !providerRecord ? (
         <Card className="text-sm text-muted-foreground">Complete your provider profile to receive feedback.</Card>
       ) : feedback.length ? (
         <DataTable
           columns={[
-            { key: 'booking', label: 'Booking', render: (row) => row.bookings?.booking_code || row.booking_id },
-            { key: 'service', label: 'Service', render: (row) => row.bookings?.service_title || '-' },
-            { key: 'customer', label: 'Customer', render: (row) => row.profiles?.full_name || '-' },
-            { key: 'rating', label: 'Rating', render: (row) => `${row.rating}/5` },
-            { key: 'comment', label: 'Comment', render: (row) => row.comment || '-' },
-            { key: 'created_at', label: 'Created', render: (row) => formatDate(row.created_at) },
+            { key: "booking", label: "Booking", render: (row) => row.bookings?.booking_code || row.booking_id },
+            { key: "service", label: "Service", render: (row) => row.bookings?.service_title || "-" },
+            { key: "customer", label: "Customer", render: (row) => row.profiles?.full_name || "-" },
+            { key: "rating", label: "Rating", render: (row) => `${row.rating}/5` },
+            { key: "comment", label: "Comment", render: (row) => row.comment || "-" },
+            { key: "created_at", label: "Created", render: (row) => formatDate(row.created_at) },
           ]}
           rows={feedback}
         />
@@ -721,43 +847,53 @@ export function ProviderReviewsPage() {
         <Card className="text-sm text-muted-foreground">No feedback yet.</Card>
       )}
     </motion.div>
-  )
+  );
 }
 
 export function ProviderNotificationsPage() {
-  const queryClient = useQueryClient()
-  const [userId, setUserId] = useState(null)
+  const queryClient = useQueryClient();
+  const [userId, setUserId] = useState(null);
 
   useEffect(() => {
-    supabase.auth.getUser().then(({ data: { user } }) => setUserId(user?.id || null))
-  }, [])
+    supabase.auth.getUser().then(({ data: { user } }) => setUserId(user?.id || null));
+  }, []);
 
-  const notifications = useNotificationsQuery(userId)
-  useRealtimeNotifications(userId)
+  const notifications = useNotificationsQuery(userId);
+  useRealtimeNotifications(userId);
 
   const markReadMutation = useMutation({
     mutationFn: markNotificationRead,
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['notifications', userId] }),
-  })
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["notifications", userId] }),
+  });
 
   const markAllReadMutation = useMutation({
     mutationFn: () => markAllNotificationsRead(userId),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['notifications', userId] }),
-  })
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["notifications", userId] }),
+  });
 
-  const unreadCount = (notifications.data || []).filter((notification) => !notification.is_read).length
+  const unreadCount = (notifications.data || []).filter((notification) => !notification.is_read).length;
 
   return (
     <motion.div className="space-y-4" {...fade}>
       <SectionHeader
         title="Notifications"
         subtitle="Booking, provider approval, service request, and message updates."
-        action={unreadCount ? <Button size="sm" variant="outline" onClick={() => markAllReadMutation.mutate()}>Mark all read</Button> : null}
+        action={
+          unreadCount ? (
+            <Button size="sm" variant="outline" onClick={() => markAllReadMutation.mutate()}>
+              Mark all read
+            </Button>
+          ) : null
+        }
       />
-      {notifications.isLoading ? <LoadingGrid count={3} /> : (notifications.data || []).length ? (
+      {notifications.isLoading ? (
+        <LoadingGrid count={3} />
+      ) : (notifications.data || []).length ? (
         <div className="space-y-3">
           {notifications.data.map((notification) => (
-            <Card key={notification.id} className={`flex items-start justify-between gap-4 ${notification.is_read ? 'opacity-70' : ''}`}>
+            <Card
+              key={notification.id}
+              className={`flex items-start justify-between gap-4 ${notification.is_read ? "opacity-70" : ""}`}>
               <div>
                 <div className="flex flex-wrap items-center gap-2">
                   <Bell className="h-4 w-4 text-primary" />
@@ -768,7 +904,11 @@ export function ProviderNotificationsPage() {
                 <p className="mt-2 text-xs text-muted-foreground">{formatDate(notification.created_at)}</p>
               </div>
               {!notification.is_read && (
-                <Button size="sm" variant="outline" disabled={markReadMutation.isPending} onClick={() => markReadMutation.mutate(notification.id)}>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  disabled={markReadMutation.isPending}
+                  onClick={() => markReadMutation.mutate(notification.id)}>
                   Mark read
                 </Button>
               )}
@@ -779,89 +919,94 @@ export function ProviderNotificationsPage() {
         <EmptyState title="No notifications" description="New booking and approval updates will appear here." />
       )}
     </motion.div>
-  )
+  );
 }
 
 export function ProviderProfilePage() {
-  const [userId, setUserId] = useState(null)
+  const [userId, setUserId] = useState(null);
   const [form, setForm] = useState({
-    business_name: '',
-    phone: '',
-    location: '',
-    experience: '',
-    certificates: '',
-    image_url: '',
-    about: '',
-  })
-  const [imageFile, setImageFile] = useState(null)
-  const [loading, setLoading] = useState(true)
-  const [saved, setSaved] = useState(false)
+    business_name: "",
+    phone: "",
+    location: "",
+    experience: "",
+    certificates: "",
+    image_url: "",
+    about: "",
+  });
+  const [imageFile, setImageFile] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [saved, setSaved] = useState(false);
 
   useEffect(() => {
-    let active = true
+    let active = true;
 
     async function loadProfile() {
-      setLoading(true)
-      const { data: { user } } = await supabase.auth.getUser()
+      setLoading(true);
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
       if (!user) {
-        if (active) setLoading(false)
-        return
+        if (active) setLoading(false);
+        return;
       }
 
       const [{ data: userProfile }, provider] = await Promise.all([
-        supabase.from('profiles').select('id, full_name, phone').eq('id', user.id).maybeSingle(),
+        supabase.from("profiles").select("id, full_name, phone").eq("id", user.id).maybeSingle(),
         getProviderByUserId(user.id),
-      ])
+      ]);
 
       if (active) {
-        setUserId(user.id)
+        setUserId(user.id);
         setForm({
-          business_name: provider?.business_name || userProfile?.full_name || '',
-          phone: userProfile?.phone || '',
-          location: provider?.location || '',
-          experience: provider?.experience || '',
-          certificates: (provider?.certificates || []).join(', '),
-          image_url: provider?.image_url || '',
-          about: provider?.about || '',
-        })
-        setLoading(false)
+          business_name: provider?.business_name || userProfile?.full_name || "",
+          phone: userProfile?.phone || "",
+          location: provider?.location || "",
+          experience: provider?.experience || "",
+          certificates: (provider?.certificates || []).join(", "),
+          image_url: provider?.image_url || "",
+          about: provider?.about || "",
+        });
+        setLoading(false);
       }
     }
 
-    loadProfile()
+    loadProfile();
     return () => {
-      active = false
-    }
-  }, [])
+      active = false;
+    };
+  }, []);
 
   const saveMutation = useMutation({
     mutationFn: async () => {
-      let imageUrl = form.image_url
+      let imageUrl = form.image_url;
       if (imageFile) {
-        imageUrl = await uploadProviderImage({ userId, file: imageFile })
+        imageUrl = await uploadProviderImage({ userId, file: imageFile });
       }
 
-      await supabase.from('profiles').update({ phone: form.phone }).eq('id', userId)
+      await supabase.from("profiles").update({ phone: form.phone }).eq("id", userId);
       return upsertProviderProfile(userId, {
         ...form,
         image_url: imageUrl,
-        certificates: form.certificates.split(',').map((item) => item.trim()).filter(Boolean),
-      })
+        certificates: form.certificates
+          .split(",")
+          .map((item) => item.trim())
+          .filter(Boolean),
+      });
     },
     onSuccess: (provider) => {
-      setSaved(true)
-      setImageFile(null)
-      setForm((current) => ({ ...current, image_url: provider.image_url || current.image_url }))
+      setSaved(true);
+      setImageFile(null);
+      setForm((current) => ({ ...current, image_url: provider.image_url || current.image_url }));
     },
-  })
+  });
 
   function handleSubmit(event) {
-    event.preventDefault()
-    if (!userId || !form.business_name.trim()) return
-    saveMutation.mutate()
+    event.preventDefault();
+    if (!userId || !form.business_name.trim()) return;
+    saveMutation.mutate();
   }
 
-  if (loading) return <LoadingGrid count={2} />
+  if (loading) return <LoadingGrid count={2} />;
 
   return (
     <motion.div className="space-y-4" {...fade}>
@@ -871,7 +1016,11 @@ export function ProviderProfilePage() {
           <div className="space-y-3">
             <div className="aspect-square overflow-hidden rounded-2xl border border-border bg-muted">
               {form.image_url ? (
-                <img src={form.image_url} alt={form.business_name || 'Provider'} className="h-full w-full object-cover" />
+                <img
+                  src={form.image_url}
+                  alt={form.business_name || "Provider"}
+                  className="h-full w-full object-cover"
+                />
               ) : (
                 <div className="grid h-full place-items-center text-sm text-muted-foreground">No image</div>
               )}
@@ -879,39 +1028,83 @@ export function ProviderProfilePage() {
             <label className="inline-flex w-full cursor-pointer items-center justify-center gap-2 rounded-2xl border border-border bg-card px-4 py-2 text-sm font-semibold transition hover:bg-muted">
               <Upload className="h-4 w-4" />
               Upload Image
-              <input type="file" accept="image/*" className="hidden" onChange={(event) => setImageFile(event.target.files?.[0] || null)} />
+              <input
+                type="file"
+                accept="image/*"
+                className="hidden"
+                onChange={(event) => setImageFile(event.target.files?.[0] || null)}
+              />
             </label>
             {imageFile && <p className="text-xs text-muted-foreground">{imageFile.name}</p>}
           </div>
           <div className="grid gap-3 md:grid-cols-2">
-            <Input required placeholder="Business name" value={form.business_name} onChange={(event) => setForm((current) => ({ ...current, business_name: event.target.value }))} />
-            <Input placeholder="Phone" value={form.phone} onChange={(event) => setForm((current) => ({ ...current, phone: event.target.value }))} />
-            <Input placeholder="Location" value={form.location} onChange={(event) => setForm((current) => ({ ...current, location: event.target.value }))} />
-            <Input placeholder="Experience e.g. 5 years" value={form.experience} onChange={(event) => setForm((current) => ({ ...current, experience: event.target.value }))} />
-            <Input className="md:col-span-2" placeholder="Certificates, comma separated" value={form.certificates} onChange={(event) => setForm((current) => ({ ...current, certificates: event.target.value }))} />
-            <Input className="md:col-span-2" placeholder="Image URL" value={form.image_url} onChange={(event) => setForm((current) => ({ ...current, image_url: event.target.value }))} />
-            <Textarea className="md:col-span-2" placeholder="About your business" value={form.about} onChange={(event) => setForm((current) => ({ ...current, about: event.target.value }))} />
+            <Input
+              required
+              placeholder="Business name"
+              value={form.business_name}
+              onChange={(event) => setForm((current) => ({ ...current, business_name: event.target.value }))}
+            />
+            <Input
+              placeholder="Phone"
+              value={form.phone}
+              onChange={(event) => setForm((current) => ({ ...current, phone: event.target.value }))}
+            />
+            <Input
+              placeholder="Location"
+              value={form.location}
+              onChange={(event) => setForm((current) => ({ ...current, location: event.target.value }))}
+            />
+            <Input
+              placeholder="Experience e.g. 5 years"
+              value={form.experience}
+              onChange={(event) => setForm((current) => ({ ...current, experience: event.target.value }))}
+            />
+            <Input
+              className="md:col-span-2"
+              placeholder="Certificates, comma separated"
+              value={form.certificates}
+              onChange={(event) => setForm((current) => ({ ...current, certificates: event.target.value }))}
+            />
+            <Input
+              className="md:col-span-2"
+              placeholder="Image URL"
+              value={form.image_url}
+              onChange={(event) => setForm((current) => ({ ...current, image_url: event.target.value }))}
+            />
+            <Textarea
+              className="md:col-span-2"
+              placeholder="About your business"
+              value={form.about}
+              onChange={(event) => setForm((current) => ({ ...current, about: event.target.value }))}
+            />
             <div className="flex flex-wrap items-center gap-3 md:col-span-2">
-              <Button type="submit" disabled={saveMutation.isPending}>{saveMutation.isPending ? 'Saving...' : 'Save Changes'}</Button>
+              <Button type="submit" disabled={saveMutation.isPending}>
+                {saveMutation.isPending ? "Saving..." : "Save Changes"}
+              </Button>
               {saved && <span className="text-sm font-medium text-green-600">Saved successfully</span>}
-              {saveMutation.error && <span className="text-sm font-medium text-red-600">{saveMutation.error.message}</span>}
+              {saveMutation.error && (
+                <span className="text-sm font-medium text-red-600">{saveMutation.error.message}</span>
+              )}
             </div>
           </div>
         </form>
       </Card>
     </motion.div>
-  )
+  );
 }
 
 export function ProviderSettingsPage() {
-  return <ModuleCard title="Settings" subtitle="Password, alerts, and notification channels." />
+  return <ModuleCard title="Settings" subtitle="Password, alerts, and notification channels." />;
 }
 
 function ModuleCard({ title, subtitle }) {
   return (
     <motion.div className="space-y-4" {...fade}>
       <SectionHeader title={title} subtitle={subtitle} />
-      <Card className="text-sm text-muted-foreground">This module includes list, details, actions, loading state, and API-ready wiring points for Supabase integration.</Card>
+      <Card className="text-sm text-muted-foreground">
+        This module includes list, details, actions, loading state, and API-ready wiring points for Supabase
+        integration.
+      </Card>
     </motion.div>
-  )
+  );
 }

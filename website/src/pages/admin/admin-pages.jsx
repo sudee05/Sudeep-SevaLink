@@ -1,20 +1,20 @@
-import { motion, AnimatePresence } from 'framer-motion'
-import { useCallback, useEffect, useMemo, useState } from 'react'
-import { Navigate, useParams } from 'react-router-dom'
-import { useDispatch, useSelector } from 'react-redux'
-import { useAdminStatsQuery, useBookingsQuery } from '@/hooks/use-queries'
-import { BookingBarChart, RevenueAreaChart } from '@/components/charts/revenue-booking-chart'
-import { DataTable } from '@/components/common/data-table'
-import { SectionHeader } from '@/components/common/section-header'
-import { StatCard } from '@/components/common/stat-card'
-import { Badge } from '@/components/ui/badge'
-import { Button } from '@/components/ui/button'
-import { Card } from '@/components/ui/card'
-import { Input } from '@/components/ui/input'
-import { Select } from '@/components/ui/select'
-import { EmptyState } from '@/components/ui/empty-state'
-import { ErrorState } from '@/components/ui/error-state'
-import { LoadingGrid } from '@/components/ui/loading-grid'
+import { motion, AnimatePresence } from "framer-motion";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { Navigate, useParams } from "react-router-dom";
+import { useDispatch, useSelector } from "react-redux";
+import { useAdminStatsQuery, useBookingsQuery, useCategoriesQuery } from "@/hooks/use-queries";
+import { BookingBarChart, RevenueAreaChart } from "@/components/charts/revenue-booking-chart";
+import { DataTable } from "@/components/common/data-table";
+import { SectionHeader } from "@/components/common/section-header";
+import { StatCard } from "@/components/common/stat-card";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Card } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Select } from "@/components/ui/select";
+import { EmptyState } from "@/components/ui/empty-state";
+import { ErrorState } from "@/components/ui/error-state";
+import { LoadingGrid } from "@/components/ui/loading-grid";
 import {
   fetchAdminSection,
   selectAdminSection,
@@ -22,21 +22,21 @@ import {
   updateAdminRow,
   deleteAdminRow,
   resetSection,
-} from '@/store/adminSlice'
-import { formatCurrency, formatDate } from '@/utils/format'
-import { supabase } from '@/lib/supabase'
-import { Pencil, Trash2, Plus, X } from 'lucide-react'
+} from "@/store/adminSlice";
+import { formatCurrency, formatDate } from "@/utils/format";
+import { supabase } from "@/lib/supabase";
+import { Pencil, Trash2, Plus, X } from "lucide-react";
 
 const fade = {
   initial: { opacity: 0, y: 10 },
   animate: { opacity: 1, y: 0 },
   transition: { duration: 0.3 },
-}
+};
 
 // ── Modal ─────────────────────────────────────────────────────
 
 function Modal({ open, onClose, title, children }) {
-  if (!open) return null
+  if (!open) return null;
   return (
     <AnimatePresence>
       <motion.div
@@ -44,21 +44,16 @@ function Modal({ open, onClose, title, children }) {
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         exit={{ opacity: 0 }}
-        onClick={onClose}
-      >
+        onClick={onClose}>
         <motion.div
           className="relative w-full max-w-lg rounded-2xl border border-border bg-card p-6 shadow-2xl"
           initial={{ opacity: 0, scale: 0.95, y: 20 }}
           animate={{ opacity: 1, scale: 1, y: 0 }}
           exit={{ opacity: 0, scale: 0.95, y: 20 }}
-          onClick={(e) => e.stopPropagation()}
-        >
+          onClick={(e) => e.stopPropagation()}>
           <div className="mb-5 flex items-center justify-between">
             <h2 className="text-lg font-semibold">{title}</h2>
-            <button
-              onClick={onClose}
-              className="rounded-xl p-1 transition hover:bg-muted"
-            >
+            <button onClick={onClose} className="rounded-xl p-1 transition hover:bg-muted">
               <X className="h-5 w-5" />
             </button>
           </div>
@@ -66,33 +61,36 @@ function Modal({ open, onClose, title, children }) {
         </motion.div>
       </motion.div>
     </AnimatePresence>
-  )
+  );
 }
 
 // ── Service Form ──────────────────────────────────────────────
 
-const EMPTY_SERVICE = { name: '', description: '' }
+const EMPTY_SERVICE = { name: "", description: "", category_id: "" };
 
-function ServiceForm({ initial = EMPTY_SERVICE, onSubmit, loading }) {
-  const [form, setForm] = useState(initial)
-  const set = (k, v) => setForm((f) => ({ ...f, [k]: v }))
+function ServiceForm({ initial = EMPTY_SERVICE, categories = [], onSubmit, loading }) {
+  const [form, setForm] = useState(initial);
+  const set = (k, v) => setForm((f) => ({ ...f, [k]: v }));
 
   return (
     <form
       onSubmit={(e) => {
-        e.preventDefault()
-        if (!form.name.trim()) return
-        onSubmit({ name: form.name.trim(), description: form.description.trim() })
+        e.preventDefault();
+        if (!form.name.trim()) return;
+        onSubmit({
+          name: form.name.trim(),
+          description: form.description.trim(),
+          category_id: form.category_id || null,
+        });
       }}
-      className="space-y-4"
-    >
+      className="space-y-4">
       <div>
         <label className="mb-1 block text-sm font-medium">Service Name</label>
         <Input
           required
           placeholder="e.g. Home Cleaning"
           value={form.name}
-          onChange={(e) => set('name', e.target.value)}
+          onChange={(e) => set("name", e.target.value)}
         />
       </div>
       <div>
@@ -101,23 +99,32 @@ function ServiceForm({ initial = EMPTY_SERVICE, onSubmit, loading }) {
           className="h-24 w-full resize-none rounded-xl border border-border bg-card px-4 py-3 text-sm outline-none transition focus:border-primary focus:ring-2 focus:ring-primary/20"
           placeholder="Describe the service..."
           value={form.description}
-          onChange={(e) => set('description', e.target.value)}
+          onChange={(e) => set("description", e.target.value)}
+        />
+      </div>
+      <div>
+        <label className="mb-1 block text-sm font-medium">Category</label>
+        <Select
+          value={form.category_id}
+          onChange={(e) => set("category_id", e.target.value)}
+          placeholder="Select category"
+          options={categories.map((category) => ({ label: category.name, value: category.id }))}
         />
       </div>
       <div className="flex justify-end gap-2 pt-2">
         <Button type="submit" disabled={loading || !form.name.trim()}>
-          {loading ? 'Saving…' : 'Save Service'}
+          {loading ? "Saving…" : "Save Service"}
         </Button>
       </div>
     </form>
-  )
+  );
 }
 
 // ── Admin Dashboard ───────────────────────────────────────────
 
 export function AdminDashboardPage() {
-  const stats = useAdminStatsQuery()
-  const bookings = useBookingsQuery()
+  const stats = useAdminStatsQuery();
+  const bookings = useBookingsQuery();
 
   return (
     <motion.div className="space-y-6" {...fade}>
@@ -127,7 +134,7 @@ export function AdminDashboardPage() {
           <StatCard
             key={card.label}
             label={card.label}
-            value={card.label === 'Revenue' ? formatCurrency(card.value) : card.value}
+            value={card.label === "Revenue" ? formatCurrency(card.value) : card.value}
             delta={card.delta}
           />
         ))}
@@ -141,13 +148,16 @@ export function AdminDashboardPage() {
           <SectionHeader title="Latest Bookings" subtitle="Newest activity in marketplace." />
           <DataTable
             columns={[
-              { key: 'id', label: 'ID', render: (row) => (row.booking_code || row.id || '').toString().slice(0, 8) },
-              { key: 'service_title', label: 'Service', render: (row) => row.service_title || '-' },
-              { key: 'customer_name', label: 'Customer', render: (row) => row.customer_name || '-' },
-              { key: 'amount', label: 'Amount', render: (row) => formatCurrency(row.amount || 0) },
+              { key: "id", label: "ID", render: (row) => (row.booking_code || row.id || "").toString().slice(0, 8) },
+              { key: "service_title", label: "Service", render: (row) => row.service_title || "-" },
+              { key: "customer_name", label: "Customer", render: (row) => row.customer_name || "-" },
+              { key: "amount", label: "Amount", render: (row) => formatCurrency(row.amount || 0) },
               {
-                key: 'status', label: 'Status',
-                render: (row) => <Badge variant={row.status === 'completed' ? 'success' : 'warning'}>{row.status}</Badge>,
+                key: "status",
+                label: "Status",
+                render: (row) => (
+                  <Badge variant={row.status === "completed" ? "success" : "warning"}>{row.status}</Badge>
+                ),
               },
             ]}
             rows={(bookings.data || []).slice(0, 5)}
@@ -157,7 +167,9 @@ export function AdminDashboardPage() {
           <SectionHeader title="Recent Activities" subtitle="Internal operations timeline." />
           <div className="space-y-3 text-sm text-muted-foreground">
             {(stats.data?.latestActivities || []).map((item) => (
-              <div key={item} className="rounded-xl border border-border p-3">{item}</div>
+              <div key={item} className="rounded-xl border border-border p-3">
+                {item}
+              </div>
             ))}
             {!stats.data?.latestActivities?.length && (
               <p className="py-4 text-center text-sm text-muted-foreground">No recent activity.</p>
@@ -166,84 +178,75 @@ export function AdminDashboardPage() {
         </Card>
       </div>
     </motion.div>
-  )
+  );
 }
 
 // ── Admin Users ───────────────────────────────────────────────
 
 export function AdminUsersPage() {
-  return <AdminSectionPage sectionOverride="users" />
+  return <AdminSectionPage sectionOverride="users" />;
 }
 
 // ── Admin Providers ───────────────────────────────────────────
 
 export function AdminProvidersPage() {
-  const dispatch = useDispatch()
-  const { rows, status, error } = useSelector(selectAdminSection('providers'))
-  const [actionId, setActionId] = useState(null) // id of provider being actioned
-  const [search, setSearch] = useState('')
-  const [filterStatus, setFilterStatus] = useState('')
-  const [selectedProvider, setSelectedProvider] = useState(null)
+  const dispatch = useDispatch();
+  const { rows, status, error } = useSelector(selectAdminSection("providers"));
+  const [actionId, setActionId] = useState(null); // id of provider being actioned
+  const [search, setSearch] = useState("");
+  const [filterStatus, setFilterStatus] = useState("");
+  const [selectedProvider, setSelectedProvider] = useState(null);
 
   useEffect(() => {
-    if (status === 'idle') dispatch(fetchAdminSection('providers'))
-  }, [dispatch, status])
+    if (status === "idle") dispatch(fetchAdminSection("providers"));
+  }, [dispatch, status]);
 
   const visibleRows = useMemo(() => {
-    let r = rows
+    let r = rows;
     if (search) {
-      const q = search.toLowerCase()
-      r = r.filter((x) =>
-        (x.business_name || '').toLowerCase().includes(q) ||
-        (x.owner_name || '').toLowerCase().includes(q) ||
-        (x.owner_phone || '').toLowerCase().includes(q) ||
-        (x.services_label || '').toLowerCase().includes(q)
-      )
+      const q = search.toLowerCase();
+      r = r.filter(
+        (x) =>
+          (x.business_name || "").toLowerCase().includes(q) ||
+          (x.owner_name || "").toLowerCase().includes(q) ||
+          (x.owner_phone || "").toLowerCase().includes(q) ||
+          (x.services_label || "").toLowerCase().includes(q),
+      );
     }
-    if (filterStatus) r = r.filter((x) => (x.approval_status || 'pending') === filterStatus)
-    return r
-  }, [rows, search, filterStatus])
+    if (filterStatus) r = r.filter((x) => (x.approval_status || "pending") === filterStatus);
+    return r;
+  }, [rows, search, filterStatus]);
 
   async function handleApproval(row, newStatus) {
     // row.id = profile UUID (we now query from profiles table)
     // row.provider_record_id = providers table UUID (may be null if no biz profile)
-    setActionId(row.id)
+    setActionId(row.id);
     try {
-      await supabase
-        .from('profiles')
-        .update({ approval_status: newStatus })
-        .eq('id', row.id)
+      await supabase.from("profiles").update({ approval_status: newStatus }).eq("id", row.id);
 
       if (row.provider_record_id) {
-        const providerStatus =
-          newStatus === 'approved' ? 'approved'
-          : newStatus === 'denied'   ? 'rejected'
-          : 'pending'
+        const providerStatus = newStatus === "approved" ? "approved" : newStatus === "denied" ? "rejected" : "pending";
         await supabase
-          .from('providers')
-          .update({ verified: newStatus === 'approved', status: providerStatus })
-          .eq('id', row.provider_record_id)
+          .from("providers")
+          .update({ verified: newStatus === "approved", status: providerStatus })
+          .eq("id", row.provider_record_id);
       }
 
       // Reset section to idle → triggers fresh re-fetch
-      dispatch(resetSection('providers'))
-      dispatch(fetchAdminSection('providers'))
+      dispatch(resetSection("providers"));
+      dispatch(fetchAdminSection("providers"));
     } catch (e) {
-      console.error('Approval update failed:', e)
+      console.error("Approval update failed:", e);
     } finally {
-      setActionId(null)
+      setActionId(null);
     }
   }
 
-  const approvalVariant = (s) =>
-    s === 'approved' ? 'success' : s === 'denied' ? 'danger' : 'warning'
+  const approvalVariant = (s) => (s === "approved" ? "success" : s === "denied" ? "danger" : "warning");
 
   return (
     <motion.div className="space-y-4" {...fade}>
-      <SectionHeader
-        title="Provider Management"
-        subtitle="Review provider registrations and approve or deny access."
-      />
+      <SectionHeader title="Provider Management" subtitle="Review provider registrations and approve or deny access." />
 
       {/* Filters */}
       <Card className="grid gap-3 md:grid-cols-4">
@@ -258,75 +261,74 @@ export function AdminProvidersPage() {
           onChange={(e) => setFilterStatus(e.target.value)}
           placeholder="All statuses"
           options={[
-            { label: 'Pending', value: 'pending' },
-            { label: 'Approved', value: 'approved' },
-            { label: 'Denied', value: 'denied' },
+            { label: "Pending", value: "pending" },
+            { label: "Approved", value: "approved" },
+            { label: "Denied", value: "denied" },
           ]}
         />
-        <Button variant="outline" onClick={() => { setSearch(''); setFilterStatus('') }}>Reset</Button>
+        <Button
+          variant="outline"
+          onClick={() => {
+            setSearch("");
+            setFilterStatus("");
+          }}>
+          Reset
+        </Button>
       </Card>
 
       {/* Table */}
-      {status === 'loading' ? (
+      {status === "loading" ? (
         <LoadingGrid count={3} />
-      ) : status === 'failed' ? (
-        <ErrorState description={error} onRetry={() => dispatch(fetchAdminSection('providers'))} />
+      ) : status === "failed" ? (
+        <ErrorState description={error} onRetry={() => dispatch(fetchAdminSection("providers"))} />
       ) : visibleRows.length ? (
         <DataTable
           columns={[
-            { key: 'business_name', label: 'Business Name', render: (row) => row.business_name || '-' },
-            { key: 'owner_name', label: 'Owner', render: (row) => row.owner_name || row.profiles?.full_name || '-' },
-            { key: 'services', label: 'Services', render: (row) => row.services_label || '-' },
-            { key: 'location', label: 'Location', render: (row) => row.location || '-' },
-            { key: 'rating', label: 'Rating', render: (row) => Number(row.rating || 0).toFixed(1) },
+            { key: "business_name", label: "Business Name", render: (row) => row.business_name || "-" },
+            { key: "owner_name", label: "Owner", render: (row) => row.owner_name || row.profiles?.full_name || "-" },
+            { key: "services", label: "Services", render: (row) => row.services_label || "-" },
+            { key: "location", label: "Location", render: (row) => row.location || "-" },
+            { key: "rating", label: "Rating", render: (row) => Number(row.rating || 0).toFixed(1) },
             {
-              key: 'approval_status', label: 'Status',
+              key: "approval_status",
+              label: "Status",
               render: (row) => {
-                const s = row.approval_status || 'pending'
-                return <Badge variant={approvalVariant(s)}>{s.charAt(0).toUpperCase() + s.slice(1)}</Badge>
+                const s = row.approval_status || "pending";
+                return <Badge variant={approvalVariant(s)}>{s.charAt(0).toUpperCase() + s.slice(1)}</Badge>;
               },
             },
             {
-              key: 'action', label: 'Actions',
+              key: "action",
+              label: "Actions",
               render: (row) => {
-                const busy = actionId === row.id
-                const s = row.approval_status || 'pending'
+                const busy = actionId === row.id;
+                const s = row.approval_status || "pending";
                 return (
                   <div className="flex gap-1">
                     <Button size="sm" variant="outline" onClick={() => setSelectedProvider(row)}>
                       View Details
                     </Button>
-                    {s !== 'approved' && (
-                      <Button
-                        size="sm"
-                        disabled={busy}
-                        onClick={() => handleApproval(row, 'approved')}
-                      >
-                        {busy ? '…' : 'Approve'}
+                    {s !== "approved" && (
+                      <Button size="sm" disabled={busy} onClick={() => handleApproval(row, "approved")}>
+                        {busy ? "…" : "Approve"}
                       </Button>
                     )}
-                    {s !== 'denied' && (
-                      <Button
-                        size="sm"
-                        variant="danger"
-                        disabled={busy}
-                        onClick={() => handleApproval(row, 'denied')}
-                      >
-                        {busy ? '…' : 'Deny'}
+                    {s !== "denied" && (
+                      <Button size="sm" variant="danger" disabled={busy} onClick={() => handleApproval(row, "denied")}>
+                        {busy ? "…" : "Deny"}
                       </Button>
                     )}
-                    {s !== 'pending' && (
+                    {s !== "pending" && (
                       <Button
                         size="sm"
                         variant="outline"
                         disabled={busy}
-                        onClick={() => handleApproval(row, 'pending')}
-                      >
+                        onClick={() => handleApproval(row, "pending")}>
                         Reset
                       </Button>
                     )}
                   </div>
-                )
+                );
               },
             },
           ]}
@@ -339,22 +341,21 @@ export function AdminProvidersPage() {
       <Modal
         open={!!selectedProvider}
         onClose={() => setSelectedProvider(null)}
-        title={selectedProvider?.business_name || 'Provider Details'}
-      >
+        title={selectedProvider?.business_name || "Provider Details"}>
         {selectedProvider && (
           <div className="space-y-4">
             <div className="grid gap-3 sm:grid-cols-2">
               <div className="rounded-xl border border-border p-3">
                 <p className="text-xs text-muted-foreground">Owner</p>
-                <p className="font-medium">{selectedProvider.owner_name || '-'}</p>
+                <p className="font-medium">{selectedProvider.owner_name || "-"}</p>
               </div>
               <div className="rounded-xl border border-border p-3">
                 <p className="text-xs text-muted-foreground">Phone</p>
-                <p className="font-medium">{selectedProvider.owner_phone || '-'}</p>
+                <p className="font-medium">{selectedProvider.owner_phone || "-"}</p>
               </div>
               <div className="rounded-xl border border-border p-3">
                 <p className="text-xs text-muted-foreground">Location</p>
-                <p className="font-medium">{selectedProvider.location || '-'}</p>
+                <p className="font-medium">{selectedProvider.location || "-"}</p>
               </div>
               <div className="rounded-xl border border-border p-3">
                 <p className="text-xs text-muted-foreground">Rating</p>
@@ -362,24 +363,24 @@ export function AdminProvidersPage() {
               </div>
               <div className="rounded-xl border border-border p-3">
                 <p className="text-xs text-muted-foreground">Profile Status</p>
-                <Badge variant={approvalVariant(selectedProvider.approval_status || 'pending')}>
-                  {selectedProvider.approval_status || 'pending'}
+                <Badge variant={approvalVariant(selectedProvider.approval_status || "pending")}>
+                  {selectedProvider.approval_status || "pending"}
                 </Badge>
               </div>
               <div className="rounded-xl border border-border p-3">
                 <p className="text-xs text-muted-foreground">Provider Status</p>
-                <Badge variant={selectedProvider.verified ? 'success' : 'warning'}>
-                  {selectedProvider.status || (selectedProvider.verified ? 'approved' : 'pending')}
+                <Badge variant={selectedProvider.verified ? "success" : "warning"}>
+                  {selectedProvider.status || (selectedProvider.verified ? "approved" : "pending")}
                 </Badge>
               </div>
             </div>
             <div className="rounded-xl border border-border p-3">
               <p className="text-xs text-muted-foreground">Services</p>
-              <p className="font-medium">{selectedProvider.services_label || '-'}</p>
+              <p className="font-medium">{selectedProvider.services_label || "-"}</p>
             </div>
             <div className="rounded-xl border border-border p-3">
               <p className="text-xs text-muted-foreground">Provider Record ID</p>
-              <p className="break-all font-mono text-xs">{selectedProvider.provider_record_id || '-'}</p>
+              <p className="break-all font-mono text-xs">{selectedProvider.provider_record_id || "-"}</p>
             </div>
             <div className="rounded-xl border border-border p-3">
               <p className="text-xs text-muted-foreground">Profile ID</p>
@@ -389,87 +390,97 @@ export function AdminProvidersPage() {
         )}
       </Modal>
     </motion.div>
-  )
+  );
 }
 
 // \u2500\u2500 Admin Services (master catalog CRUD + service requests) \u2500\u2500\u2500\u2500\u2500
 
 export function AdminServicesPage() {
-  const dispatch = useDispatch()
-  const { rows, status, error } = useSelector(selectAdminSection('services'))
-  const [tab, setTab] = useState('catalog') // 'catalog' | 'requests'
-  const [requests, setRequests] = useState([])
-  const [reqLoading, setReqLoading] = useState(false)
-  const [search, setSearch] = useState('')
-  const [showAdd, setShowAdd] = useState(false)
-  const [editRow, setEditRow] = useState(null)
-  const [actionLoading, setActionLoading] = useState(false)
-  const [deleteConfirm, setDeleteConfirm] = useState(null)
+  const dispatch = useDispatch();
+  const categoriesQuery = useCategoriesQuery();
+  const { rows, status, error } = useSelector(selectAdminSection("services"));
+  const [tab, setTab] = useState("catalog"); // 'catalog' | 'requests'
+  const [requests, setRequests] = useState([]);
+  const [reqLoading, setReqLoading] = useState(false);
+  const [search, setSearch] = useState("");
+  const [showAdd, setShowAdd] = useState(false);
+  const [editRow, setEditRow] = useState(null);
+  const [actionLoading, setActionLoading] = useState(false);
+  const [deleteConfirm, setDeleteConfirm] = useState(null);
 
   useEffect(() => {
-    if (status === 'idle') dispatch(fetchAdminSection('services'))
-  }, [dispatch, status])
+    if (status === "idle") dispatch(fetchAdminSection("services"));
+  }, [dispatch, status]);
 
   const loadRequests = useCallback(async () => {
-    setReqLoading(true)
+    setReqLoading(true);
     try {
       const { data } = await supabase
-        .from('service_requests')
-        .select('*, profiles(full_name), providers(business_name)')
-        .order('created_at', { ascending: false })
-      setRequests(data || [])
+        .from("service_requests")
+        .select("*, profiles(full_name), providers(business_name), categories(name)")
+        .order("created_at", { ascending: false });
+      setRequests(data || []);
     } finally {
-      setReqLoading(false)
+      setReqLoading(false);
     }
-  }, [])
+  }, []);
 
   const visibleRows = useMemo(() => {
-    if (!search) return rows
-    const q = search.toLowerCase()
-    return rows.filter((x) => (x.name || '').toLowerCase().includes(q) || (x.description || '').toLowerCase().includes(q))
-  }, [rows, search])
+    if (!search) return rows;
+    const q = search.toLowerCase();
+    return rows.filter(
+      (x) =>
+        (x.name || "").toLowerCase().includes(q) ||
+        (x.description || "").toLowerCase().includes(q) ||
+        (x.category?.name || x.category_name || "").toLowerCase().includes(q),
+    );
+  }, [rows, search]);
 
   async function handleCreate(payload) {
-    setActionLoading(true)
-    await dispatch(createAdminRow({ section: 'services', payload }))
-    setActionLoading(false)
-    setShowAdd(false)
+    setActionLoading(true);
+    await dispatch(createAdminRow({ section: "services", payload }));
+    setActionLoading(false);
+    setShowAdd(false);
   }
 
   async function handleUpdate(payload) {
-    const rowId = editRow?.id
-    if (!rowId) return
-    setActionLoading(true)
-    await dispatch(updateAdminRow({ section: 'services', id: rowId, payload }))
-    setActionLoading(false)
-    setEditRow(null)
+    const rowId = editRow?.id;
+    if (!rowId) return;
+    setActionLoading(true);
+    await dispatch(updateAdminRow({ section: "services", id: rowId, payload }));
+    setActionLoading(false);
+    setEditRow(null);
   }
 
   async function handleDelete(id) {
-    setActionLoading(true)
-    await dispatch(deleteAdminRow({ section: 'services', id }))
-    setActionLoading(false)
-    setDeleteConfirm(null)
+    setActionLoading(true);
+    await dispatch(deleteAdminRow({ section: "services", id }));
+    setActionLoading(false);
+    setDeleteConfirm(null);
   }
 
   async function handleRequest(req, action) {
-    setReqLoading(true)
+    setReqLoading(true);
     try {
-      if (action === 'approve') {
+      if (action === "approve") {
         // Add to master catalog
-        await supabase.from('services').insert({
+        await supabase.from("services").insert({
           name: req.service_name || req.name,
-          description: req.description || '',
-        })
+          description: req.description || "",
+          category_id: req.category_id || null,
+        });
       }
       // Update request status
-      await supabase.from('service_requests').update({ status: action === 'approve' ? 'approved' : 'denied' }).eq('id', req.id)
+      await supabase
+        .from("service_requests")
+        .update({ status: action === "approve" ? "approved" : "denied" })
+        .eq("id", req.id);
       // Refresh
-      dispatch(resetSection('services'))
-      dispatch(fetchAdminSection('services'))
-      await loadRequests()
+      dispatch(resetSection("services"));
+      dispatch(fetchAdminSection("services"));
+      await loadRequests();
     } finally {
-      setReqLoading(false)
+      setReqLoading(false);
     }
   }
 
@@ -479,7 +490,7 @@ export function AdminServicesPage() {
         title="Service Catalog"
         subtitle="Manage the master list of service types available on the platform."
         action={
-          tab === 'catalog' ? (
+          tab === "catalog" ? (
             <Button onClick={() => setShowAdd(true)}>
               <Plus className="h-4 w-4" /> Add Service
             </Button>
@@ -489,23 +500,22 @@ export function AdminServicesPage() {
 
       {/* Tabs */}
       <div className="flex gap-1 rounded-xl border border-border bg-muted/30 p-1 w-fit">
-        {['catalog', 'requests'].map((t) => (
+        {["catalog", "requests"].map((t) => (
           <button
             key={t}
             onClick={() => {
-              setTab(t)
-              if (t === 'requests') loadRequests()
+              setTab(t);
+              if (t === "requests") loadRequests();
             }}
             className={`rounded-lg px-4 py-1.5 text-sm font-medium capitalize transition-all ${
-              tab === t ? 'bg-card text-foreground shadow' : 'text-muted-foreground hover:text-foreground'
-            }`}
-          >
-            {t === 'catalog' ? 'Service Catalog' : 'Requests'}
+              tab === t ? "bg-card text-foreground shadow" : "text-muted-foreground hover:text-foreground"
+            }`}>
+            {t === "catalog" ? "Service Catalog" : "Requests"}
           </button>
         ))}
       </div>
 
-      {tab === 'catalog' && (
+      {tab === "catalog" && (
         <>
           {/* Search */}
           <Card className="flex gap-3">
@@ -515,20 +525,40 @@ export function AdminServicesPage() {
               value={search}
               onChange={(e) => setSearch(e.target.value)}
             />
-            <Button variant="outline" onClick={() => setSearch('')}>Reset</Button>
+            <Button variant="outline" onClick={() => setSearch("")}>
+              Reset
+            </Button>
           </Card>
 
-          {status === 'loading' ? (
+          {status === "loading" ? (
             <LoadingGrid count={3} />
-          ) : status === 'failed' ? (
-            <ErrorState description={error} onRetry={() => dispatch(fetchAdminSection('services'))} />
+          ) : status === "failed" ? (
+            <ErrorState description={error} onRetry={() => dispatch(fetchAdminSection("services"))} />
           ) : visibleRows.length ? (
             <DataTable
               columns={[
-                { key: 'name', label: 'Service Name', render: (row) => <span className="font-medium">{row.name}</span> },
-                { key: 'description', label: 'Description', render: (row) => <span className="max-w-xs truncate text-muted-foreground">{row.description || '-'}</span> },
                 {
-                  key: 'action', label: 'Actions',
+                  key: "name",
+                  label: "Service Name",
+                  render: (row) => <span className="font-medium">{row.name}</span>,
+                },
+                {
+                  key: "category",
+                  label: "Category",
+                  render: (row) => (
+                    <span className="text-muted-foreground">{row.category?.name || row.category_name || "-"}</span>
+                  ),
+                },
+                {
+                  key: "description",
+                  label: "Description",
+                  render: (row) => (
+                    <span className="max-w-xs truncate text-muted-foreground">{row.description || "-"}</span>
+                  ),
+                },
+                {
+                  key: "action",
+                  label: "Actions",
                   render: (row) => (
                     <div className="flex gap-1">
                       <Button size="sm" variant="outline" onClick={() => setEditRow(row)}>
@@ -549,41 +579,65 @@ export function AdminServicesPage() {
         </>
       )}
 
-      {tab === 'requests' && (
-        reqLoading ? <LoadingGrid count={2} /> :
-        requests.length ? (
+      {tab === "requests" &&
+        (reqLoading ? (
+          <LoadingGrid count={2} />
+        ) : requests.length ? (
           <DataTable
             columns={[
-              { key: 'service_name', label: 'Requested Service', render: (r) => <span className="font-medium">{r.service_name || r.name}</span> },
-              { key: 'description', label: 'Description', render: (r) => r.description || '-' },
-              { key: 'provider', label: 'Requested By', render: (r) => r.providers?.business_name || r.profiles?.full_name || '-' },
-              { key: 'phone', label: 'Phone', render: (r) => r.phone || '-' },
-              { key: 'created_at', label: 'Date', render: (r) => formatDate(r.created_at) },
               {
-                key: 'status', label: 'Status',
+                key: "service_name",
+                label: "Requested Service",
+                render: (r) => <span className="font-medium">{r.service_name || r.name}</span>,
+              },
+              {
+                key: "category",
+                label: "Category",
+                render: (r) => <span className="text-muted-foreground">{r.categories?.name || "-"}</span>,
+              },
+              { key: "description", label: "Description", render: (r) => r.description || "-" },
+              {
+                key: "provider",
+                label: "Requested By",
+                render: (r) => r.providers?.business_name || r.profiles?.full_name || "-",
+              },
+              { key: "phone", label: "Phone", render: (r) => r.phone || "-" },
+              { key: "created_at", label: "Date", render: (r) => formatDate(r.created_at) },
+              {
+                key: "status",
+                label: "Status",
                 render: (r) => {
-                  const v = r.status === 'approved' ? 'success' : r.status === 'denied' ? 'danger' : 'warning'
-                  return <Badge variant={v}>{r.status}</Badge>
+                  const v = r.status === "approved" ? "success" : r.status === "denied" ? "danger" : "warning";
+                  return <Badge variant={v}>{r.status}</Badge>;
                 },
               },
               {
-                key: 'action', label: 'Actions',
-                render: (r) => r.status === 'pending' ? (
-                  <div className="flex gap-1">
-                    <Button size="sm" disabled={reqLoading} onClick={() => handleRequest(r, 'approve')}>Approve</Button>
-                    <Button size="sm" variant="danger" disabled={reqLoading} onClick={() => handleRequest(r, 'deny')}>Deny</Button>
-                  </div>
-                ) : <span className="text-xs text-muted-foreground capitalize">{r.status}</span>,
+                key: "action",
+                label: "Actions",
+                render: (r) =>
+                  r.status === "pending" ? (
+                    <div className="flex gap-1">
+                      <Button size="sm" disabled={reqLoading} onClick={() => handleRequest(r, "approve")}>
+                        Approve
+                      </Button>
+                      <Button size="sm" variant="danger" disabled={reqLoading} onClick={() => handleRequest(r, "deny")}>
+                        Deny
+                      </Button>
+                    </div>
+                  ) : (
+                    <span className="text-xs text-muted-foreground capitalize">{r.status}</span>
+                  ),
               },
             ]}
             rows={requests}
           />
-        ) : <EmptyState title="No service requests" />
-      )}
+        ) : (
+          <EmptyState title="No service requests" />
+        ))}
 
       {/* Add Modal */}
       <Modal open={showAdd} onClose={() => setShowAdd(false)} title="Add New Service">
-        <ServiceForm loading={actionLoading} onSubmit={handleCreate} />
+        <ServiceForm categories={categoriesQuery.data || []} loading={actionLoading} onSubmit={handleCreate} />
       </Modal>
 
       {/* Edit Modal */}
@@ -591,7 +645,12 @@ export function AdminServicesPage() {
         {editRow && (
           <ServiceForm
             key={editRow.id}
-            initial={{ name: editRow.name || '', description: editRow.description || '' }}
+            initial={{
+              name: editRow.name || "",
+              description: editRow.description || "",
+              category_id: editRow.category_id || editRow.category?.id || "",
+            }}
+            categories={categoriesQuery.data || []}
             loading={actionLoading}
             onSubmit={handleUpdate}
           />
@@ -601,52 +660,54 @@ export function AdminServicesPage() {
       {/* Delete Confirm Modal */}
       <Modal open={!!deleteConfirm} onClose={() => setDeleteConfirm(null)} title="Delete Service">
         <p className="mb-6 text-sm text-muted-foreground">
-          Are you sure you want to delete <span className="font-semibold text-foreground">"{deleteConfirm?.name}"</span>?
-          This action cannot be undone.
+          Are you sure you want to delete <span className="font-semibold text-foreground">"{deleteConfirm?.name}"</span>
+          ? This action cannot be undone.
         </p>
         <div className="flex justify-end gap-2">
-          <Button variant="outline" onClick={() => setDeleteConfirm(null)}>Cancel</Button>
+          <Button variant="outline" onClick={() => setDeleteConfirm(null)}>
+            Cancel
+          </Button>
           <Button variant="danger" disabled={actionLoading} onClick={() => handleDelete(deleteConfirm?.id)}>
-            {actionLoading ? 'Deleting…' : 'Delete'}
+            {actionLoading ? "Deleting…" : "Delete"}
           </Button>
         </div>
       </Modal>
     </motion.div>
-  )
+  );
 }
 
 // ── Admin Bookings (with payment details) ─────────────────────
 
-
 export function AdminBookingsPage() {
-  const dispatch = useDispatch()
-  const { rows, status, error } = useSelector(selectAdminSection('bookings'))
-  const [search, setSearch] = useState('')
-  const [filterStatus, setFilterStatus] = useState('')
+  const dispatch = useDispatch();
+  const { rows, status, error } = useSelector(selectAdminSection("bookings"));
+  const [search, setSearch] = useState("");
+  const [filterStatus, setFilterStatus] = useState("");
 
   useEffect(() => {
-    if (status === 'idle') dispatch(fetchAdminSection('bookings'))
-  }, [dispatch, status])
+    if (status === "idle") dispatch(fetchAdminSection("bookings"));
+  }, [dispatch, status]);
 
   const visibleRows = useMemo(() => {
-    let r = rows
+    let r = rows;
     if (search) {
-      const q = search.toLowerCase()
-      r = r.filter((x) =>
-        (x.booking_code || x.id || '').toString().toLowerCase().includes(q) ||
-        (x.customer_name || '').toLowerCase().includes(q) ||
-        (x.service_title || '').toLowerCase().includes(q) ||
-        (x.provider_name || '').toLowerCase().includes(q)
-      )
+      const q = search.toLowerCase();
+      r = r.filter(
+        (x) =>
+          (x.booking_code || x.id || "").toString().toLowerCase().includes(q) ||
+          (x.customer_name || "").toLowerCase().includes(q) ||
+          (x.service_title || "").toLowerCase().includes(q) ||
+          (x.provider_name || "").toLowerCase().includes(q),
+      );
     }
-    if (filterStatus) r = r.filter((x) => x.status === filterStatus)
-    return r
-  }, [rows, search, filterStatus])
+    if (filterStatus) r = r.filter((x) => x.status === filterStatus);
+    return r;
+  }, [rows, search, filterStatus]);
 
   const statusOptions = useMemo(() => {
-    const unique = [...new Set(rows.map((r) => r.status).filter(Boolean))]
-    return unique.map((s) => ({ label: s.charAt(0).toUpperCase() + s.slice(1), value: s }))
-  }, [rows])
+    const unique = [...new Set(rows.map((r) => r.status).filter(Boolean))];
+    return unique.map((s) => ({ label: s.charAt(0).toUpperCase() + s.slice(1), value: s }));
+  }, [rows]);
 
   return (
     <motion.div className="space-y-4" {...fade}>
@@ -669,60 +730,68 @@ export function AdminBookingsPage() {
           placeholder="All statuses"
           options={statusOptions}
         />
-        <Button variant="outline" onClick={() => { setSearch(''); setFilterStatus('') }}>Reset</Button>
+        <Button
+          variant="outline"
+          onClick={() => {
+            setSearch("");
+            setFilterStatus("");
+          }}>
+          Reset
+        </Button>
       </Card>
 
       {/* Table */}
-      {status === 'loading' ? (
+      {status === "loading" ? (
         <LoadingGrid count={3} />
-      ) : status === 'failed' ? (
-        <ErrorState description={error} onRetry={() => dispatch(fetchAdminSection('bookings'))} />
+      ) : status === "failed" ? (
+        <ErrorState description={error} onRetry={() => dispatch(fetchAdminSection("bookings"))} />
       ) : visibleRows.length ? (
         <DataTable
           columns={[
             {
-              key: 'booking_code', label: 'Booking #',
+              key: "booking_code",
+              label: "Booking #",
               render: (row) => (
                 <span className="font-mono text-xs font-semibold">
-                  {(row.booking_code || row.id || '').toString().slice(0, 10)}
+                  {(row.booking_code || row.id || "").toString().slice(0, 10)}
                 </span>
               ),
             },
-            { key: 'service_title', label: 'Service', render: (row) => row.service_title || '-' },
-            { key: 'customer_name', label: 'Customer', render: (row) => row.customer_name || '-' },
-            { key: 'provider_name', label: 'Provider', render: (row) => row.provider_name || '-' },
-            { key: 'scheduled_date', label: 'Date', render: (row) => formatDate(row.scheduled_date || row.created_at) },
+            { key: "service_title", label: "Service", render: (row) => row.service_title || "-" },
+            { key: "customer_name", label: "Customer", render: (row) => row.customer_name || "-" },
+            { key: "provider_name", label: "Provider", render: (row) => row.provider_name || "-" },
+            { key: "scheduled_date", label: "Date", render: (row) => formatDate(row.scheduled_date || row.created_at) },
             {
-              key: 'status', label: 'Status',
+              key: "status",
+              label: "Status",
               render: (row) => {
                 const variant =
-                  row.status === 'completed' ? 'success'
-                  : row.status === 'cancelled' ? 'danger'
-                  : 'warning'
-                return <Badge variant={variant}>{row.status}</Badge>
+                  row.status === "completed" ? "success" : row.status === "cancelled" ? "danger" : "warning";
+                return <Badge variant={variant}>{row.status}</Badge>;
               },
             },
             // ── Payment details ──
             {
-              key: 'amount', label: 'Amount',
-              render: (row) => (
-                <span className="font-semibold">{formatCurrency(row.amount || 0)}</span>
-              ),
+              key: "amount",
+              label: "Amount",
+              render: (row) => <span className="font-semibold">{formatCurrency(row.amount || 0)}</span>,
             },
             {
-              key: 'payment_status', label: 'Payment',
+              key: "payment_status",
+              label: "Payment",
               render: (row) => {
-                const ps = row.payment_status || (row.status === 'completed' ? 'paid' : 'pending')
-                return (
-                  <Badge variant={ps === 'paid' ? 'success' : 'warning'}>
-                    {ps}
-                  </Badge>
-                )
+                const ps = row.payment_status || (row.status === "completed" ? "paid" : "pending");
+                return <Badge variant={ps === "paid" ? "success" : "warning"}>{ps}</Badge>;
               },
             },
             {
-              key: 'action', label: 'Action',
-              render: () => <Button size="sm" variant="outline">View</Button>,
+              key: "action",
+              label: "Action",
+              render: () => (
+                <Button size="sm" variant="outline">
+                  View
+                </Button>
+              ),
             },
           ]}
           rows={visibleRows}
@@ -731,7 +800,7 @@ export function AdminBookingsPage() {
         <EmptyState title="No bookings found" />
       )}
     </motion.div>
-  )
+  );
 }
 
 // ── Admin Reports ─────────────────────────────────────────────
@@ -741,14 +810,16 @@ export function AdminReportsPage() {
     <motion.div className="space-y-4" {...fade}>
       <SectionHeader title="Reports" subtitle="Growth, revenue, categories, providers and customer insights." />
       <div className="grid gap-4 xl:grid-cols-2">
-        <RevenueAreaChart data={[
-          { month: 'Jan', revenue: 920000, bookings: 2800 },
-          { month: 'Feb', revenue: 1000000, bookings: 2950 },
-          { month: 'Mar', revenue: 1110000, bookings: 3210 },
-          { month: 'Apr', revenue: 1190000, bookings: 3550 },
-          { month: 'May', revenue: 1280000, bookings: 3780 },
-          { month: 'Jun', revenue: 1360000, bookings: 3980 },
-        ]} />
+        <RevenueAreaChart
+          data={[
+            { month: "Jan", revenue: 920000, bookings: 2800 },
+            { month: "Feb", revenue: 1000000, bookings: 2950 },
+            { month: "Mar", revenue: 1110000, bookings: 3210 },
+            { month: "Apr", revenue: 1190000, bookings: 3550 },
+            { month: "May", revenue: 1280000, bookings: 3780 },
+            { month: "Jun", revenue: 1360000, bookings: 3980 },
+          ]}
+        />
         <Card className="space-y-2">
           <h3 className="font-semibold">Top Insights</h3>
           <p className="text-sm text-muted-foreground">Cleaning services grew 22% MoM.</p>
@@ -757,105 +828,130 @@ export function AdminReportsPage() {
         </Card>
       </div>
     </motion.div>
-  )
+  );
 }
 
 // ── Generic Section Page ──────────────────────────────────────
 
 const sectionConfig = {
   users: {
-    title: 'Users',
-    subtitle: 'Customer, provider, and admin account administration.',
-    action: 'New User',
+    title: "Users",
+    subtitle: "Customer, provider, and admin account administration.",
+    action: "New User",
     columns: [
-      { key: 'full_name', label: 'Name', render: (row) => row.full_name || 'Unnamed user' },
-      { key: 'phone', label: 'Phone', render: (row) => row.phone || '-' },
-      { key: 'role', label: 'Role', render: (row) => <Badge>{row.role}</Badge> },
-      { key: 'created_at', label: 'Joined', render: (row) => formatDate(row.created_at) },
+      { key: "full_name", label: "Name", render: (row) => row.full_name || "Unnamed user" },
+      { key: "phone", label: "Phone", render: (row) => row.phone || "-" },
+      { key: "role", label: "Role", render: (row) => <Badge>{row.role}</Badge> },
+      { key: "created_at", label: "Joined", render: (row) => formatDate(row.created_at) },
     ],
   },
   providers: {
-    title: 'Providers',
-    subtitle: 'Verification, quality, and operational status.',
-    action: 'Request Changes',
+    title: "Providers",
+    subtitle: "Verification, quality, and operational status.",
+    action: "Request Changes",
     columns: [
-      { key: 'business_name', label: 'Provider' },
-      { key: 'services', label: 'Services', render: (row) => row.services_label || '-' },
-      { key: 'location', label: 'Location', render: (row) => row.location || '-' },
-      { key: 'status', label: 'Status', render: (row) => <Badge variant={row.verified ? 'success' : 'warning'}>{row.status || (row.verified ? 'approved' : 'pending')}</Badge> },
-      { key: 'rating', label: 'Rating', render: (row) => Number(row.rating || 0).toFixed(1) },
+      { key: "business_name", label: "Provider" },
+      { key: "services", label: "Services", render: (row) => row.services_label || "-" },
+      { key: "location", label: "Location", render: (row) => row.location || "-" },
+      {
+        key: "status",
+        label: "Status",
+        render: (row) => (
+          <Badge variant={row.verified ? "success" : "warning"}>
+            {row.status || (row.verified ? "approved" : "pending")}
+          </Badge>
+        ),
+      },
+      { key: "rating", label: "Rating", render: (row) => Number(row.rating || 0).toFixed(1) },
     ],
   },
   complaints: {
-    title: 'Complaints',
-    subtitle: 'Review escalations, quality issues, and resolution timelines.',
-    action: 'Assign',
+    title: "Complaints",
+    subtitle: "Review escalations, quality issues, and resolution timelines.",
+    action: "Assign",
     columns: [
-      { key: 'booking', label: 'Booking', render: (row) => row.bookings?.booking_code || row.booking_id },
-      { key: 'subject', label: 'Subject', render: (row) => row.subject || '-' },
-      { key: 'service', label: 'Service', render: (row) => row.services?.name || '-' },
-      { key: 'customer', label: 'Customer', render: (row) => row.profiles?.full_name || '-' },
-      { key: 'provider', label: 'Provider', render: (row) => row.providers?.business_name || '-' },
-      { key: 'status', label: 'Status', render: (row) => <Badge variant={row.status === 'resolved' ? 'success' : 'warning'}>{row.status}</Badge> },
-      { key: 'comment', label: 'Comment', render: (row) => row.comment || '-' },
-      { key: 'created_at', label: 'Created', render: (row) => formatDate(row.created_at) },
+      { key: "booking", label: "Booking", render: (row) => row.bookings?.booking_code || row.booking_id },
+      { key: "subject", label: "Subject", render: (row) => row.subject || "-" },
+      { key: "service", label: "Service", render: (row) => row.services?.name || "-" },
+      { key: "customer", label: "Customer", render: (row) => row.profiles?.full_name || "-" },
+      { key: "provider", label: "Provider", render: (row) => row.providers?.business_name || "-" },
+      {
+        key: "status",
+        label: "Status",
+        render: (row) => <Badge variant={row.status === "resolved" ? "success" : "warning"}>{row.status}</Badge>,
+      },
+      { key: "comment", label: "Comment", render: (row) => row.comment || "-" },
+      { key: "created_at", label: "Created", render: (row) => formatDate(row.created_at) },
     ],
   },
   settings: {
-    title: 'Admin Settings',
-    subtitle: 'Permissions, platform policies, and notification controls.',
-    action: 'Save',
+    title: "Admin Settings",
+    subtitle: "Permissions, platform policies, and notification controls.",
+    action: "Save",
     staticRows: [
-      { name: 'Admin access', status: 'Enabled', updatedBy: 'System', updatedOn: new Date().toISOString() },
-      { name: 'Provider approval workflow', status: 'Enabled', updatedBy: 'System', updatedOn: new Date().toISOString() },
+      { name: "Admin access", status: "Enabled", updatedBy: "System", updatedOn: new Date().toISOString() },
+      {
+        name: "Provider approval workflow",
+        status: "Enabled",
+        updatedBy: "System",
+        updatedOn: new Date().toISOString(),
+      },
     ],
     columns: [
-      { key: 'name', label: 'Setting' },
-      { key: 'status', label: 'Status', render: (row) => <Badge variant="success">{row.status}</Badge> },
-      { key: 'updatedBy', label: 'Updated By' },
-      { key: 'updatedOn', label: 'Updated On', render: (row) => formatDate(row.updatedOn) },
+      { key: "name", label: "Setting" },
+      { key: "status", label: "Status", render: (row) => <Badge variant="success">{row.status}</Badge> },
+      { key: "updatedBy", label: "Updated By" },
+      { key: "updatedOn", label: "Updated On", render: (row) => formatDate(row.updatedOn) },
     ],
   },
-}
+};
 
 export function AdminSectionPage({ sectionOverride }) {
-  const params = useParams()
-  const section = sectionOverride || params.section
-  const config = sectionConfig[section]
-  const dispatch = useDispatch()
-  const sectionState = useSelector(selectAdminSection(section))
-  const { rows, status, error } = sectionState
+  const params = useParams();
+  const section = sectionOverride || params.section;
+  const config = sectionConfig[section];
+  const dispatch = useDispatch();
+  const sectionState = useSelector(selectAdminSection(section));
+  const { rows, status, error } = sectionState;
 
   useEffect(() => {
-    if (config && !config.staticRows && status === 'idle') {
-      dispatch(fetchAdminSection(section))
+    if (config && !config.staticRows && status === "idle") {
+      dispatch(fetchAdminSection(section));
     }
-  }, [config, dispatch, section, status])
+  }, [config, dispatch, section, status]);
 
   const visibleRows = useMemo(() => {
-    const sourceRows = config?.staticRows || rows
-    return config?.filterRows ? config.filterRows(sourceRows) : sourceRows
-  }, [config, rows])
+    const sourceRows = config?.staticRows || rows;
+    return config?.filterRows ? config.filterRows(sourceRows) : sourceRows;
+  }, [config, rows]);
 
-  if (!config) return <Navigate to="/sevalink-admin" replace />
+  if (!config) return <Navigate to="/sevalink-admin" replace />;
 
   return (
     <motion.div className="space-y-4" {...fade}>
       <SectionHeader title={config.title} subtitle={config.subtitle} action={<Button>{config.action}</Button>} />
       <Card className="grid gap-3 md:grid-cols-4">
         <Input className="md:col-span-2" placeholder={`Search ${config.title}`} />
-        <Select placeholder="Filter" options={[{ label: 'All', value: 'all' }]} />
+        <Select placeholder="Filter" options={[{ label: "All", value: "all" }]} />
         <Button variant="outline">Apply</Button>
       </Card>
-      {status === 'loading' && !config.staticRows ? (
+      {status === "loading" && !config.staticRows ? (
         <LoadingGrid count={3} />
-      ) : status === 'failed' ? (
+      ) : status === "failed" ? (
         <ErrorState description={error} onRetry={() => dispatch(fetchAdminSection(section))} />
       ) : visibleRows.length ? (
         <DataTable
           columns={[
             ...config.columns,
-            { key: 'action', label: 'Action', render: () => <Button size="sm" variant="outline">Edit</Button> },
+            {
+              key: "action",
+              label: "Action",
+              render: () => (
+                <Button size="sm" variant="outline">
+                  Edit
+                </Button>
+              ),
+            },
           ]}
           rows={visibleRows}
         />
@@ -863,5 +959,5 @@ export function AdminSectionPage({ sectionOverride }) {
         <EmptyState title={`No ${config.title.toLowerCase()} found`} />
       )}
     </motion.div>
-  )
+  );
 }

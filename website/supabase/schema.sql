@@ -115,9 +115,12 @@ create policy "Providers can update own record"
 -- =============================================
 create table public.services (
   id uuid default uuid_generate_v4() primary key,
+  category_id uuid references public.categories(id) on delete set null,
   name text not null,
   description text default ''
 );
+
+create index if not exists services_category_id_idx on public.services(category_id);
 
 alter table public.services enable row level security;
 
@@ -183,6 +186,7 @@ create table public.service_requests (
   id uuid default uuid_generate_v4() primary key,
   provider_id uuid references public.providers(id) on delete set null,
   user_id uuid not null references public.profiles(id) on delete cascade,
+  category_id uuid references public.categories(id) on delete set null,
   phone text default '',
   service_name text not null,
   description text default '',
