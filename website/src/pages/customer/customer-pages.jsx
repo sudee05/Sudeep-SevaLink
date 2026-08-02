@@ -289,7 +289,7 @@ export function CustomerDashboardPage() {
   const queryClient = useQueryClient();
   const toast = useToast();
   const [selectedService, setSelectedService] = useState(null);
-  const [selectedCategoryId, setSelectedCategoryId] = useState("");
+  const [selectedCategoryId, setSelectedCategoryId] = useState("all");
   const [location, setLocation] = useState("");
   const [maxPrice, setMaxPrice] = useState("");
   const [bookingProvider, setBookingProvider] = useState(null);
@@ -297,7 +297,7 @@ export function CustomerDashboardPage() {
   const providers = useProvidersByServiceQuery(selectedService?.id);
 
   const filteredServices = useMemo(() => {
-    if (!selectedCategoryId) return [];
+    if (selectedCategoryId === "all") return services.data || [];
     return (services.data || []).filter((service) => String(service.category_id) === String(selectedCategoryId));
   }, [services.data, selectedCategoryId]);
 
@@ -387,7 +387,7 @@ export function CustomerDashboardPage() {
                 type="button"
                 onClick={() => {
                   setSelectedService(null);
-                  setSelectedCategoryId("");
+                  setSelectedCategoryId("all");
                   setBookingProvider(null);
                   setLocation("");
                   setMaxPrice("");
@@ -400,40 +400,51 @@ export function CustomerDashboardPage() {
           </div>
         ) : (
           <div className="space-y-4">
-            <Select
-              value={selectedCategoryId}
-              onChange={(event) => {
-                setSelectedCategoryId(event.target.value);
-                setSelectedService(null);
-                setBookingProvider(null);
-              }}
-              placeholder="Select a category"
-              options={(categories.data || []).map((category) => ({ label: category.name, value: category.id }))}
-            />
-            {!selectedCategoryId ? (
-              <EmptyState title="Choose a category" description="Select a category to see matching services." />
-            ) : (
-              <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
-                {filteredServices.map((service) => (
-                  <button
-                    key={service.id}
-                    type="button"
-                    onClick={() => {
-                      setSelectedService(service);
-                      setBookingProvider(null);
-                    }}
-                    className="rounded-xl border border-border p-4 text-left opacity-100 transition duration-200 hover:border-primary hover:shadow-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20">
-                    <p className="text-xs uppercase tracking-wide text-muted-foreground">
-                      {service.category_name || service.category?.name || "Category"}
-                    </p>
-                    <p className="font-semibold">{service.name}</p>
-                    <p className="mt-1 line-clamp-2 text-sm text-muted-foreground">
-                      {service.description || "Available service"}
-                    </p>
-                  </button>
-                ))}
-              </div>
-            )}
+            <div className="flex flex-wrap gap-2">
+              <button
+                type="button"
+                onClick={() => {
+                  setSelectedCategoryId("all");
+                  setSelectedService(null);
+                  setBookingProvider(null);
+                }}
+                className={`rounded-full border px-4 py-2 text-sm font-medium transition ${selectedCategoryId === "all" ? "border-primary bg-primary text-white" : "border-border bg-card text-foreground hover:border-primary"}`}>
+                All
+              </button>
+              {(categories.data || []).map((category) => (
+                <button
+                  key={category.id}
+                  type="button"
+                  onClick={() => {
+                    setSelectedCategoryId(category.id);
+                    setSelectedService(null);
+                    setBookingProvider(null);
+                  }}
+                  className={`rounded-full border px-4 py-2 text-sm font-medium transition ${selectedCategoryId === category.id ? "border-primary bg-primary text-white" : "border-border bg-card text-foreground hover:border-primary"}`}>
+                  {category.name}
+                </button>
+              ))}
+            </div>
+            <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+              {filteredServices.map((service) => (
+                <button
+                  key={service.id}
+                  type="button"
+                  onClick={() => {
+                    setSelectedService(service);
+                    setBookingProvider(null);
+                  }}
+                  className="rounded-xl border border-border p-4 text-left opacity-100 transition duration-200 hover:border-primary hover:shadow-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20">
+                  <p className="text-xs uppercase tracking-wide text-muted-foreground">
+                    {service.category_name || service.category?.name || "Category"}
+                  </p>
+                  <p className="font-semibold">{service.name}</p>
+                  <p className="mt-1 line-clamp-2 text-sm text-muted-foreground">
+                    {service.description || "Available service"}
+                  </p>
+                </button>
+              ))}
+            </div>
           </div>
         )}
       </Card>

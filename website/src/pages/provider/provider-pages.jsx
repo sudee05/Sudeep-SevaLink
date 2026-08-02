@@ -1,7 +1,7 @@
 import { motion } from "framer-motion";
 import { useEffect, useMemo, useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { Link, useParams } from "react-router-dom";
+import { Link, useNavigate, useParams } from "react-router-dom";
 import { Bell, Calendar, CheckCircle2, CircleDollarSign, Clock, Upload, X } from "lucide-react";
 import { useBookingsQuery, useNotificationsQuery, useProviderBookingsQuery } from "@/hooks/use-queries";
 import { useRealtimeNotifications } from "@/hooks/use-realtime";
@@ -852,6 +852,7 @@ export function ProviderReviewsPage() {
 
 export function ProviderNotificationsPage() {
   const queryClient = useQueryClient();
+  const navigate = useNavigate();
   const [userId, setUserId] = useState(null);
 
   useEffect(() => {
@@ -873,6 +874,21 @@ export function ProviderNotificationsPage() {
 
   const unreadCount = (notifications.data || []).filter((notification) => !notification.is_read).length;
 
+  function openNotification(notification) {
+    if (!notification.booking_id) return;
+
+    const goToBooking = () => navigate(`/provider/bookings/${notification.booking_id}`);
+
+    if (notification.is_read) {
+      goToBooking();
+      return;
+    }
+
+    markReadMutation.mutate(notification.id, {
+      onSuccess: goToBooking,
+    });
+  }
+
   return (
     <motion.div className="space-y-4" {...fade}>
       <SectionHeader
@@ -893,7 +909,16 @@ export function ProviderNotificationsPage() {
           {notifications.data.map((notification) => (
             <Card
               key={notification.id}
-              className={`flex items-start justify-between gap-4 ${notification.is_read ? "opacity-70" : ""}`}>
+              className={`flex items-start justify-between gap-4 ${notification.is_read ? "opacity-70" : "cursor-pointer hover:border-primary"}`}
+              role={notification.booking_id ? "button" : undefined}
+              tabIndex={notification.booking_id ? 0 : undefined}
+              onClick={() => openNotification(notification)}
+              onKeyDown={(event) => {
+                if (notification.booking_id && (event.key === "Enter" || event.key === " ")) {
+                  event.preventDefault();
+                  openNotification(notification);
+                }
+              }}>
               <div>
                 <div className="flex flex-wrap items-center gap-2">
                   <Bell className="h-4 w-4 text-primary" />
@@ -902,13 +927,19 @@ export function ProviderNotificationsPage() {
                 </div>
                 <p className="mt-1 text-sm text-muted-foreground">{notification.message}</p>
                 <p className="mt-2 text-xs text-muted-foreground">{formatDate(notification.created_at)}</p>
+                {notification.booking_id && (
+                  <p className="mt-2 text-xs font-medium text-primary">Open booking</p>
+                )}
               </div>
               {!notification.is_read && (
                 <Button
                   size="sm"
                   variant="outline"
                   disabled={markReadMutation.isPending}
-                  onClick={() => markReadMutation.mutate(notification.id)}>
+                  onClick={(event) => {
+                    event.stopPropagation();
+                    markReadMutation.mutate(notification.id);
+                  }}>
                   Mark read
                 </Button>
               )}

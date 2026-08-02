@@ -530,10 +530,10 @@ export function CategoriesPage() {
 export function ServicesPage() {
   const categories = useCategoriesQuery();
   const { data, isLoading } = useServicesQuery();
-  const [selectedCategoryId, setSelectedCategoryId] = useState("");
+  const [selectedCategoryId, setSelectedCategoryId] = useState("all");
   const [location, setLocation] = useState("");
   const filteredServices = useMemo(() => {
-    if (!selectedCategoryId) return [];
+    if (selectedCategoryId === "all") return data || [];
     return (data || []).filter((service) => String(service.category_id) === String(selectedCategoryId));
   }, [data, selectedCategoryId]);
 
@@ -545,18 +545,25 @@ export function ServicesPage() {
         <LocationSelector className="lg:col-span-2" value={location} onChange={setLocation} />
         <Button variant="outline">Filter</Button>
       </div>
-      <div className="mb-5 grid gap-3 md:grid-cols-2">
-        <Select
-          value={selectedCategoryId}
-          onChange={(event) => setSelectedCategoryId(event.target.value)}
-          placeholder="Select a category"
-          options={(categories.data || []).map((category) => ({ label: category.name, value: category.id }))}
-        />
+      <div className="mb-5 flex flex-wrap gap-2">
+        <button
+          type="button"
+          onClick={() => setSelectedCategoryId("all")}
+          className={`rounded-full border px-4 py-2 text-sm font-medium transition ${selectedCategoryId === "all" ? "border-primary bg-primary text-white" : "border-border bg-card text-foreground hover:border-primary"}`}>
+          All
+        </button>
+        {(categories.data || []).map((category) => (
+          <button
+            key={category.id}
+            type="button"
+            onClick={() => setSelectedCategoryId(category.id)}
+            className={`rounded-full border px-4 py-2 text-sm font-medium transition ${selectedCategoryId === category.id ? "border-primary bg-primary text-white" : "border-border bg-card text-foreground hover:border-primary"}`}>
+            {category.name}
+          </button>
+        ))}
       </div>
       {isLoading || categories.isLoading ? (
         <LoadingGrid />
-      ) : !selectedCategoryId ? (
-        <EmptyState title="Choose a category" description="Select a category to browse matching services." />
       ) : (
         <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
           {filteredServices.map((service) => (
@@ -684,10 +691,10 @@ export function ProviderDetailsPage() {
 export function SearchPage() {
   const categories = useCategoriesQuery();
   const { data, isLoading } = useServicesQuery();
-  const [selectedCategoryId, setSelectedCategoryId] = useState("");
+  const [selectedCategoryId, setSelectedCategoryId] = useState("all");
   const [location, setLocation] = useState("");
   const filteredServices = useMemo(() => {
-    if (!selectedCategoryId) return [];
+    if (selectedCategoryId === "all") return data || [];
     return (data || []).filter((service) => String(service.category_id) === String(selectedCategoryId));
   }, [data, selectedCategoryId]);
 
@@ -698,19 +705,28 @@ export function SearchPage() {
       <SectionHeader title="Search Services" subtitle="Use advanced filters and smart suggestions." />
       <Card className="grid gap-3 lg:grid-cols-6">
         <Input className="lg:col-span-2" placeholder="What service are you looking for?" />
-        <Select
-          value={selectedCategoryId}
-          onChange={(event) => setSelectedCategoryId(event.target.value)}
-          placeholder="Category"
-          options={(categories.data || []).map((category) => ({ label: category.name, value: category.id }))}
-        />
+        <div className="lg:col-span-2 flex flex-wrap gap-2">
+          <button
+            type="button"
+            onClick={() => setSelectedCategoryId("all")}
+            className={`rounded-full border px-4 py-2 text-sm font-medium transition ${selectedCategoryId === "all" ? "border-primary bg-primary text-white" : "border-border bg-card text-foreground hover:border-primary"}`}>
+            All
+          </button>
+          {(categories.data || []).map((category) => (
+            <button
+              key={category.id}
+              type="button"
+              onClick={() => setSelectedCategoryId(category.id)}
+              className={`rounded-full border px-4 py-2 text-sm font-medium transition ${selectedCategoryId === category.id ? "border-primary bg-primary text-white" : "border-border bg-card text-foreground hover:border-primary"}`}>
+              {category.name}
+            </button>
+          ))}
+        </div>
         <LocationSelector value={location} onChange={setLocation} />
         <Select placeholder="Price" options={[{ label: "Under ₹1500", value: "1500" }]} />
         <Select placeholder="Sort" options={[{ label: "Recommended", value: "rec" }]} />
       </Card>
-      {!selectedCategoryId ? (
-        <EmptyState title="Choose a category" description="Select a category to see matching services." />
-      ) : filteredServices.length ? (
+      {filteredServices.length ? (
         <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
           {filteredServices.map((service) => (
             <ServiceCard key={service.id} service={service} />
