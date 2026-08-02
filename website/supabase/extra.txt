@@ -1,0 +1,77 @@
+-- =====================================================================
+-- SevaLink — Add FCM Token to profiles table
+-- Run this in Supabase SQL Editor (Dashboard → SQL Editor → New Query)
+-- Safe to run multiple times — uses IF NOT EXISTS guards
+-- =====================================================================
+
+-- 1. Add fcm_token column to profiles
+ALTER TABLE profiles
+  ADD COLUMN IF NOT EXISTS fcm_token TEXT DEFAULT NULL;
+
+-- 2. Add index for faster lookups when sending push notifications
+--    (e.g., "give me FCM tokens of all providers with a new booking")
+CREATE INDEX IF NOT EXISTS idx_profiles_fcm_token
+  ON profiles (fcm_token)
+  WHERE fcm_token IS NOT NULL;
+
+-- 3. Add updated_at column if not already present (good practice)
+ALTER TABLE profiles
+  ADD COLUMN IF NOT EXISTS fcm_token_updated_at TIMESTAMPTZ DEFAULT NULL;
+
+-- =====================================================================
+-- 4. RLS Policy — allow a logged-in user to update only their own FCM token
+--    (skip if you already have a permissive UPDATE policy on profiles)
+-- =====================================================================
+
+-- First check existing policies with:
+-- SELECT * FROM pg_policies WHERE tablename = 'profiles';
+
+-- If no update policy exists, add:
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_policies
+    WHERE tablename = 'profiles'
+      AND policyname = 'Users can update their own profile'
+  ) THEN
+    EXECUTE $policy$
+      CREATE POLICY "Users can update their own profile"
+        ON profiles
+        FOR UPDATE
+        USING (auth.uid() = id)
+        WITH CHECK (auth.uid() = id);
+    $policy$;
+  END IF;
+END $$;
+
+-- =====================================================================
+-- 5. Helper function: upsert FCM token for a user
+--    Call this from Edge Functions or the app via RPC
+-- =====================================================================
+
+CREATE OR REPLACE FUNCTION upsert_fcm_token(p_user_id UUID, p_token TEXT)
+RETURNS VOID
+LANGUAGE plpgsql
+SECURITY DEFINER
+AS $$
+BEGIN
+  UPDATE profiles
+  SET
+    fcm_token = p_token,
+    fcm_token_updated_at = NOW()
+  WHERE id = p_user_id;
+END;
+$$;
+
+-- Grant execute to authenticated users (they can only update their own row
+-- because the UPDATE policy above restricts it)
+GRANT EXECUTE ON FUNCTION upsert_fcm_token(UUID, TEXT) TO authenticated;
+
+-- =====================================================================
+-- VERIFICATION — run after applying the migration:
+-- =====================================================================
+-- SELECT column_name, data_type, is_nullable
+-- FROM information_schema.columns
+-- WHERE table_name = 'profiles'
+-- ORDER BY ordinal_position;
+
