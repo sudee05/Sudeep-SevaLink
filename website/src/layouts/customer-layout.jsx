@@ -1,7 +1,7 @@
-import { Outlet } from 'react-router-dom'
-import { PortalTopbar } from '@/components/common/portal-topbar'
-import { customerNav } from '@/routes/nav-data'
-import { PhoneCall } from 'lucide-react'
+import { Outlet } from "react-router-dom";
+import { PortalTopbar } from "@/components/common/portal-topbar";
+import { customerNav } from "@/routes/nav-data";
+import { PhoneCall } from "lucide-react";
 
 export function CustomerLayout() {
   return (
@@ -20,5 +20,5 @@ export function CustomerLayout() {
         Customer Care
       </a>
     </div>
-  )
+  );
 }

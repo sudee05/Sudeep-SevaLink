@@ -927,9 +927,7 @@ export function ProviderNotificationsPage() {
                 </div>
                 <p className="mt-1 text-sm text-muted-foreground">{notification.message}</p>
                 <p className="mt-2 text-xs text-muted-foreground">{formatDate(notification.created_at)}</p>
-                {notification.booking_id && (
-                  <p className="mt-2 text-xs font-medium text-primary">Open booking</p>
-                )}
+                {notification.booking_id && <p className="mt-2 text-xs font-medium text-primary">Open booking</p>}
               </div>
               {!notification.is_read && (
                 <Button
