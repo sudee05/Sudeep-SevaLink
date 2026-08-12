@@ -145,6 +145,10 @@ class BookingModel {
   final String? customerName;
   final String status;
   final double amount;
+  final double depositAmount;
+  final String paymentStatus;
+  final String? paymentMethod;
+  final String? paymentReference;
   final String? address;
   final String? notes;
   final DateTime? scheduledDate;
@@ -160,6 +164,10 @@ class BookingModel {
     this.customerName,
     required this.status,
     this.amount = 0,
+    this.depositAmount = 0,
+    this.paymentStatus = 'pending',
+    this.paymentMethod,
+    this.paymentReference,
     this.address,
     this.notes,
     this.scheduledDate,
@@ -180,6 +188,10 @@ class BookingModel {
       customerName: json['customer_name'] as String?,
       status: json['status'] as String? ?? 'pending',
       amount: (json['amount'] as num?)?.toDouble() ?? 0,
+      depositAmount: (json['deposit_amount'] as num?)?.toDouble() ?? 0,
+      paymentStatus: json['payment_status'] as String? ?? 'pending',
+      paymentMethod: json['payment_method'] as String?,
+      paymentReference: json['payment_reference'] as String?,
       address: json['address'] as String?,
       notes: json['notes'] as String?,
       scheduledDate: dateStr != null ? DateTime.tryParse(dateStr.toString()) : null,

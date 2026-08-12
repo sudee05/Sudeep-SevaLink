@@ -12,7 +12,6 @@ import {
   Image,
   MapPin,
   Paperclip,
-  Receipt,
   Send,
   Sparkles,
   X,
@@ -37,7 +36,6 @@ import { EmptyState } from "@/components/ui/empty-state";
 import { LoadingGrid } from "@/components/ui/loading-grid";
 import { DataTable } from "@/components/common/data-table";
 import { SectionHeader } from "@/components/common/section-header";
-import { ServiceCard } from "@/components/common/service-card";
 import { formatCurrency, formatDate } from "@/utils/format";
 import { selectProfile, selectUser, setAuth, signOut } from "@/store/authSlice";
 import {
@@ -55,6 +53,7 @@ import {
   uploadChatAttachment,
 } from "@/services/supabaseApi";
 import { useToast } from "@/hooks/use-toast";
+import { payWithRazorpay } from "../../lib/razorpay.js";
 
 const fade = {
   initial: { opacity: 0, y: 10 },
@@ -68,10 +67,22 @@ function bookingStatusVariant(status) {
   return "warning";
 }
 
+function getBookingPricing(provider) {
+  const totalAmount = Number(provider?.price || provider?.starting_price || provider?.base_price || 0);
+  const depositAmount = Math.max(1, Math.round(totalAmount * 0.15));
+  const balanceAmount = Math.max(totalAmount - depositAmount, 0);
+  return { totalAmount, depositAmount, balanceAmount };
+}
+
+function getTodayDateInputValue() {
+  return new Date().toISOString().split("T")[0];
+}
+
 function BookingModal({
   bookingForm,
   bookingMutation,
   bookingProvider,
+  isProcessingPayment,
   onClose,
   onSubmit,
   selectedService,
@@ -81,6 +92,9 @@ function BookingModal({
 
   const providerName = bookingProvider.business_name || bookingProvider.name || "Provider";
   const providerPrice = bookingProvider.price || bookingProvider.starting_price || bookingProvider.base_price;
+  const minBookingDate = getTodayDateInputValue();
+  const { totalAmount, depositAmount, balanceAmount } = getBookingPricing(bookingProvider);
+  const hasFixedPrice = Number.isFinite(totalAmount) && totalAmount > 0;
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/55 px-4 py-6 backdrop-blur-sm">
@@ -99,18 +113,26 @@ function BookingModal({
           </Button>
         </div>
         <form className="grid gap-3 md:grid-cols-2" onSubmit={onSubmit}>
-          <Input
-            required
-            type="date"
-            value={bookingForm.booking_date}
-            onChange={(event) => setBookingForm((form) => ({ ...form, booking_date: event.target.value }))}
-          />
-          <Input
-            required
-            type="time"
-            value={bookingForm.booking_time}
-            onChange={(event) => setBookingForm((form) => ({ ...form, booking_time: event.target.value }))}
-          />
+          <label className="space-y-1 md:col-span-1">
+            <span className="text-sm font-medium text-foreground">Booking date</span>
+            <Input
+              required
+              type="date"
+              min={minBookingDate}
+              value={bookingForm.booking_date}
+              onChange={(event) => setBookingForm((form) => ({ ...form, booking_date: event.target.value }))}
+            />
+            <p className="text-xs text-muted-foreground">Choose today or a future date. Past dates are disabled.</p>
+          </label>
+          <label className="space-y-1 md:col-span-1">
+            <span className="text-sm font-medium text-foreground">Booking time</span>
+            <Input
+              required
+              type="time"
+              value={bookingForm.booking_time}
+              onChange={(event) => setBookingForm((form) => ({ ...form, booking_time: event.target.value }))}
+            />
+          </label>
           <Input
             required
             placeholder="Service address"
@@ -124,9 +146,37 @@ function BookingModal({
             value={bookingForm.notes}
             onChange={(event) => setBookingForm((form) => ({ ...form, notes: event.target.value }))}
           />
+          <div className="rounded-xl border border-border bg-muted/30 p-4 text-sm md:col-span-2">
+            <div className="flex items-center gap-2 font-semibold text-foreground">
+              <CreditCard className="h-4 w-4" />
+              Payment summary
+            </div>
+            {hasFixedPrice ? (
+              <div className="mt-3 grid gap-2 text-muted-foreground sm:grid-cols-3">
+                <div className="rounded-lg bg-card px-3 py-2">
+                  <p className="text-xs uppercase tracking-wide">Total</p>
+                  <p className="text-base font-semibold text-foreground">{formatCurrency(totalAmount)}</p>
+                </div>
+                <div className="rounded-lg bg-card px-3 py-2">
+                  <p className="text-xs uppercase tracking-wide">Pay now</p>
+                  <p className="text-base font-semibold text-foreground">{formatCurrency(depositAmount)}</p>
+                  <p className="text-xs text-muted-foreground">15% booking deposit</p>
+                </div>
+                <div className="rounded-lg bg-card px-3 py-2">
+                  <p className="text-xs uppercase tracking-wide">Pay later</p>
+                  <p className="text-base font-semibold text-foreground">{formatCurrency(balanceAmount)}</p>
+                  <p className="text-xs text-muted-foreground">Paid directly to the provider after service</p>
+                </div>
+              </div>
+            ) : (
+              <p className="mt-2 text-muted-foreground">
+                This provider does not have a fixed price yet, so deposit payment is unavailable.
+              </p>
+            )}
+          </div>
           <div className="flex flex-wrap gap-2 md:col-span-2">
-            <Button type="submit" disabled={bookingMutation.isPending}>
-              {bookingMutation.isPending ? "Booking..." : "Confirm Booking"}
+            <Button type="submit" disabled={bookingMutation.isPending || isProcessingPayment || !hasFixedPrice}>
+              {isProcessingPayment ? "Opening payment..." : bookingMutation.isPending ? "Booking..." : "Pay 15% & Book"}
             </Button>
             <Button type="button" variant="outline" onClick={onClose}>
               Cancel
@@ -294,6 +344,7 @@ export function CustomerDashboardPage() {
   const [maxPrice, setMaxPrice] = useState("");
   const [bookingProvider, setBookingProvider] = useState(null);
   const [bookingForm, setBookingForm] = useState({ booking_date: "", booking_time: "", address: "", notes: "" });
+  const [isProcessingPayment, setIsProcessingPayment] = useState(false);
   const providers = useProvidersByServiceQuery(selectedService?.id);
 
   const filteredServices = useMemo(() => {
@@ -322,24 +373,65 @@ export function CustomerDashboardPage() {
     onError: (error) => toast.error(error.message || "Could not create booking"),
   });
 
-  function handleBookingSubmit(event) {
+  async function handleBookingSubmit(event) {
     event.preventDefault();
     if (!profile?.id || !selectedService || !bookingProvider) return;
 
-    bookingMutation.mutate({
-      customer_id: profile.id,
-      provider_id: bookingProvider.id,
-      service_id: selectedService.id,
-      service_title: selectedService.name,
-      provider_name: bookingProvider.business_name || bookingProvider.name || "",
-      customer_name: profile.full_name || "",
-      booking_date: bookingForm.booking_date,
-      booking_time: bookingForm.booking_time,
-      address: bookingForm.address,
-      notes: bookingForm.notes,
-      amount: Number(bookingProvider.price || bookingProvider.starting_price || bookingProvider.base_price || 0),
-      status: "pending",
-    });
+    const { totalAmount, depositAmount, balanceAmount } = getBookingPricing(bookingProvider);
+    if (!Number.isFinite(totalAmount) || totalAmount <= 0) {
+      toast.error("This provider does not have a fixed price yet.");
+      return;
+    }
+
+    setIsProcessingPayment(true);
+    try {
+      const payment = await payWithRazorpay({
+        amount: depositAmount,
+        name: "SevaLink booking deposit",
+        description: `${selectedService.name} booking for ${bookingProvider.business_name || bookingProvider.name || "provider"}`,
+        notes: {
+          booking_type: "service_booking_deposit",
+          service_title: selectedService.name,
+          provider_name: bookingProvider.business_name || bookingProvider.name || "",
+          customer_name: profile.full_name || "",
+          deposit_amount: String(depositAmount),
+          balance_amount: String(balanceAmount),
+        },
+        prefill: {
+          name: profile.full_name || "",
+          email: profile.email || "",
+          contact: profile.phone || "",
+        },
+        theme: {
+          color: "#0f766e",
+        },
+      });
+
+      await bookingMutation.mutateAsync({
+        customer_id: profile.id,
+        provider_id: bookingProvider.id,
+        service_id: selectedService.id,
+        service_title: selectedService.name,
+        provider_name: bookingProvider.business_name || bookingProvider.name || "",
+        customer_name: profile.full_name || "",
+        booking_date: bookingForm.booking_date,
+        booking_time: bookingForm.booking_time,
+        address: bookingForm.address,
+        notes: bookingForm.notes,
+        amount: totalAmount,
+        deposit_amount: depositAmount,
+        payment_status: "deposit_paid",
+        payment_method: "razorpay",
+        payment_reference: payment?.razorpay_payment_id || "",
+        status: "pending",
+      });
+
+      toast.success(`Deposit paid. The remaining ${formatCurrency(balanceAmount)} is due after the service.`);
+    } catch (error) {
+      toast.error(error.message || "Could not complete payment");
+    } finally {
+      setIsProcessingPayment(false);
+    }
   }
 
   return (
@@ -519,6 +611,7 @@ export function CustomerDashboardPage() {
         bookingForm={bookingForm}
         bookingMutation={bookingMutation}
         bookingProvider={bookingProvider}
+        isProcessingPayment={isProcessingPayment}
         onClose={() => setBookingProvider(null)}
         onSubmit={handleBookingSubmit}
         selectedService={selectedService}

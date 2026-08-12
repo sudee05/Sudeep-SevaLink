@@ -785,7 +785,8 @@ export function AdminBookingsPage() {
               label: "Payment",
               render: (row) => {
                 const ps = row.payment_status || (row.status === "completed" ? "paid" : "pending");
-                return <Badge variant={ps === "paid" ? "success" : "warning"}>{ps}</Badge>;
+                const variant = ps === "paid" ? "success" : ps === "deposit_paid" ? "warning" : "warning";
+                return <Badge variant={variant}>{ps === "deposit_paid" ? "deposit paid" : ps}</Badge>;
               },
             },
             {

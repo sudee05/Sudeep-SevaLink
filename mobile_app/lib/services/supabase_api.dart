@@ -77,16 +77,17 @@ Future<List<ServiceModel>> getServices() async {
 // ── Providers by Service ──────────────────────────────────────
 
 Future<List<ProviderModel>> getProvidersByService(String serviceId) async {
-  // 1. Get provider IDs for this service
   final psData = await supabase
       .from('provider_services')
       .select('provider_id, price')
       .eq('service_id', serviceId);
-  final List rows = psData as List;
+  final rows = (psData as List).cast<Map<String, dynamic>>();
   if (rows.isEmpty) return [];
 
-  final providerIds = rows.map((r) => r['provider_id'].toString()).toList();
-  final priceMap = {for (final r in rows) r['provider_id'].toString(): (r['price'] as num?)?.toDouble() ?? 0.0};
+  final providerIds = rows.map((row) => row['provider_id'].toString()).toList();
+  final priceMap = {
+    for (final row in rows) row['provider_id'].toString(): (row['price'] as num?)?.toDouble() ?? 0.0,
+  };
 
   final pData = await supabase
       .from('providers')
@@ -95,9 +96,14 @@ Future<List<ProviderModel>> getProvidersByService(String serviceId) async {
       .or('verified.eq.true,status.eq.approved')
       .order('rating', ascending: false);
 
-  return (pData as List).map((e) {
-    final p = ProviderModel.fromJson(e);
-    // override price from provider_services
+  final filteredRows = (pData as List).cast<Map<String, dynamic>>();
+  final rowsToUse = filteredRows.isNotEmpty
+      ? filteredRows
+      : (await supabase.from('providers').select('*').inFilter('id', providerIds).order('rating', ascending: false))
+          as List;
+
+  return rowsToUse.map((e) {
+    final p = ProviderModel.fromJson(Map<String, dynamic>.from(e as Map));
     return ProviderModel(
       id: p.id,
       businessName: p.businessName,
@@ -117,7 +123,9 @@ Future<List<ProviderModel>> getProvidersByService(String serviceId) async {
 Future<List<BookingModel>> getCustomerBookings(String customerId) async {
   final data = await supabase
       .from('bookings')
-      .select('*, provider:providers!bookings_provider_id_fkey(business_name), service:services!bookings_service_id_fkey(name)')
+      .select(
+        '*, provider:providers!bookings_provider_id_fkey(business_name), service:services!bookings_service_id_fkey(name)',
+      )
       .eq('customer_id', customerId)
       .order('created_at', ascending: false);
   return (data as List).map((e) => BookingModel.fromJson(e)).toList();
@@ -135,6 +143,10 @@ Future<BookingModel> createBooking({
   required String address,
   String? notes,
   double amount = 0,
+  double depositAmount = 0,
+  String paymentStatus = 'pending',
+  String paymentMethod = '',
+  String paymentReference = '',
 }) async {
   final scheduledDate = '${bookingDate}T${bookingTime.length == 5 ? '$bookingTime:00' : bookingTime}';
   final data = await supabase
@@ -152,6 +164,10 @@ Future<BookingModel> createBooking({
         'address': address,
         'notes': notes ?? '',
         'amount': amount,
+        'deposit_amount': depositAmount,
+        'payment_status': paymentStatus,
+        'payment_method': paymentMethod,
+        'payment_reference': paymentReference,
         'status': 'pending',
       })
       .select()
@@ -221,8 +237,7 @@ Future<void> markAllNotificationsRead(String userId) async {
 
 // ── Chat ──────────────────────────────────────────────────────
 
-bool isBookingChatEnabled(String status) =>
-    ['accepted', 'confirmed', 'in_progress', 'completed'].contains(status);
+bool isBookingChatEnabled(String status) => ['accepted', 'confirmed', 'in_progress', 'completed'].contains(status);
 
 Future<ConversationModel?> getConversationByBooking(String bookingId) async {
   final data = await supabase

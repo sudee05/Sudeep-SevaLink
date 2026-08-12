@@ -464,7 +464,16 @@ export async function getProviderBookings(providerId) {
   return (data || []).map(normalizeBooking);
 }
 
+function getTodayDateInputValue() {
+  return new Date().toISOString().split("T")[0];
+}
+
 export async function createBooking(booking) {
+  const today = getTodayDateInputValue();
+  if (booking?.booking_date && booking.booking_date < today) {
+    throw new Error("Please choose today or a future date for your booking.");
+  }
+
   const scheduledDate = booking.scheduled_date || `${booking.booking_date}T${booking.booking_time || "09:00"}:00`;
   const { data, error } = await supabase
     .from("bookings")

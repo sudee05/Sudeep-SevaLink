@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import '../../models/models.dart';
 import '../../providers/app_providers.dart';
 import '../../services/supabase_api.dart' as api;
+import '../../services/razorpay_service.dart';
 import '../../theme/app_theme.dart';
 import 'package:intl/intl.dart';
 
@@ -33,6 +35,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
     final categoriesAsync = ref.watch(_categoriesProvider);
     final servicesAsync = ref.watch(_servicesProvider);
     final bookingsAsync = ref.watch(_bookingsProvider(profile?.id ?? ''));
+  final recentBookings = bookingsAsync.value?.take(3).toList() ?? [];
 
     final totalBookings = bookingsAsync.value?.length ?? 0;
     final pending = bookingsAsync.value?.where((b) => b.status == 'pending').length ?? 0;
@@ -62,22 +65,83 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                       style: Theme.of(context).textTheme.bodyMedium),
                   const SizedBox(height: 20),
 
-                  // Stat cards
-                  GridView.count(
-                    crossAxisCount: 2,
-                    shrinkWrap: true,
-                    physics: const NeverScrollableScrollPhysics(),
-                    crossAxisSpacing: 10,
-                    mainAxisSpacing: 10,
-                    childAspectRatio: 2.2,
-                    children: [
-                      _StatCard('Total Bookings', '$totalBookings', Icons.bookmark_outline),
-                      _StatCard('Pending', '$pending', Icons.pending_outlined, color: AppColors.warning),
-                      _StatCard('Completed', '$completed', Icons.check_circle_outline, color: AppColors.success),
-                      _StatCard('Services', '$totalServices', Icons.home_repair_service_outlined),
-                    ],
+                  Card(
+                    child: Padding(
+                      padding: const EdgeInsets.all(16),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text('Your bookings',
+                                      style: Theme.of(context)
+                                          .textTheme
+                                          .titleMedium
+                                          ?.copyWith(fontWeight: FontWeight.w700)),
+                                  Text('Recent bookings and quick actions',
+                                      style: Theme.of(context).textTheme.bodySmall),
+                                ],
+                              ),
+                              TextButton(
+                                onPressed: () => context.go('/customer/bookings'),
+                                child: const Text('View all'),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 12),
+                          if (bookingsAsync.isLoading)
+                            const Padding(
+                              padding: EdgeInsets.symmetric(vertical: 16),
+                              child: Center(child: CircularProgressIndicator()),
+                            )
+                          else if (recentBookings.isEmpty)
+                            Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text('No bookings yet',
+                                    style: Theme.of(context)
+                                        .textTheme
+                                        .titleSmall
+                                        ?.copyWith(fontWeight: FontWeight.w600)),
+                                const SizedBox(height: 6),
+                                Text('Pick a service below to create your first booking.',
+                                    style: Theme.of(context).textTheme.bodySmall),
+                              ],
+                            )
+                          else
+                            Column(
+                              children: recentBookings
+                                  .map((booking) => Padding(
+                                        padding: const EdgeInsets.only(bottom: 10),
+                                        child: _RecentBookingTile(
+                                          booking: booking,
+                                          onTap: () => context.push('/customer/bookings/${booking.id}'),
+                                        ),
+                                      ))
+                                  .toList(),
+                            ),
+                          const SizedBox(height: 4),
+                          SizedBox(
+                            width: double.infinity,
+                            child: ElevatedButton.icon(
+                              icon: const Icon(Icons.add_circle_outline),
+                              label: const Text('Create a new booking'),
+                              onPressed: () {
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  const SnackBar(content: Text('Select a service below to continue.')),
+                                );
+                              },
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
                   ),
-                  const SizedBox(height: 24),
+                  const SizedBox(height: 20),
 
                   // Service selection card
                   _buildServiceSection(context, categoriesAsync, servicesAsync),
@@ -563,8 +627,33 @@ class _BookingBottomSheetState extends ConsumerState<_BookingBottomSheet> {
       showSnack(context, 'Please fill all required fields', isError: true);
       return;
     }
+
+    final totalAmount = widget.provider.price ?? 0;
+    if (totalAmount <= 0) {
+      showSnack(context, 'This provider has no fixed price yet.', isError: true);
+      return;
+    }
+
+    final depositAmount = (totalAmount * 0.15) <= 1 ? 1.0 : (totalAmount * 0.15);
+    final balanceAmount = totalAmount - depositAmount;
     setState(() => _loading = true);
     try {
+      final payment = await payWithRazorpay(
+        amount: depositAmount,
+        name: 'SevaLink booking deposit',
+        description: '${widget.service.name} with ${widget.provider.displayName}',
+        notes: {
+          'service_title': widget.service.name,
+          'provider_name': widget.provider.displayName,
+          'deposit_amount': depositAmount.toStringAsFixed(2),
+          'balance_amount': balanceAmount.toStringAsFixed(2),
+          'payment_type': 'booking_deposit',
+        },
+        theme: {
+          'color': '#0f766e',
+        },
+      );
+
       final dateStr = DateFormat('yyyy-MM-dd').format(_date!);
       final timeStr = '${_time!.hour.toString().padLeft(2, '0')}:${_time!.minute.toString().padLeft(2, '0')}';
       await api.createBooking(
@@ -578,11 +667,18 @@ class _BookingBottomSheetState extends ConsumerState<_BookingBottomSheet> {
         bookingTime: timeStr,
         address: _addressCtrl.text.trim(),
         notes: _notesCtrl.text.trim(),
-        amount: widget.provider.price ?? 0,
+        amount: totalAmount,
+        depositAmount: depositAmount,
+        paymentStatus: 'deposit_paid',
+        paymentMethod: 'razorpay',
+        paymentReference: payment.paymentId,
       );
       widget.onSuccess();
+      if (mounted) {
+        showSnack(context, 'Deposit paid. The remaining amount is due after the service.');
+      }
     } catch (e) {
-      if (mounted) showSnack(context, e.toString(), isError: true);
+      if (mounted) showSnack(context, e.toString().replaceFirst('Exception: ', ''), isError: true);
     } finally {
       if (mounted) setState(() => _loading = false);
     }
@@ -701,6 +797,69 @@ class _BookingBottomSheetState extends ConsumerState<_BookingBottomSheet> {
                 ),
                 const SizedBox(width: 8),
                 OutlinedButton(onPressed: widget.onClose, child: const Text('Cancel')),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _RecentBookingTile extends StatelessWidget {
+  final BookingModel booking;
+  final VoidCallback onTap;
+
+  const _RecentBookingTile({required this.booking, required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    final fmt = DateFormat('dd MMM, hh:mm a');
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(14),
+      child: Container(
+        padding: const EdgeInsets.all(12),
+        decoration: BoxDecoration(
+          color: Theme.of(context).colorScheme.surface,
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(color: AppColors.darkBorder),
+        ),
+        child: Row(
+          children: [
+            Container(
+              width: 42,
+              height: 42,
+              decoration: BoxDecoration(
+                color: AppColors.primary.withOpacity(0.12),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: const Icon(Icons.calendar_month_outlined, color: AppColors.primary, size: 22),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(booking.serviceTitle ?? 'Booking',
+                      style: const TextStyle(fontWeight: FontWeight.w700)),
+                  const SizedBox(height: 2),
+                  Text(booking.providerName ?? 'Provider',
+                      style: Theme.of(context).textTheme.bodySmall),
+                  if (booking.scheduledDate != null)
+                    Text(fmt.format(booking.scheduledDate!),
+                        style: Theme.of(context).textTheme.bodySmall?.copyWith(color: AppColors.darkMuted)),
+                ],
+              ),
+            ),
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.end,
+              children: [
+                Text('₹${booking.amount.toStringAsFixed(0)}',
+                    style: const TextStyle(fontWeight: FontWeight.w700, color: AppColors.primary)),
+                const SizedBox(height: 4),
+                Text(booking.status.toUpperCase(),
+                    style: Theme.of(context).textTheme.bodySmall?.copyWith(color: AppColors.darkMuted)),
               ],
             ),
           ],

@@ -8,6 +8,14 @@ import 'router/app_router.dart';
 import 'theme/app_theme.dart';
 import 'services/fcm_service.dart';
 
+// Set your Razorpay test key here once for local runs.
+// You can still override it with --dart-define=RAZORPAY_KEY_ID=... when needed.
+const String razorpayTestKeyId = 'rzp_test_your_key_here';
+const String razorpayKeyId = String.fromEnvironment(
+  'RAZORPAY_KEY_ID',
+  defaultValue: razorpayTestKeyId,
+);
+
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
