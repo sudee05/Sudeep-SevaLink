@@ -54,6 +54,8 @@ import {
 } from "@/services/supabaseApi";
 import { useToast } from "@/hooks/use-toast";
 import { payWithRazorpay } from "../../lib/razorpay";
+import { DatePicker } from "@/components/ui/datePicker";
+import { TimePicker } from "@/components/ui/timePicker";
 
 const fade = {
   initial: { opacity: 0, y: 10 },
@@ -115,22 +117,18 @@ function BookingModal({
         <form className="grid gap-3 md:grid-cols-2" onSubmit={onSubmit}>
           <label className="space-y-1 md:col-span-1">
             <span className="text-sm font-medium text-foreground">Booking date</span>
-            <Input
-              required
-              type="date"
-              min={minBookingDate}
+            <DatePicker
               value={bookingForm.booking_date}
-              onChange={(event) => setBookingForm((form) => ({ ...form, booking_date: event.target.value }))}
+              min={minBookingDate}
+              onChange={(date) => setBookingForm((form) => ({ ...form, booking_date: date }))}
             />
             <p className="text-xs text-muted-foreground">Choose today or a future date. Past dates are disabled.</p>
           </label>
           <label className="space-y-1 md:col-span-1">
             <span className="text-sm font-medium text-foreground">Booking time</span>
-            <Input
-              required
-              type="time"
+            <TimePicker
               value={bookingForm.booking_time}
-              onChange={(event) => setBookingForm((form) => ({ ...form, booking_time: event.target.value }))}
+              onChange={(time) => setBookingForm((form) => ({ ...form, booking_time: time }))}
             />
           </label>
           <Input
@@ -338,7 +336,7 @@ export function CustomerDashboardPage() {
   const profile = useSelector(selectProfile);
   const queryClient = useQueryClient();
   const toast = useToast();
-  const navigate =useNavigate();
+  const navigate = useNavigate();
   const [selectedService, setSelectedService] = useState(null);
   const [selectedCategoryId, setSelectedCategoryId] = useState("all");
   const [location, setLocation] = useState("");
