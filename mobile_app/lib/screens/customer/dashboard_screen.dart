@@ -643,11 +643,12 @@ class _BookingBottomSheetState extends ConsumerState<_BookingBottomSheet> {
         name: 'SevaLink booking deposit',
         description: '${widget.service.name} with ${widget.provider.displayName}',
         notes: {
+          'booking_type': 'service_booking_deposit',
           'service_title': widget.service.name,
           'provider_name': widget.provider.displayName,
+          'customer_name': widget.customerName,
           'deposit_amount': depositAmount.toStringAsFixed(2),
           'balance_amount': balanceAmount.toStringAsFixed(2),
-          'payment_type': 'booking_deposit',
         },
         theme: {
           'color': '#0f766e',
@@ -656,7 +657,7 @@ class _BookingBottomSheetState extends ConsumerState<_BookingBottomSheet> {
 
       final dateStr = DateFormat('yyyy-MM-dd').format(_date!);
       final timeStr = '${_time!.hour.toString().padLeft(2, '0')}:${_time!.minute.toString().padLeft(2, '0')}';
-      await api.createBooking(
+      await api.createBookingWithPayment(
         customerId: widget.customerId,
         providerId: widget.provider.id,
         serviceId: widget.service.id,
@@ -668,10 +669,19 @@ class _BookingBottomSheetState extends ConsumerState<_BookingBottomSheet> {
         address: _addressCtrl.text.trim(),
         notes: _notesCtrl.text.trim(),
         amount: totalAmount,
-        depositAmount: depositAmount,
-        paymentStatus: 'deposit_paid',
+        razorpayPaymentId: payment.paymentId,
+        razorpayOrderId: payment.orderId ?? '',
+        razorpaySignature: payment.signature ?? '',
+        paymentAmount: depositAmount,
+        paymentStatus: 'captured',
         paymentMethod: 'razorpay',
-        paymentReference: payment.paymentId,
+        paymentMetadata: {
+          'service_title': widget.service.name,
+          'provider_name': widget.provider.displayName,
+          'customer_name': widget.customerName,
+          'deposit_amount': depositAmount.toStringAsFixed(2),
+          'balance_amount': balanceAmount.toStringAsFixed(2),
+        },
       );
       widget.onSuccess();
       if (mounted) {

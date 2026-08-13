@@ -143,10 +143,6 @@ Future<BookingModel> createBooking({
   required String address,
   String? notes,
   double amount = 0,
-  double depositAmount = 0,
-  String paymentStatus = 'pending',
-  String paymentMethod = '',
-  String paymentReference = '',
 }) async {
   final scheduledDate = '${bookingDate}T${bookingTime.length == 5 ? '$bookingTime:00' : bookingTime}';
   final data = await supabase
@@ -164,13 +160,96 @@ Future<BookingModel> createBooking({
         'address': address,
         'notes': notes ?? '',
         'amount': amount,
-        'deposit_amount': depositAmount,
-        'payment_status': paymentStatus,
-        'payment_method': paymentMethod,
-        'payment_reference': paymentReference,
         'status': 'pending',
       })
       .select()
+      .single();
+  return BookingModel.fromJson(data);
+}
+
+Future<Map<String, dynamic>> createPayment({
+  required String bookingId,
+  required String razorpayPaymentId,
+  String razorpayOrderId = '',
+  String razorpaySignature = '',
+  double amount = 0,
+  String currency = 'INR',
+  String status = 'captured',
+  String paymentMethod = 'razorpay',
+  Map<String, dynamic> paymentMetadata = const <String, dynamic>{},
+}) async {
+  final data = await supabase
+      .from('payments')
+      .insert({
+        'booking_id': bookingId,
+        'razorpay_payment_id': razorpayPaymentId,
+        'razorpay_order_id': razorpayOrderId,
+        'razorpay_signature': razorpaySignature,
+        'amount': amount,
+        'currency': currency,
+        'status': status,
+        'payment_method': paymentMethod,
+        'payment_metadata': paymentMetadata,
+      })
+      .select()
+      .single();
+  return Map<String, dynamic>.from(data as Map);
+}
+
+Future<BookingModel> createBookingWithPayment({
+  required String customerId,
+  required String providerId,
+  required String serviceId,
+  required String serviceTitle,
+  required String providerName,
+  required String customerName,
+  required String bookingDate,
+  required String bookingTime,
+  required String address,
+  String? notes,
+  double amount = 0,
+  required String razorpayPaymentId,
+  String razorpayOrderId = '',
+  String razorpaySignature = '',
+  double paymentAmount = 0,
+  String currency = 'INR',
+  String paymentStatus = 'captured',
+  String paymentMethod = 'razorpay',
+  Map<String, dynamic> paymentMetadata = const <String, dynamic>{},
+}) async {
+  final createdBooking = await createBooking(
+    customerId: customerId,
+    providerId: providerId,
+    serviceId: serviceId,
+    serviceTitle: serviceTitle,
+    providerName: providerName,
+    customerName: customerName,
+    bookingDate: bookingDate,
+    bookingTime: bookingTime,
+    address: address,
+    notes: notes,
+    amount: amount,
+  );
+
+  final createdPayment = await createPayment(
+    bookingId: createdBooking.id,
+    razorpayPaymentId: razorpayPaymentId,
+    razorpayOrderId: razorpayOrderId,
+    razorpaySignature: razorpaySignature,
+    amount: paymentAmount,
+    currency: currency,
+    status: paymentStatus,
+    paymentMethod: paymentMethod,
+    paymentMetadata: paymentMetadata,
+  );
+
+  final data = await supabase
+      .from('bookings')
+      .update({'payment_id': createdPayment['id']})
+      .eq('id', createdBooking.id)
+      .select(
+        '*, provider:providers!bookings_provider_id_fkey(business_name), service:services!bookings_service_id_fkey(name)',
+      )
       .single();
   return BookingModel.fromJson(data);
 }
