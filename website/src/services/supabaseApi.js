@@ -484,6 +484,45 @@ export async function createBooking(booking) {
   return normalizeBooking(data);
 }
 
+export async function createPayment(payment) {
+  const { data, error } = await supabase
+    .from("payments")
+    .insert({
+      booking_id: payment.booking_id,
+      razorpay_payment_id: payment.razorpay_payment_id,
+      razorpay_order_id: payment.razorpay_order_id || "",
+      razorpay_signature: payment.razorpay_signature || "",
+      amount: Number(payment.amount || 0),
+      currency: payment.currency || "INR",
+      status: payment.status || "captured",
+      payment_method: payment.payment_method || "razorpay",
+      payment_metadata: payment.payment_metadata || {},
+    })
+    .select()
+    .single();
+  if (error) throw error;
+  return data;
+}
+
+export async function createBookingWithPayment({ booking, payment }) {
+  const createdBooking = await createBooking(booking);
+  const createdPayment = await createPayment({
+    ...payment,
+    booking_id: createdBooking.id,
+  });
+
+  const { data, error } = await supabase
+    .from("bookings")
+    .update({ payment_id: createdPayment.id })
+    .eq("id", createdBooking.id)
+    .select(
+      "*, provider:providers!bookings_provider_id_fkey(business_name), service:services!bookings_service_id_fkey(name)",
+    )
+    .single();
+  if (error) throw error;
+  return normalizeBooking(data);
+}
+
 export async function updateBookingStatus(id, status) {
   const { data, error } = await supabase.from("bookings").update({ status }).eq("id", id).select().single();
   if (error) throw error;

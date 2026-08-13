@@ -39,7 +39,7 @@ import { SectionHeader } from "@/components/common/section-header";
 import { formatCurrency, formatDate } from "@/utils/format";
 import { selectProfile, selectUser, setAuth, signOut } from "@/store/authSlice";
 import {
-  createBooking,
+  createBookingWithPayment,
   createBookingComplaint,
   createBookingFeedback,
   ensureConversationForBooking,
@@ -53,7 +53,7 @@ import {
   uploadChatAttachment,
 } from "@/services/supabaseApi";
 import { useToast } from "@/hooks/use-toast";
-import { payWithRazorpay } from "../../lib/razorpay.js";
+import { payWithRazorpay } from "../../lib/razorpay";
 
 const fade = {
   initial: { opacity: 0, y: 10 },
@@ -338,6 +338,7 @@ export function CustomerDashboardPage() {
   const profile = useSelector(selectProfile);
   const queryClient = useQueryClient();
   const toast = useToast();
+  const navigate =useNavigate();
   const [selectedService, setSelectedService] = useState(null);
   const [selectedCategoryId, setSelectedCategoryId] = useState("all");
   const [location, setLocation] = useState("");
@@ -363,10 +364,9 @@ export function CustomerDashboardPage() {
   }, [providers.data, location, maxPrice]);
 
   const bookingMutation = useMutation({
-    mutationFn: createBooking,
+    mutationFn: createBookingWithPayment,
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["bookings"] });
-      toast.success("Booking created successfully.");
       setBookingProvider(null);
       setBookingForm({ booking_date: "", booking_time: "", address: "", notes: "" });
     },
@@ -408,25 +408,40 @@ export function CustomerDashboardPage() {
       });
 
       await bookingMutation.mutateAsync({
-        customer_id: profile.id,
-        provider_id: bookingProvider.id,
-        service_id: selectedService.id,
-        service_title: selectedService.name,
-        provider_name: bookingProvider.business_name || bookingProvider.name || "",
-        customer_name: profile.full_name || "",
-        booking_date: bookingForm.booking_date,
-        booking_time: bookingForm.booking_time,
-        address: bookingForm.address,
-        notes: bookingForm.notes,
-        amount: totalAmount,
-        deposit_amount: depositAmount,
-        payment_status: "deposit_paid",
-        payment_method: "razorpay",
-        payment_reference: payment?.razorpay_payment_id || "",
-        status: "pending",
+        booking: {
+          customer_id: profile.id,
+          provider_id: bookingProvider.id,
+          service_id: selectedService.id,
+          service_title: selectedService.name,
+          provider_name: bookingProvider.business_name || bookingProvider.name || "",
+          customer_name: profile.full_name || "",
+          booking_date: bookingForm.booking_date,
+          booking_time: bookingForm.booking_time,
+          address: bookingForm.address,
+          notes: bookingForm.notes,
+          amount: totalAmount,
+        },
+        payment: {
+          booking_id: null,
+          razorpay_payment_id: payment?.razorpay_payment_id || "",
+          razorpay_order_id: payment?.razorpay_order_id || "",
+          razorpay_signature: payment?.razorpay_signature || "",
+          amount: depositAmount,
+          currency: "INR",
+          status: "captured",
+          payment_method: "razorpay",
+          payment_metadata: {
+            service_title: selectedService.name,
+            provider_name: bookingProvider.business_name || bookingProvider.name || "",
+            customer_name: profile.full_name || "",
+            deposit_amount: String(depositAmount),
+            balance_amount: String(balanceAmount),
+          },
+        },
       });
 
       toast.success(`Deposit paid. The remaining ${formatCurrency(balanceAmount)} is due after the service.`);
+      navigate("/customer/bookings");
     } catch (error) {
       toast.error(error.message || "Could not complete payment");
     } finally {
@@ -895,21 +910,12 @@ export function CustomerProfilePage() {
   const profile = useSelector(selectProfile);
   const user = useSelector(selectUser);
   const toast = useToast();
-  const [profileForm, setProfileForm] = useState({
-    full_name: "",
-    email: "",
-    phone: "",
-    avatar_url: "",
-  });
-
-  useEffect(() => {
-    setProfileForm({
-      full_name: profile?.full_name || "",
-      email: user?.email || profile?.email || "",
-      phone: profile?.phone || "",
-      avatar_url: profile?.avatar_url || "",
-    });
-  }, [profile, user]);
+  const initialProfileForm = {
+    full_name: profile?.full_name || "",
+    email: user?.email || profile?.email || "",
+    phone: profile?.phone || "",
+    avatar_url: profile?.avatar_url || "",
+  };
 
   const profileMutation = useMutation({
     mutationFn: (updates) => updateProfile(profile.id, updates),
@@ -925,50 +931,68 @@ export function CustomerProfilePage() {
     navigate("/login", { replace: true });
   }
 
-  function handleProfileSubmit(event) {
-    event.preventDefault();
+  function handleProfileSubmit(formValues) {
     if (!profile?.id) return;
 
     profileMutation.mutate({
-      full_name: profileForm.full_name,
-      phone: profileForm.phone,
-      avatar_url: profileForm.avatar_url,
+      full_name: formValues.full_name,
+      phone: formValues.phone,
+      avatar_url: formValues.avatar_url,
     });
   }
 
   return (
     <motion.div className="space-y-4" {...fade}>
       <SectionHeader title="Profile" subtitle="Manage your Supabase profile details and account session." />
-      <Card>
-        <form className="grid gap-3 md:grid-cols-2" onSubmit={handleProfileSubmit}>
-          <Input
-            required
-            placeholder="Full name"
-            value={profileForm.full_name}
-            onChange={(event) => setProfileForm((form) => ({ ...form, full_name: event.target.value }))}
-          />
-          <Input placeholder="Email" value={profileForm.email} disabled />
-          <Input
-            placeholder="Phone"
-            value={profileForm.phone}
-            onChange={(event) => setProfileForm((form) => ({ ...form, phone: event.target.value }))}
-          />
-          <Input
-            placeholder="Avatar URL"
-            value={profileForm.avatar_url}
-            onChange={(event) => setProfileForm((form) => ({ ...form, avatar_url: event.target.value }))}
-          />
-          <div className="flex flex-wrap gap-2 md:col-span-2">
-            <Button type="submit" disabled={profileMutation.isPending}>
-              {profileMutation.isPending ? "Saving..." : "Save Profile"}
-            </Button>
-            <Button type="button" variant="outline" onClick={handleLogout}>
-              Logout
-            </Button>
-          </div>
-        </form>
-      </Card>
+      <ProfileFormCard
+        key={profile?.id || user?.id || user?.email || "profile-form"}
+        initialProfileForm={initialProfileForm}
+        onLogout={handleLogout}
+        onSubmitProfile={handleProfileSubmit}
+        profileMutation={profileMutation}
+      />
     </motion.div>
+  );
+}
+
+function ProfileFormCard({ initialProfileForm, onLogout, onSubmitProfile, profileMutation }) {
+  const [profileForm, setProfileForm] = useState(initialProfileForm);
+
+  function handleSubmit(event) {
+    event.preventDefault();
+    onSubmitProfile(profileForm);
+  }
+
+  return (
+    <Card>
+      <form className="grid gap-3 md:grid-cols-2" onSubmit={handleSubmit}>
+        <Input
+          required
+          placeholder="Full name"
+          value={profileForm.full_name}
+          onChange={(event) => setProfileForm((form) => ({ ...form, full_name: event.target.value }))}
+        />
+        <Input placeholder="Email" value={profileForm.email} disabled />
+        <Input
+          placeholder="Phone"
+          value={profileForm.phone}
+          onChange={(event) => setProfileForm((form) => ({ ...form, phone: event.target.value }))}
+        />
+        <Input
+          placeholder="Avatar URL"
+          value={profileForm.avatar_url}
+          onChange={(event) => setProfileForm((form) => ({ ...form, avatar_url: event.target.value }))}
+        />
+        <div className="flex flex-wrap gap-2 md:col-span-2">
+          <Button type="submit" disabled={profileMutation.isPending}>
+            {profileMutation.isPending ? "Saving..." : "Save Profile"}
+          </Button>
+          <Button type="button" variant="outline" onClick={onLogout}>
+            Logout
+          </Button>
+        </div>
+      </form>
+    </Card>
   );
 }
 
