@@ -4,6 +4,7 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.45.4';
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+  'Access-Control-Allow-Methods': 'POST, OPTIONS',
 };
 
 const jsonResponse = (body: Record<string, unknown>, status = 200) =>
@@ -13,8 +14,9 @@ const jsonResponse = (body: Record<string, unknown>, status = 200) =>
   });
 
 serve(async (req) => {
+  // Handle CORS preflight — must return 200 OK
   if (req.method === 'OPTIONS') {
-    return new Response('ok', { headers: corsHeaders });
+    return new Response(null, { status: 200, headers: corsHeaders });
   }
 
   if (req.method !== 'POST') {
@@ -47,34 +49,54 @@ serve(async (req) => {
 
   const body = await req.json().catch(() => ({}));
   const bookingId = typeof body.booking_id === 'string' ? body.booking_id : '';
+  console.log('[refund] booking_id received:', bookingId);
   if (!bookingId) {
     return jsonResponse({ error: 'booking_id is required.' }, 400);
   }
 
+  // Fetch booking — only columns that actually exist in the schema
   const { data: booking, error: bookingError } = await adminClient
     .from('bookings')
-    .select('id, customer_id, provider_id, service_title, provider_name, status, payment_status, payment_id')
+    .select('id, customer_id, provider_id, booking_code, status, payment_status')
     .eq('id', bookingId)
     .single();
 
+  console.log('[refund] booking query result:', JSON.stringify(booking));
+  console.log('[refund] booking query error:', JSON.stringify(bookingError));
+
   if (bookingError || !booking) {
-    return jsonResponse({ error: 'Booking not found.' }, 404);
+    return jsonResponse({
+      error: 'Booking not found.',
+      detail: bookingError?.message ?? 'no row',
+      code: bookingError?.code,
+    }, 404);
   }
 
-  const { data: provider } = await adminClient
+  console.log('[refund] booking status:', booking.status, '| provider_id:', booking.provider_id);
+
+  // Verify the caller is the assigned provider
+  const { data: provider, error: providerError } = await adminClient
     .from('providers')
     .select('user_id')
     .eq('id', booking.provider_id)
     .single();
 
+  console.log('[refund] provider lookup:', JSON.stringify(provider), 'error:', JSON.stringify(providerError));
+  console.log('[refund] caller user.id:', user.id, '| provider.user_id:', provider?.user_id);
+
   if (!provider || provider.user_id !== user.id) {
     return jsonResponse({ error: 'Only the assigned provider can cancel this booking.' }, 403);
   }
 
-  if (!['pending', 'accepted', 'confirmed', 'in_progress', 'reschedule_requested'].includes(booking.status)) {
-    return jsonResponse({ error: 'This booking cannot be cancelled now.' }, 409);
+  // Allow cancellation from any non-terminal status
+  const cancellableStatuses = ['pending', 'accepted', 'confirmed', 'in_progress', 'reschedule_requested'];
+  console.log('[refund] status check:', booking.status, 'cancellable?', cancellableStatuses.includes(booking.status));
+  if (!cancellableStatuses.includes(booking.status)) {
+    return jsonResponse({ error: `Booking cannot be cancelled (current status: ${booking.status}).` }, 409);
   }
 
+
+  // Try to find a payment record for this booking
   const { data: payment } = await adminClient
     .from('payments')
     .select('id, razorpay_payment_id, amount, currency, status')
@@ -122,6 +144,7 @@ serve(async (req) => {
       .eq('id', payment.id);
   }
 
+  // Update booking status to cancelled
   await adminClient
     .from('bookings')
     .update({
@@ -131,6 +154,7 @@ serve(async (req) => {
     })
     .eq('id', bookingId);
 
+  // Notify the customer
   await adminClient.from('notifications').insert({
     receiver_id: booking.customer_id,
     user_id: booking.customer_id,
@@ -139,8 +163,8 @@ serve(async (req) => {
     type: payment ? 'refund_initiated' : 'booking_cancelled',
     title: payment ? 'Refund initiated' : 'Booking cancelled',
     message: payment
-      ? 'Your booking was cancelled by the provider. The amount will be refunded in 2-3 working days.'
-      : 'Your booking was cancelled by the provider.',
+      ? `Your booking ${booking.booking_code ?? bookingId} was cancelled by the provider. The amount will be refunded in 2–3 working days.`
+      : `Your booking ${booking.booking_code ?? bookingId} was cancelled by the provider.`,
     is_read: false,
     read: false,
   });

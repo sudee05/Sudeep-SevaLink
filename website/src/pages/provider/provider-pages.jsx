@@ -61,7 +61,7 @@ function ProviderBookingActions({ booking, onChanged }) {
   const updateStatus = (status) => {
     if (status === "cancelled") {
       const confirmed = window.confirm(
-        "Cancel this booking? The customer will be notified that the amount will be refunded in 2-3 working days.",
+        "Are you sure you want to Cancel this booking? The amount will be refunded to the customer in 2-3 working days.",
       );
       if (!confirmed) return;
     }
@@ -549,9 +549,8 @@ export function ProviderServicesPage() {
           <button
             key={t.key}
             onClick={() => setTab(t.key)}
-            className={`rounded-lg px-4 py-1.5 text-sm font-medium transition-all ${
-              tab === t.key ? "bg-card text-foreground shadow" : "text-muted-foreground hover:text-foreground"
-            }`}>
+            className={`rounded-lg px-4 py-1.5 text-sm font-medium transition-all ${tab === t.key ? "bg-card text-foreground shadow" : "text-muted-foreground hover:text-foreground"
+              }`}>
             {t.label}
           </button>
         ))}
