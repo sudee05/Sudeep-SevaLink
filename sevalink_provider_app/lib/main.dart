@@ -96,6 +96,7 @@ class ProviderBooking {
     this.serviceTitle = '-',
     this.status = 'pending',
     this.amount = 0,
+    this.paymentStatus = 'pending',
     this.address = '',
     this.notes = '',
     this.scheduledDate,
@@ -110,6 +111,7 @@ class ProviderBooking {
   final String serviceTitle;
   final String status;
   final double amount;
+  final String paymentStatus;
   final String address;
   final String notes;
   final DateTime? scheduledDate;
@@ -128,6 +130,7 @@ class ProviderBooking {
       serviceTitle: (service?['name'] ?? json['service_title'] ?? '-') as String,
       status: json['status'] as String? ?? 'pending',
       amount: (json['amount'] as num?)?.toDouble() ?? 0,
+      paymentStatus: json['payment_status'] as String? ?? 'pending',
       address: json['address'] as String? ?? '',
       notes: json['notes'] as String? ?? '',
       scheduledDate: dateValue == null ? null : DateTime.tryParse(dateValue.toString()),
@@ -306,6 +309,17 @@ class ProviderApi {
 
   static Future<void> updateBookingStatus(String bookingId, String status) async {
     await client.from('bookings').update({'status': status}).eq('id', bookingId);
+  }
+
+  static Future<void> cancelBookingWithRefund(String bookingId) async {
+    final response = await client.functions.invoke(
+      'refund-payment',
+      body: {'booking_id': bookingId},
+    );
+    final data = response.data;
+    if (data is Map && data['error'] != null) {
+      throw Exception(data['error']);
+    }
   }
 
   static Future<List<ProviderNotification>> getNotifications(String userId) async {
@@ -855,19 +869,42 @@ class _BookingDetailsPageState extends State<BookingDetailsPage> {
   void _reload() => setState(() => _future = ProviderApi.getBookingById(widget.bookingId));
 
   Future<void> _setStatus(String status) async {
+    if (status == 'cancelled' && !await _confirmCancellation()) return;
     setState(() => _updatingStatus = status);
     try {
-      await ProviderApi.updateBookingStatus(widget.bookingId, status);
+      if (status == 'cancelled') {
+        await ProviderApi.cancelBookingWithRefund(widget.bookingId);
+      } else {
+        await ProviderApi.updateBookingStatus(widget.bookingId, status);
+      }
       _changed = true;
       _reload();
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Booking marked ${status.replaceAll('_', ' ')}')));
+        final message = status == 'cancelled'
+            ? 'Booking cancelled. Refund notification sent to the customer.'
+            : 'Booking marked ${status.replaceAll('_', ' ')}';
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message)));
       }
     } catch (error) {
       if (mounted) _showError(context, error);
     } finally {
       if (mounted) setState(() => _updatingStatus = null);
     }
+  }
+
+  Future<bool> _confirmCancellation() async {
+    final result = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Cancel booking?'),
+        content: const Text('The customer will be notified that the paid amount will be refunded in 2-3 working days.'),
+        actions: [
+          TextButton(onPressed: () => Navigator.of(context).pop(false), child: const Text('Keep booking')),
+          FilledButton(onPressed: () => Navigator.of(context).pop(true), child: const Text('Cancel booking')),
+        ],
+      ),
+    );
+    return result ?? false;
   }
 
   @override
@@ -897,6 +934,7 @@ class _BookingDetailsPageState extends State<BookingDetailsPage> {
                     DetailRow(label: 'Service', value: booking.serviceTitle),
                     DetailRow(label: 'Scheduled', value: _formatDate(booking.scheduledDate)),
                     DetailRow(label: 'Amount', value: _moneyFormat.format(booking.amount)),
+                    DetailRow(label: 'Payment', value: booking.paymentStatus.replaceAll('_', ' ')),
                     DetailRow(label: 'Address', value: booking.address.isEmpty ? '-' : booking.address),
                     DetailRow(label: 'Notes', value: booking.notes.isEmpty ? '-' : booking.notes),
                     const SizedBox(height: 8),
@@ -1542,16 +1580,18 @@ List<BookingAction> statusActions(String status) {
   return switch (status) {
     'pending' => const [
         BookingAction('Accept', 'accepted'),
-        BookingAction('Reject', 'rejected'),
+        BookingAction('Cancel', 'cancelled'),
         BookingAction('Reschedule', 'reschedule_requested'),
       ],
     'accepted' => const [
         BookingAction('In Progress', 'in_progress'),
         BookingAction('Complete', 'completed'),
+        BookingAction('Cancel', 'cancelled'),
         BookingAction('Reschedule', 'reschedule_requested'),
       ],
     'confirmed' || 'in_progress' => const [
         BookingAction('Complete', 'completed'),
+        BookingAction('Cancel', 'cancelled'),
         BookingAction('Reschedule', 'reschedule_requested'),
       ],
     _ => const [],

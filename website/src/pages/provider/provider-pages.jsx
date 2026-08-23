@@ -18,8 +18,10 @@ import { Textarea } from "@/components/ui/textarea";
 import { EmptyState } from "@/components/ui/empty-state";
 import { LoadingGrid } from "@/components/ui/loading-grid";
 import { Select } from "@/components/ui/select";
+import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/lib/supabase";
 import {
+  cancelBookingWithRefund,
   getBookingById,
   getProviderFeedback,
   getProviderByUserId,
@@ -38,14 +40,33 @@ const fade = {
   transition: { duration: 0.3 },
 };
 
-function ProviderBookingActions({ booking }) {
+function ProviderBookingActions({ booking, onChanged }) {
   const queryClient = useQueryClient();
+  const toast = useToast();
   const statusMutation = useMutation({
-    mutationFn: (status) => updateBookingStatus(booking.id, status),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["bookings"] }),
+    mutationFn: (status) => (status === "cancelled" ? cancelBookingWithRefund(booking.id) : updateBookingStatus(booking.id, status)),
+    onSuccess: (updatedBooking, status) => {
+      queryClient.invalidateQueries({ queryKey: ["bookings"] });
+      onChanged?.({ ...booking, ...updatedBooking, status });
+      if (status === "cancelled") {
+        toast.success("Booking cancelled. Refund notification sent to the customer.");
+      }
+    },
+    onError: (error) => toast.error(error.message || "Could not update booking"),
   });
 
   const busy = statusMutation.isPending;
+  const canCancel = ["pending", "accepted", "confirmed", "in_progress", "reschedule_requested"].includes(booking.status);
+
+  const updateStatus = (status) => {
+    if (status === "cancelled") {
+      const confirmed = window.confirm(
+        "Cancel this booking? The customer will be notified that the amount will be refunded in 2-3 working days.",
+      );
+      if (!confirmed) return;
+    }
+    statusMutation.mutate(status);
+  };
 
   if (booking.status === "completed") {
     return (
@@ -70,22 +91,24 @@ function ProviderBookingActions({ booking }) {
           <Button size="sm" disabled={busy} onClick={() => statusMutation.mutate("accepted")}>
             Accept
           </Button>
-          <Button size="sm" variant="danger" disabled={busy} onClick={() => statusMutation.mutate("rejected")}>
-            Reject
-          </Button>
         </>
+      )}
+      {canCancel && (
+        <Button size="sm" variant="danger" disabled={busy} onClick={() => updateStatus("cancelled")}>
+          Cancel
+        </Button>
       )}
       {["pending", "accepted", "confirmed"].includes(booking.status) && (
         <Button
           size="sm"
           variant="outline"
           disabled={busy}
-          onClick={() => statusMutation.mutate("reschedule_requested")}>
+          onClick={() => updateStatus("reschedule_requested")}>
           Reschedule
         </Button>
       )}
       {["accepted", "confirmed", "in_progress"].includes(booking.status) && (
-        <Button size="sm" variant="success" disabled={busy} onClick={() => statusMutation.mutate("completed")}>
+        <Button size="sm" variant="success" disabled={busy} onClick={() => updateStatus("completed")}>
           Complete
         </Button>
       )}
@@ -347,7 +370,7 @@ export function ProviderBookingDetailsPage() {
             {booking.status}
           </Badge>
           <div className=" absolute top-4 right-4">
-            <ProviderBookingActions booking={booking} />
+            <ProviderBookingActions booking={booking} onChanged={setBooking} />
             {booking.status === "accepted" && (
               <Button disabled={statusMutation.isPending} onClick={() => statusMutation.mutate("in_progress")}>
                 Mark In Progress

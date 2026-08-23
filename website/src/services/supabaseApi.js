@@ -529,6 +529,15 @@ export async function updateBookingStatus(id, status) {
   return data;
 }
 
+export async function cancelBookingWithRefund(id) {
+  const { data, error } = await supabase.functions.invoke("refund-payment", {
+    body: { booking_id: id },
+  });
+  if (error) throw error;
+  if (data?.error) throw new Error(data.error);
+  return { id, status: "cancelled", payment_status: "refunded", ...(data || {}) };
+}
+
 export async function requestBookingReschedule(id) {
   return updateBookingStatus(id, "reschedule_requested");
 }
