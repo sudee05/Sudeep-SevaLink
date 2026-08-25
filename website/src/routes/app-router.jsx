@@ -74,6 +74,7 @@ function LandingRoute() {
   if (!loading && isAuthenticated) {
     if (role === 'customer') return <Navigate to="/customer" replace />
     if (role === 'provider') return <Navigate to="/provider" replace />
+    if (role === 'admin') return <Navigate to="/sevalink-admin" replace />
   }
 
   return <LandingPage />

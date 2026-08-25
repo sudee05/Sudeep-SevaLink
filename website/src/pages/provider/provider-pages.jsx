@@ -43,11 +43,27 @@ const fade = {
 function ProviderBookingActions({ booking, onChanged }) {
   const queryClient = useQueryClient();
   const toast = useToast();
+
+  // Immediately patch every cached bookings query that contains this booking
+  function patchBookingInCache(updatedFields) {
+    const merged = { ...booking, ...updatedFields };
+    // Optimistically update all cached booking arrays
+    queryClient.setQueriesData({ queryKey: ["bookings"] }, (old) => {
+      if (!Array.isArray(old)) return old;
+      return old.map((b) => (b.id === booking.id ? { ...b, ...updatedFields } : b));
+    });
+    onChanged?.(merged);
+  }
+
   const statusMutation = useMutation({
-    mutationFn: (status) => (status === "cancelled" ? cancelBookingWithRefund(booking.id) : updateBookingStatus(booking.id, status)),
+    mutationFn: (status) =>
+      status === "cancelled"
+        ? cancelBookingWithRefund(booking.id)
+        : updateBookingStatus(booking.id, status),
     onSuccess: (updatedBooking, status) => {
+      patchBookingInCache({ ...updatedBooking, status });
+      // Also trigger a background re-fetch to sync server state
       queryClient.invalidateQueries({ queryKey: ["bookings"] });
-      onChanged?.({ ...booking, ...updatedBooking, status });
       if (status === "cancelled") {
         toast.success("Booking cancelled. Refund notification sent to the customer.");
       }

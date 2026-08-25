@@ -57,7 +57,7 @@ serve(async (req) => {
   // Fetch booking — only columns that actually exist in the schema
   const { data: booking, error: bookingError } = await adminClient
     .from('bookings')
-    .select('id, customer_id, provider_id, booking_code, status, payment_status')
+    .select('id, customer_id, provider_id, booking_code, status')
     .eq('id', bookingId)
     .single();
 
@@ -149,7 +149,6 @@ serve(async (req) => {
     .from('bookings')
     .update({
       status: 'cancelled',
-      payment_status: payment ? 'refunded' : booking.payment_status,
       updated_at: new Date().toISOString(),
     })
     .eq('id', bookingId);
