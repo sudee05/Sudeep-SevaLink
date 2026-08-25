@@ -16,6 +16,7 @@ import {
   getConversationByBooking,
   getConversations,
   getMessages,
+  getAdminPendingItems,
 } from '@/services/supabaseApi'
 
 export function useCategoriesQuery() {
@@ -124,4 +125,12 @@ export function useMessagesQuery(conversationId) {
 
 export function useAdminStatsQuery() {
   return useQuery({ queryKey: ['admin-stats'], queryFn: getAdminStats })
+}
+
+export function useAdminPendingItemsQuery() {
+  return useQuery({
+    queryKey: ['admin-pending-items'],
+    queryFn: getAdminPendingItems,
+    refetchInterval: 30_000, // refresh every 30s
+  })
 }

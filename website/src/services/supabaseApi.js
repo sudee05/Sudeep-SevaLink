@@ -777,3 +777,37 @@ export async function uploadChatAttachment({ conversationId, file }) {
     type: file.type,
   };
 }
+
+// ── Admin Notifications (pending providers + service requests) ─
+
+export async function getAdminPendingItems() {
+  const [{ data: providers }, { data: serviceRequests }] = await Promise.all([
+    supabase
+      .from("profiles")
+      .select("id, full_name, phone, created_at, approval_status")
+      .eq("role", "provider")
+      .eq("approval_status", "pending")
+      .order("created_at", { ascending: false }),
+    supabase
+      .from("service_requests")
+      .select("id, service_name, description, status, created_at, providers(business_name), categories(name)")
+      .eq("status", "pending")
+      .order("created_at", { ascending: false }),
+  ]);
+
+  return {
+    pendingProviders: (providers || []).map((p) => ({
+      ...p,
+      type: "provider",
+      title: `New provider registration`,
+      message: `${p.full_name || "A provider"} has registered and is awaiting approval.`,
+    })),
+    pendingServiceRequests: (serviceRequests || []).map((r) => ({
+      ...r,
+      type: "service_request",
+      title: `New service request`,
+      message: `"${r.service_name}" requested by ${r.providers?.business_name || "a provider"}.`,
+    })),
+  };
+}
+

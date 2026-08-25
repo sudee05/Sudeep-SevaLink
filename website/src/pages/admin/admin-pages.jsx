@@ -1,8 +1,8 @@
 import { motion, AnimatePresence } from "framer-motion";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Navigate, useParams } from "react-router-dom";
+import { Navigate, useNavigate, useParams } from "react-router-dom";
 import { useDispatch, useSelector } from "react-redux";
-import { useAdminStatsQuery, useBookingsQuery, useCategoriesQuery } from "@/hooks/use-queries";
+import { useAdminPendingItemsQuery, useAdminStatsQuery, useBookingsQuery, useCategoriesQuery } from "@/hooks/use-queries";
 import { BookingBarChart, RevenueAreaChart } from "@/components/charts/revenue-booking-chart";
 import { DataTable } from "@/components/common/data-table";
 import { SectionHeader } from "@/components/common/section-header";
@@ -25,7 +25,7 @@ import {
 } from "@/store/adminSlice";
 import { formatCurrency, formatDate } from "@/utils/format";
 import { supabase } from "@/lib/supabase";
-import { Pencil, Trash2, Plus, X } from "lucide-react";
+import { Bell, CheckCircle2, Clock, Pencil, Trash2, Plus, ShieldCheck, Wrench, X } from "lucide-react";
 
 const fade = {
   initial: { opacity: 0, y: 10 },
@@ -962,6 +962,200 @@ export function AdminSectionPage({ sectionOverride }) {
         />
       ) : (
         <EmptyState title={`No ${config.title.toLowerCase()} found`} />
+      )}
+    </motion.div>
+  );
+}
+
+// ── Admin Notifications ────────────────────────────────────────
+
+export function AdminNotificationsPage() {
+  const { data, isLoading, refetch } = useAdminPendingItemsQuery();
+  const navigate = useNavigate();
+  const [actionId, setActionId] = useState(null);
+
+  const pendingProviders = data?.pendingProviders || [];
+  const pendingServiceRequests = data?.pendingServiceRequests || [];
+  const totalCount = pendingProviders.length + pendingServiceRequests.length;
+
+  async function handleProviderAction(row, newStatus) {
+    setActionId(row.id);
+    try {
+      await supabase.from("profiles").update({ approval_status: newStatus }).eq("id", row.id);
+      if (row.provider_record_id) {
+        const providerStatus = newStatus === "approved" ? "approved" : "rejected";
+        await supabase
+          .from("providers")
+          .update({ verified: newStatus === "approved", status: providerStatus })
+          .eq("id", row.provider_record_id);
+      }
+      refetch();
+    } catch (e) {
+      console.error("Approval failed:", e);
+    } finally {
+      setActionId(null);
+    }
+  }
+
+  async function handleServiceRequestAction(req, action) {
+    setActionId(req.id);
+    try {
+      if (action === "approve") {
+        await supabase.from("services").insert({
+          name: req.service_name || req.name,
+          description: req.description || "",
+          category_id: req.category_id || null,
+        });
+      }
+      await supabase
+        .from("service_requests")
+        .update({ status: action === "approve" ? "approved" : "denied" })
+        .eq("id", req.id);
+      refetch();
+    } catch (e) {
+      console.error("Service request action failed:", e);
+    } finally {
+      setActionId(null);
+    }
+  }
+
+  return (
+    <motion.div className="space-y-6" {...fade}>
+      <SectionHeader
+        title="Notifications"
+        subtitle="Pending provider registrations and service requests that need your attention."
+        action={
+          <Button variant="outline" size="sm" onClick={() => refetch()}>
+            Refresh
+          </Button>
+        }
+      />
+
+      {isLoading ? (
+        <LoadingGrid count={4} />
+      ) : totalCount === 0 ? (
+        <EmptyState
+          title="All caught up!"
+          description="No pending provider registrations or service requests right now."
+        />
+      ) : (
+        <div className="space-y-6">
+          {/* Pending Provider Registrations */}
+          <div className="space-y-3">
+            <div className="flex items-center gap-2">
+              <ShieldCheck className="h-5 w-5 text-primary" />
+              <h2 className="text-base font-semibold">
+                Pending Provider Registrations
+                <span className="ml-2 rounded-full bg-primary/10 px-2 py-0.5 text-xs font-bold text-primary">
+                  {pendingProviders.length}
+                </span>
+              </h2>
+            </div>
+            {pendingProviders.length === 0 ? (
+              <Card className="py-6 text-center text-sm text-muted-foreground">No pending registrations.</Card>
+            ) : (
+              <div className="space-y-3">
+                {pendingProviders.map((provider) => (
+                  <Card key={provider.id} className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                    <div className="flex items-start gap-3">
+                      <div className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-primary/10">
+                        <ShieldCheck className="h-5 w-5 text-primary" />
+                      </div>
+                      <div>
+                        <p className="font-semibold text-foreground">{provider.full_name || "Unknown Provider"}</p>
+                        <p className="text-sm text-muted-foreground">{provider.phone || "No phone"}</p>
+                        <p className="mt-1 flex items-center gap-1 text-xs text-muted-foreground">
+                          <Clock className="h-3 w-3" /> Registered {formatDate(provider.created_at)}
+                        </p>
+                      </div>
+                    </div>
+                    <div className="flex shrink-0 flex-wrap gap-2">
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => navigate("/sevalink-admin/providers")}>
+                        View Profile
+                      </Button>
+                      <Button
+                        size="sm"
+                        disabled={actionId === provider.id}
+                        onClick={() => handleProviderAction(provider, "approved")}>
+                        {actionId === provider.id ? "…" : "Approve"}
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="danger"
+                        disabled={actionId === provider.id}
+                        onClick={() => handleProviderAction(provider, "denied")}>
+                        {actionId === provider.id ? "…" : "Deny"}
+                      </Button>
+                    </div>
+                  </Card>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {/* Pending Service Requests */}
+          <div className="space-y-3">
+            <div className="flex items-center gap-2">
+              <Wrench className="h-5 w-5 text-primary" />
+              <h2 className="text-base font-semibold">
+                Pending Service Requests
+                <span className="ml-2 rounded-full bg-primary/10 px-2 py-0.5 text-xs font-bold text-primary">
+                  {pendingServiceRequests.length}
+                </span>
+              </h2>
+            </div>
+            {pendingServiceRequests.length === 0 ? (
+              <Card className="py-6 text-center text-sm text-muted-foreground">No pending service requests.</Card>
+            ) : (
+              <div className="space-y-3">
+                {pendingServiceRequests.map((req) => (
+                  <Card key={req.id} className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                    <div className="flex items-start gap-3">
+                      <div className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-amber-100 dark:bg-amber-900/30">
+                        <Wrench className="h-5 w-5 text-amber-600 dark:text-amber-400" />
+                      </div>
+                      <div>
+                        <p className="font-semibold text-foreground">{req.service_name}</p>
+                        <p className="text-sm text-muted-foreground">
+                          Requested by {req.providers?.business_name || "a provider"}
+                          {req.categories?.name && (
+                            <> &nbsp;·&nbsp; <span className="text-primary">{req.categories.name}</span></>
+                          )}
+                        </p>
+                        {req.description && (
+                          <p className="mt-1 line-clamp-2 text-xs text-muted-foreground">{req.description}</p>
+                        )}
+                        <p className="mt-1 flex items-center gap-1 text-xs text-muted-foreground">
+                          <Clock className="h-3 w-3" /> {formatDate(req.created_at)}
+                        </p>
+                      </div>
+                    </div>
+                    <div className="flex shrink-0 flex-wrap gap-2">
+                      <Button
+                        size="sm"
+                        disabled={actionId === req.id}
+                        onClick={() => handleServiceRequestAction(req, "approve")}>
+                        <CheckCircle2 className="mr-1 h-3.5 w-3.5" />
+                        {actionId === req.id ? "…" : "Approve"}
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="danger"
+                        disabled={actionId === req.id}
+                        onClick={() => handleServiceRequestAction(req, "deny")}>
+                        <X className="mr-1 h-3.5 w-3.5" />
+                        {actionId === req.id ? "…" : "Deny"}
+                      </Button>
+                    </div>
+                  </Card>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
       )}
     </motion.div>
   );
