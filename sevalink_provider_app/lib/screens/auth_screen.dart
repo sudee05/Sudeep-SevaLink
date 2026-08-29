@@ -5,6 +5,14 @@ import '../services/provider_api.dart';
 String? _required(String? value) =>
     (value == null || value.trim().isEmpty) ? 'Required' : null;
 
+String? _emailValidator(String? value) {
+  final required = _required(value);
+  if (required != null) return required;
+  final email = value!.trim();
+  final valid = RegExp(r'^[^@\s]+@[^@\s]+\.[^@\s]+$').hasMatch(email);
+  return valid ? null : 'Enter a valid email address';
+}
+
 class AuthScreen extends StatefulWidget {
   const AuthScreen({super.key});
 
@@ -50,8 +58,12 @@ class _AuthScreenState extends State<AuthScreen> {
         await ProviderApi.signIn(_email.text.trim(), _password.text);
       }
     } catch (error) {
-      setState(
-          () => _error = error.toString().replaceFirst('Exception: ', ''));
+      if (mounted) {
+        setState(
+          () => _error =
+              ProviderApi.authErrorMessage(error, signingUp: _signup),
+        );
+      }
     } finally {
       if (mounted) setState(() => _busy = false);
     }
@@ -138,7 +150,7 @@ class _AuthScreenState extends State<AuthScreen> {
                                 prefixIcon: Icon(Icons.email_outlined),
                               ),
                               keyboardType: TextInputType.emailAddress,
-                              validator: _required,
+                              validator: _emailValidator,
                               textInputAction: TextInputAction.next,
                             ),
                             const SizedBox(height: 14),

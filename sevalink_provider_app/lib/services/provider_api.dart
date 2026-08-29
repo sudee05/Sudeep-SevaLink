@@ -13,9 +13,13 @@ class ProviderApi {
   // ── Auth ──────────────────────────────────────────────────────
 
   static Future<void> signIn(String email, String password) async {
-    final response =
-        await client.auth.signInWithPassword(email: email, password: password);
-    if (response.user == null) throw Exception('Login failed');
+    try {
+      final response =
+          await client.auth.signInWithPassword(email: email, password: password);
+      if (response.user == null) throw Exception('Login failed');
+    } catch (error) {
+      throw Exception(authErrorMessage(error, signingUp: false));
+    }
   }
 
   static Future<void> signUp({
@@ -24,15 +28,59 @@ class ProviderApi {
     required String email,
     required String password,
   }) async {
-    final response = await client.auth.signUp(
-      email: email,
-      password: password,
-      data: {'full_name': fullName, 'phone': phone, 'role': 'provider'},
-    );
-    if (response.user == null) throw Exception('Signup failed');
+    try {
+      final response = await client.auth.signUp(
+        email: email,
+        password: password,
+        data: {'full_name': fullName, 'phone': phone, 'role': 'provider'},
+      );
+      if (response.user == null) throw Exception('Signup failed');
+    } catch (error) {
+      throw Exception(authErrorMessage(error, signingUp: true));
+    }
   }
 
   static Future<void> signOut() => client.auth.signOut();
+
+  static String authErrorMessage(Object error, {required bool signingUp}) {
+    final message = error is AuthException
+        ? error.message
+        : error.toString().replaceFirst('Exception: ', '');
+    final normalized = message.toLowerCase();
+
+    if (normalized.contains('invalid login') ||
+        normalized.contains('invalid credentials') ||
+        normalized.contains('email or password')) {
+      return 'Invalid email or password.';
+    }
+    if (normalized.contains('email') &&
+        (normalized.contains('invalid') ||
+            normalized.contains('format') ||
+            normalized.contains('validate'))) {
+      return 'Enter a valid email address.';
+    }
+    if (normalized.contains('password') && normalized.contains('six')) {
+      return 'Use a password with at least 6 characters.';
+    }
+    if (normalized.contains('already registered') ||
+        normalized.contains('already exists') ||
+        normalized.contains('user already')) {
+      return 'An account already exists with this email.';
+    }
+    if (normalized.contains('email not confirmed') ||
+        normalized.contains('confirm')) {
+      return 'Please verify your email before logging in.';
+    }
+    if (normalized.contains('network') ||
+        normalized.contains('socket') ||
+        normalized.contains('connection')) {
+      return 'Please check your internet connection and try again.';
+    }
+
+    return signingUp
+        ? 'Could not create your account. Please try again.'
+        : 'Could not log in. Please try again.';
+  }
 
   // ── Profile ───────────────────────────────────────────────────
 
