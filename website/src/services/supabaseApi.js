@@ -14,6 +14,32 @@ export async function getAdminCategories() {
   return data;
 }
 
+export async function createCategory(payload) {
+  const { data, error } = await supabase
+    .from("categories")
+    .insert({ name: payload.name, description: payload.description || null, icon: payload.icon || "Tag" })
+    .select()
+    .single();
+  if (error) throw error;
+  return data;
+}
+
+export async function updateCategory(id, payload) {
+  const { data, error } = await supabase
+    .from("categories")
+    .update({ name: payload.name, description: payload.description || null, icon: payload.icon || "Tag" })
+    .eq("id", id)
+    .select()
+    .single();
+  if (error) throw error;
+  return data;
+}
+
+export async function deleteCategory(id) {
+  const { error } = await supabase.from("categories").delete().eq("id", id);
+  if (error) throw error;
+}
+
 function normalizeService(service) {
   const category = service?.category || service?.categories || null;
   return {

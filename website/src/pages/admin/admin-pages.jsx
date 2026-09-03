@@ -66,7 +66,7 @@ function Modal({ open, onClose, title, children }) {
 
 // ── Service Form ──────────────────────────────────────────────
 
-const EMPTY_SERVICE = { name: "", description: "", category_id: "" };
+const EMPTY_SERVICE = { name: "", description: "", category_id: "", icon: "" };
 
 function ServiceForm({ initial = EMPTY_SERVICE, categories = [], onSubmit, loading }) {
   const [form, setForm] = useState(initial);
@@ -81,6 +81,7 @@ function ServiceForm({ initial = EMPTY_SERVICE, categories = [], onSubmit, loadi
           name: form.name.trim(),
           description: form.description.trim(),
           category_id: form.category_id || null,
+          icon: form.icon.trim() || null,
         });
       }}
       className="space-y-4">
@@ -92,6 +93,15 @@ function ServiceForm({ initial = EMPTY_SERVICE, categories = [], onSubmit, loadi
           value={form.name}
           onChange={(e) => set("name", e.target.value)}
         />
+      </div>
+      <div>
+        <label className="mb-1 block text-sm font-medium">Icon Name</label>
+        <Input
+          placeholder="e.g. Wrench, Home, Sparkles, Briefcase"
+          value={form.icon}
+          onChange={(e) => set("icon", e.target.value)}
+        />
+        <p className="mt-1 text-xs text-muted-foreground">Enter a Lucide icon name (PascalCase). Browse at lucide.dev/icons</p>
       </div>
       <div>
         <label className="mb-1 block text-sm font-medium">Description</label>
@@ -114,6 +124,62 @@ function ServiceForm({ initial = EMPTY_SERVICE, categories = [], onSubmit, loadi
       <div className="flex justify-end gap-2 pt-2">
         <Button type="submit" disabled={loading || !form.name.trim()}>
           {loading ? "Saving…" : "Save Service"}
+        </Button>
+      </div>
+    </form>
+  );
+}
+
+// ── Category Form ─────────────────────────────────────────────
+
+const EMPTY_CATEGORY = { name: "", description: "", icon: "" };
+
+function CategoryForm({ initial = EMPTY_CATEGORY, onSubmit, loading, onCancel }) {
+  const [form, setForm] = useState(initial);
+  const set = (k, v) => setForm((f) => ({ ...f, [k]: v }));
+
+  return (
+    <form
+      onSubmit={(e) => {
+        e.preventDefault();
+        if (!form.name.trim()) return;
+        onSubmit({
+          name: form.name.trim(),
+          description: form.description.trim(),
+          icon: form.icon.trim() || "Tag",
+        });
+      }}
+      className="space-y-4">
+      <div>
+        <label className="mb-1 block text-sm font-medium">Category Name <span className="text-red-500">*</span></label>
+        <Input
+          required
+          placeholder="e.g. Home Maintenance"
+          value={form.name}
+          onChange={(e) => set("name", e.target.value)}
+        />
+      </div>
+      <div>
+        <label className="mb-1 block text-sm font-medium">Icon Name</label>
+        <Input
+          placeholder="e.g. Home, Wrench, Stethoscope, Truck, Leaf"
+          value={form.icon}
+          onChange={(e) => set("icon", e.target.value)}
+        />
+        <p className="mt-1 text-xs text-muted-foreground">Enter a Lucide icon name (PascalCase). Browse at lucide.dev/icons</p>
+      </div>
+      <div>
+        <label className="mb-1 block text-sm font-medium">Description</label>
+        <Input
+          placeholder="Short description (optional)"
+          value={form.description}
+          onChange={(e) => set("description", e.target.value)}
+        />
+      </div>
+      <div className="flex justify-end gap-2 pt-2">
+        {onCancel && <Button type="button" variant="outline" onClick={onCancel}>Cancel</Button>}
+        <Button type="submit" disabled={loading || !form.name.trim()}>
+          {loading ? "Saving…" : "Save Category"}
         </Button>
       </div>
     </form>
@@ -963,6 +1029,146 @@ export function AdminSectionPage({ sectionOverride }) {
       ) : (
         <EmptyState title={`No ${config.title.toLowerCase()} found`} />
       )}
+    </motion.div>
+  );
+}
+
+// ── Admin Categories (CRUD) ───────────────────────────────────
+
+export function AdminCategoriesPage() {
+  const dispatch = useDispatch();
+  const { rows, status, error } = useSelector(selectAdminSection("categories"));
+  const [search, setSearch] = useState("");
+  const [showAdd, setShowAdd] = useState(false);
+  const [editRow, setEditRow] = useState(null);
+  const [deleteConfirm, setDeleteConfirm] = useState(null);
+  const [actionLoading, setActionLoading] = useState(false);
+
+  useEffect(() => {
+    if (status === "idle") dispatch(fetchAdminSection("categories"));
+  }, [dispatch, status]);
+
+  const visibleRows = useMemo(() => {
+    if (!search) return rows;
+    const q = search.toLowerCase();
+    return rows.filter(
+      (x) =>
+        (x.name || "").toLowerCase().includes(q) ||
+        (x.description || "").toLowerCase().includes(q) ||
+        (x.icon || "").toLowerCase().includes(q),
+    );
+  }, [rows, search]);
+
+  async function handleCreate(payload) {
+    setActionLoading(true);
+    await dispatch(createAdminRow({ section: "categories", payload }));
+    setActionLoading(false);
+    setShowAdd(false);
+  }
+
+  async function handleUpdate(payload) {
+    if (!editRow?.id) return;
+    setActionLoading(true);
+    await dispatch(updateAdminRow({ section: "categories", id: editRow.id, payload }));
+    setActionLoading(false);
+    setEditRow(null);
+  }
+
+  async function handleDelete(id) {
+    setActionLoading(true);
+    await dispatch(deleteAdminRow({ section: "categories", id }));
+    setActionLoading(false);
+    setDeleteConfirm(null);
+  }
+
+  return (
+    <motion.div className="space-y-4" {...fade}>
+      <SectionHeader
+        title="Category Management"
+        subtitle="Manage service categories. Add icons to make them visually distinct on the customer portal."
+        action={
+          <Button onClick={() => setShowAdd(true)}>
+            <Plus className="h-4 w-4" /> Add Category
+          </Button>
+        }
+      />
+
+      {/* Search */}
+      <Card className="flex gap-3">
+        <Input
+          className="max-w-sm"
+          placeholder="Search categories…"
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+        />
+      </Card>
+
+      {/* Table */}
+      {status === "loading" ? (
+        <LoadingGrid count={3} />
+      ) : status === "failed" ? (
+        <ErrorState description={error} onRetry={() => dispatch(fetchAdminSection("categories"))} />
+      ) : visibleRows.length ? (
+        <DataTable
+          columns={[
+            { key: "name", label: "Name", render: (row) => <span className="font-semibold">{row.name}</span> },
+            { key: "icon", label: "Icon Name", render: (row) => row.icon ? <code className="rounded bg-muted px-2 py-0.5 text-xs">{row.icon}</code> : <span className="text-muted-foreground">—</span> },
+            { key: "description", label: "Description", render: (row) => row.description || "—" },
+            { key: "created_at", label: "Created", render: (row) => formatDate(row.created_at) },
+            {
+              key: "actions",
+              label: "Actions",
+              render: (row) => (
+                <div className="flex gap-1">
+                  <Button size="sm" variant="outline" onClick={() => setEditRow(row)}>
+                    <Pencil className="h-3.5 w-3.5" />
+                  </Button>
+                  <Button size="sm" variant="danger" onClick={() => setDeleteConfirm(row)}>
+                    <Trash2 className="h-3.5 w-3.5" />
+                  </Button>
+                </div>
+              ),
+            },
+          ]}
+          rows={visibleRows}
+        />
+      ) : (
+        <EmptyState title="No categories found" description="Add your first category to get started." />
+      )}
+
+      {/* Add modal */}
+      <Modal open={showAdd} onClose={() => setShowAdd(false)} title="Add Category">
+        <CategoryForm loading={actionLoading} onSubmit={handleCreate} onCancel={() => setShowAdd(false)} />
+      </Modal>
+
+      {/* Edit modal */}
+      <Modal open={!!editRow} onClose={() => setEditRow(null)} title="Edit Category">
+        {editRow && (
+          <CategoryForm
+            initial={{ name: editRow.name || "", description: editRow.description || "", icon: editRow.icon || "" }}
+            loading={actionLoading}
+            onSubmit={handleUpdate}
+            onCancel={() => setEditRow(null)}
+          />
+        )}
+      </Modal>
+
+      {/* Delete confirm modal */}
+      <Modal open={!!deleteConfirm} onClose={() => setDeleteConfirm(null)} title="Delete Category">
+        {deleteConfirm && (
+          <div className="space-y-4">
+            <p className="text-sm text-muted-foreground">
+              Are you sure you want to delete <strong>{deleteConfirm.name}</strong>? This cannot be undone.
+            </p>
+            <div className="flex justify-end gap-2">
+              <Button variant="outline" onClick={() => setDeleteConfirm(null)}>Cancel</Button>
+              <Button variant="danger" disabled={actionLoading} onClick={() => handleDelete(deleteConfirm.id)}>
+                {actionLoading ? "Deleting…" : "Delete"}
+              </Button>
+            </div>
+          </div>
+        )}
+      </Modal>
     </motion.div>
   );
 }

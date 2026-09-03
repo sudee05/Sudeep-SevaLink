@@ -47,6 +47,7 @@ import {
 } from '@/pages/provider/provider-pages'
 import {
   AdminBookingsPage,
+  AdminCategoriesPage,
   AdminDashboardPage,
   AdminProvidersPage,
   AdminReportsPage,
@@ -152,6 +153,7 @@ export function AppRouter() {
         }
       >
         <Route index element={<AdminDashboardPage />} />
+        <Route path="categories" element={<AdminCategoriesPage />} />
         <Route path="reports" element={<AdminReportsPage />} />
         <Route path="services" element={<AdminServicesPage />} />
         <Route path="bookings" element={<AdminBookingsPage />} />

@@ -3,17 +3,22 @@ import {
   getAdminComplaints,
   getAdminServices,
   getAdminUsers,
+  getAdminCategories,
   getAllProviders,
   getBookings,
   createService,
   updateService,
   deleteService,
+  createCategory,
+  updateCategory,
+  deleteCategory,
 } from '@/services/supabaseApi'
 
 const fetchers = {
   users: getAdminUsers,
   providers: getAllProviders,
   services: getAdminServices,
+  categories: getAdminCategories,
   bookings: getBookings,
   complaints: getAdminComplaints,
 }
@@ -42,7 +47,7 @@ export const createAdminRow = createAsyncThunk(
   'admin/createRow',
   async ({ section, payload }, { rejectWithValue }) => {
     try {
-      const creators = { services: createService }
+      const creators = { services: createService, categories: createCategory }
       const fn = creators[section]
       if (!fn) throw new Error(`No creator for section: ${section}`)
       const row = await fn(payload)
@@ -58,7 +63,7 @@ export const updateAdminRow = createAsyncThunk(
   'admin/updateRow',
   async ({ section, id, payload }, { rejectWithValue }) => {
     try {
-      const updaters = { services: updateService }
+      const updaters = { services: updateService, categories: updateCategory }
       const fn = updaters[section]
       if (!fn) throw new Error(`No updater for section: ${section}`)
       const row = await fn(id, payload)
@@ -74,7 +79,7 @@ export const deleteAdminRow = createAsyncThunk(
   'admin/deleteRow',
   async ({ section, id }, { rejectWithValue }) => {
     try {
-      const deleters = { services: deleteService }
+      const deleters = { services: deleteService, categories: deleteCategory }
       const fn = deleters[section]
       if (!fn) throw new Error(`No deleter for section: ${section}`)
       await fn(id)

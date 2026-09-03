@@ -1,6 +1,7 @@
 import { motion } from "framer-motion";
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { Link, useParams } from "react-router-dom";
+import * as LucideIcons from "lucide-react";
 import {
   ArrowRight,
   BadgeCheck,
@@ -12,6 +13,7 @@ import {
   ShieldCheck,
   SlidersHorizontal,
   Sparkles,
+  Tag,
   Users,
 } from "lucide-react";
 import {
@@ -493,33 +495,73 @@ export function LandingPage() {
   );
 }
 
+// Palette of light background + matching text/icon colours
+const CARD_PALETTES = [
+  { bg: 'bg-blue-50 dark:bg-blue-950/40', icon: 'text-blue-600 dark:text-blue-400', iconBg: 'bg-blue-100 dark:bg-blue-900/50', border: 'border-blue-200 dark:border-blue-800' },
+  { bg: 'bg-violet-50 dark:bg-violet-950/40', icon: 'text-violet-600 dark:text-violet-400', iconBg: 'bg-violet-100 dark:bg-violet-900/50', border: 'border-violet-200 dark:border-violet-800' },
+  { bg: 'bg-emerald-50 dark:bg-emerald-950/40', icon: 'text-emerald-600 dark:text-emerald-400', iconBg: 'bg-emerald-100 dark:bg-emerald-900/50', border: 'border-emerald-200 dark:border-emerald-800' },
+  { bg: 'bg-amber-50 dark:bg-amber-950/40', icon: 'text-amber-600 dark:text-amber-400', iconBg: 'bg-amber-100 dark:bg-amber-900/50', border: 'border-amber-200 dark:border-amber-800' },
+  { bg: 'bg-rose-50 dark:bg-rose-950/40', icon: 'text-rose-600 dark:text-rose-400', iconBg: 'bg-rose-100 dark:bg-rose-900/50', border: 'border-rose-200 dark:border-rose-800' },
+  { bg: 'bg-cyan-50 dark:bg-cyan-950/40', icon: 'text-cyan-600 dark:text-cyan-400', iconBg: 'bg-cyan-100 dark:bg-cyan-900/50', border: 'border-cyan-200 dark:border-cyan-800' },
+  { bg: 'bg-fuchsia-50 dark:bg-fuchsia-950/40', icon: 'text-fuchsia-600 dark:text-fuchsia-400', iconBg: 'bg-fuchsia-100 dark:bg-fuchsia-900/50', border: 'border-fuchsia-200 dark:border-fuchsia-800' },
+  { bg: 'bg-orange-50 dark:bg-orange-950/40', icon: 'text-orange-600 dark:text-orange-400', iconBg: 'bg-orange-100 dark:bg-orange-900/50', border: 'border-orange-200 dark:border-orange-800' },
+]
+
+function getLucideIcon(iconName) {
+  if (!iconName) return Tag
+  // Support PascalCase and common variants
+  const key = iconName.replace(/-([a-z])/g, (_, c) => c.toUpperCase())
+  const Icon = LucideIcons[key] || LucideIcons[iconName]
+  return Icon || Tag
+}
+
 export function CategoriesPage() {
   const { data, isLoading } = useCategoriesQuery();
+  const [search, setSearch] = useState("");
+
+  const filtered = useMemo(() => {
+    if (!search) return data || [];
+    return (data || []).filter((c) => c.name.toLowerCase().includes(search.toLowerCase()));
+  }, [data, search]);
 
   if (isLoading) return <LoadingGrid count={6} />;
 
   return (
     <motion.div {...fade}>
       <SectionHeader title="Service Categories" subtitle="Find by home, business, and lifestyle needs." />
-      <div className="mb-5 grid gap-3 md:grid-cols-4">
-        <Input placeholder="Search categories" />
-        <Select placeholder="Popularity" options={[{ label: "Most booked", value: "booked" }]} />
-        <Select placeholder="City" options={[{ label: "All cities", value: "all" }]} />
-        <Button variant="outline">
-          <SlidersHorizontal className="h-4 w-4" /> More Filters
-        </Button>
+      <div className="mb-6 flex gap-3">
+        <Input
+          placeholder="Search categories…"
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          className="max-w-xs"
+        />
       </div>
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-        {data?.map((category) => {
-          const Icon = category.icon;
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+        {filtered.map((category, i) => {
+          const palette = CARD_PALETTES[i % CARD_PALETTES.length];
+          const Icon = getLucideIcon(category.icon);
           return (
-            <Card key={category.id} className="space-y-3">
-              <div className="inline-flex rounded-xl bg-muted p-3">
-                <Icon className="h-5 w-5 text-primary" />
-              </div>
-              <h3 className="font-semibold">{category.name}</h3>
-              <p className="text-sm text-muted-foreground">{category.services}+ services</p>
-            </Card>
+            <Link key={category.id} to={`/services?category=${category.id}`}>
+              <motion.div
+                whileHover={{ y: -4, scale: 1.02 }}
+                transition={{ type: 'spring', stiffness: 300, damping: 20 }}
+                className={`group flex flex-col gap-4 rounded-2xl border p-5 transition-shadow hover:shadow-lg cursor-pointer ${palette.bg} ${palette.border}`}
+              >
+                <div className={`inline-flex w-fit rounded-xl p-3 ${palette.iconBg}`}>
+                  <Icon className={`h-6 w-6 ${palette.icon}`} />
+                </div>
+                <div>
+                  <h3 className="font-bold text-foreground">{category.name}</h3>
+                  {category.description && (
+                    <p className="mt-0.5 line-clamp-2 text-xs text-muted-foreground">{category.description}</p>
+                  )}
+                </div>
+                <span className={`mt-auto inline-flex items-center gap-1 text-xs font-semibold ${palette.icon}`}>
+                  Browse services <ArrowRight className="h-3.5 w-3.5" />
+                </span>
+              </motion.div>
+            </Link>
           );
         })}
       </div>
