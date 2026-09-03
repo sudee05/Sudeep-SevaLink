@@ -63,7 +63,9 @@ class _ServicesPageState extends State<ServicesPage>
         widget.profile.providerId!,
         _services.where((s) => s.enrolled).toList(),
       );
-      setState(() => _future = _load());
+      setState(() {
+        _future = _load();
+      });
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(

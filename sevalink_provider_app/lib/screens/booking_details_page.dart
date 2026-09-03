@@ -35,8 +35,11 @@ class _BookingDetailsPageState extends State<BookingDetailsPage> {
   bool _changed = false;
   String? _updatingStatus;
 
-  void _reload() =>
-      setState(() => _future = ProviderApi.getBookingById(widget.bookingId));
+  void _reload() {
+    setState(() {
+      _future = ProviderApi.getBookingById(widget.bookingId);
+    });
+  }
 
   Future<void> _setStatus(ProviderBooking booking, String status) async {
     if (status == 'cancelled' && !await _confirmCancellation()) return;

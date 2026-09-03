@@ -20,8 +20,11 @@ class _NotificationsPageState extends State<NotificationsPage> {
   bool _markingAllRead = false;
   String? _openingId;
 
-  void _reload() => setState(
-      () => _future = ProviderApi.getNotifications(widget.profile.userId));
+  void _reload() {
+    setState(() {
+      _future = ProviderApi.getNotifications(widget.profile.userId);
+    });
+  }
 
   Future<void> _markAllRead() async {
     setState(() => _markingAllRead = true);

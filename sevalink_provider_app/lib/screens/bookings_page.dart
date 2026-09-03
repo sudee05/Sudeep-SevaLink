@@ -49,7 +49,11 @@ class _BookingsPageState extends State<BookingsPage>
     return ProviderApi.getProviderBookings(providerId);
   }
 
-  void _reload() => setState(() => _future = _loadBookings());
+  void _reload() {
+    setState(() {
+      _future = _loadBookings();
+    });
+  }
 
   List<ProviderBooking> _filter(
       List<ProviderBooking> all, Set<String> statuses) {

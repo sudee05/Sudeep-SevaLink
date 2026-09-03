@@ -29,7 +29,11 @@ class _DashboardPageState extends State<DashboardPage> {
     return ProviderApi.getProviderBookings(providerId);
   }
 
-  void _reload() => setState(() => _future = _loadBookings());
+  void _reload() {
+    setState(() {
+      _future = _loadBookings();
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
