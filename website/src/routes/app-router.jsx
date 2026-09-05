@@ -29,11 +29,13 @@ import {
   BookingPaymentPage,
   BookingSuccessPage,
   BookingTrackingPage,
+  BookProviderPage,
   CustomerBookingDetailsPage,
   CustomerBookingsPage,
   CustomerDashboardPage,
   CustomerNotificationsPage,
   CustomerProfilePage,
+  ProviderDetails,
 } from '@/pages/customer/customer-pages'
 import {
   ProviderAnalyticsPage,
@@ -122,6 +124,8 @@ export function AppRouter() {
         <Route path="booking/success" element={<BookingSuccessPage />} />
         <Route path="booking/failed" element={<BookingFailedPage />} />
         <Route path="booking/tracking/:id" element={<BookingTrackingPage />} />
+        <Route path="provider-details/:id" element={<ProviderDetails />} />
+        <Route path="book-provider" element={<BookProviderPage />} />
       </Route>
 
       {/* Provider Portal — protected, requires "provider" role */}
