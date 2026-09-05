@@ -18,6 +18,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { EmptyState } from "@/components/ui/empty-state";
 import { LoadingGrid } from "@/components/ui/loading-grid";
 import { Select } from "@/components/ui/select";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/lib/supabase";
 import {
@@ -43,6 +44,7 @@ const fade = {
 function ProviderBookingActions({ booking, onChanged }) {
   const queryClient = useQueryClient();
   const toast = useToast();
+  const [confirmOpen, setConfirmOpen] = useState(false);
 
   // Immediately patch every cached bookings query that contains this booking
   function patchBookingInCache(updatedFields) {
@@ -76,10 +78,8 @@ function ProviderBookingActions({ booking, onChanged }) {
 
   const updateStatus = (status) => {
     if (status === "cancelled") {
-      const confirmed = window.confirm(
-        "Are you sure you want to Cancel this booking? The amount will be refunded to the customer in 2-3 working days.",
-      );
-      if (!confirmed) return;
+      setConfirmOpen(true);
+      return;
     }
     statusMutation.mutate(status);
   };
@@ -101,34 +101,49 @@ function ProviderBookingActions({ booking, onChanged }) {
   }
 
   return (
-    <div className="flex flex-wrap gap-1">
-      {booking.status === "pending" && (
-        <>
-          <Button size="sm" disabled={busy} onClick={() => statusMutation.mutate("accepted")}>
-            Accept
+    <>
+      <ConfirmDialog
+        open={confirmOpen}
+        title="Cancel Booking?"
+        description="Are you sure you want to cancel this booking? The amount will be refunded to the customer in 2–3 working days."
+        confirmLabel={busy ? "Cancelling..." : "Yes, Cancel"}
+        cancelLabel="Go Back"
+        variant="danger"
+        onConfirm={() => {
+          setConfirmOpen(false);
+          statusMutation.mutate("cancelled");
+        }}
+        onCancel={() => setConfirmOpen(false)}
+      />
+      <div className="flex flex-wrap gap-1">
+        {booking.status === "pending" && (
+          <>
+            <Button size="sm" disabled={busy} onClick={() => statusMutation.mutate("accepted")}>
+              Accept
+            </Button>
+          </>
+        )}
+        {canCancel && (
+          <Button size="sm" variant="danger" disabled={busy} onClick={() => updateStatus("cancelled")}>
+            Cancel
           </Button>
-        </>
-      )}
-      {canCancel && (
-        <Button size="sm" variant="danger" disabled={busy} onClick={() => updateStatus("cancelled")}>
-          Cancel
-        </Button>
-      )}
-      {["pending", "accepted", "confirmed"].includes(booking.status) && (
-        <Button
-          size="sm"
-          variant="outline"
-          disabled={busy}
-          onClick={() => updateStatus("reschedule_requested")}>
-          Reschedule
-        </Button>
-      )}
-      {["accepted", "confirmed", "in_progress"].includes(booking.status) && (
-        <Button size="sm" variant="success" disabled={busy} onClick={() => updateStatus("completed")}>
-          Complete
-        </Button>
-      )}
-    </div>
+        )}
+        {["pending", "accepted", "confirmed"].includes(booking.status) && (
+          <Button
+            size="sm"
+            variant="outline"
+            disabled={busy}
+            onClick={() => updateStatus("reschedule_requested")}>
+            Reschedule
+          </Button>
+        )}
+        {["accepted", "confirmed", "in_progress"].includes(booking.status) && (
+          <Button size="sm" variant="success" disabled={busy} onClick={() => updateStatus("completed")}>
+            Complete
+          </Button>
+        )}
+      </div>
+    </>
   );
 }
 
@@ -1082,13 +1097,21 @@ export function ProviderProfilePage() {
         <form className="grid gap-4 md:grid-cols-[220px_1fr]" onSubmit={handleSubmit}>
           <div className="space-y-3">
             <div className="aspect-square overflow-hidden rounded-2xl border border-border bg-muted">
-              {form.image_url ? (
+              {imageFile ? (
+                <img
+                  src={URL.createObjectURL(imageFile)}
+                  alt="Preview"
+                  className="h-full w-full object-cover"
+                />
+              ) : form.image_url ? (
                 <img
                   src={form.image_url}
                   alt={form.business_name || "Provider"}
                   className="h-full w-full object-cover"
+                  onError={(e) => { e.currentTarget.style.display = 'none'; e.currentTarget.nextSibling?.removeAttribute('hidden'); }}
                 />
-              ) : (
+              ) : null}
+              {!imageFile && !form.image_url && (
                 <div className="grid h-full place-items-center text-sm text-muted-foreground">No image</div>
               )}
             </div>
@@ -1132,12 +1155,7 @@ export function ProviderProfilePage() {
               value={form.certificates}
               onChange={(event) => setForm((current) => ({ ...current, certificates: event.target.value }))}
             />
-            <Input
-              className="md:col-span-2"
-              placeholder="Image URL"
-              value={form.image_url}
-              onChange={(event) => setForm((current) => ({ ...current, image_url: event.target.value }))}
-            />
+
             <Textarea
               className="md:col-span-2"
               placeholder="About your business"

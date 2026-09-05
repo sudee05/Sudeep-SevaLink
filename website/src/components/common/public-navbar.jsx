@@ -4,13 +4,17 @@ import { Button } from '@/components/ui/button'
 import { Logo } from '@/components/common/logo'
 import { ThemeToggle } from '@/components/common/theme-toggle'
 
-const links = [
-  { to: '/services', label: 'For Customers' },
-  { to: '/providers', label: 'For Providers' },
-  { to: '/categories', label: 'About Us' },
-]
 
 export function PublicNavbar() {
+const currentPath = window.location.pathname;
+const links = [
+  { to: "/services", label: "For Customers" },
+  { to: "/providers", label: "For Providers" },
+  {
+    to: currentPath === "/" ? "#about-us" : "/#about-us",
+    label: "About Us",
+  },
+];
   return (
     <header className="public-nav sticky top-0 z-40 border-b border-slate-200/80 bg-[#f6f8ff]/88 backdrop-blur-xl dark:border-border dark:bg-background/90">
       <div className="mx-auto flex w-full max-w-7xl items-center justify-between gap-4 px-4 py-4 lg:px-8">

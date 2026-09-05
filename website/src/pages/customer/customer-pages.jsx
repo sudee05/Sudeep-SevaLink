@@ -477,6 +477,7 @@ export function CustomerDashboardPage() {
 
       <Card>
         <SectionHeader title="Choose a Service" subtitle="Start by selecting what you need." />
+        
         {services.isLoading || categories.isLoading ? (
           <LoadingGrid count={3} />
         ) : selectedService ? (

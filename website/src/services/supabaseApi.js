@@ -55,7 +55,7 @@ function normalizeService(service) {
 export async function getServices() {
   const { data, error } = await supabase
     .from("services")
-    .select("id, name, description, category_id, category:categories(id, name)")
+    .select("id, name, description, icon, category_id, category:categories(id, name)")
     .order("name");
   if (error) throw error;
   return (data || []).map(normalizeService);
@@ -64,7 +64,7 @@ export async function getServices() {
 export async function getAdminServices() {
   const { data, error } = await supabase
     .from("services")
-    .select("id, name, description, category_id, category:categories(id, name)")
+    .select("id, name, description, icon, category_id, category:categories(id, name)")
     .order("name");
   if (error) throw error;
   return (data || []).map(normalizeService);

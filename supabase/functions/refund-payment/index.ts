@@ -104,6 +104,8 @@ serve(async (req) => {
     .maybeSingle();
 
   let refundId = '';
+  let refundError: string | null = null;
+
   if (payment?.razorpay_payment_id && payment.status !== 'refunded') {
     const auth = btoa(`${razorpayKeyId}:${razorpayKeySecret}`);
     const refundResponse = await fetch(
@@ -126,18 +128,22 @@ serve(async (req) => {
 
     const refund = await refundResponse.json().catch(() => ({}));
     if (!refundResponse.ok) {
-      return jsonResponse({ error: refund?.error?.description ?? 'Razorpay refund failed.' }, 502);
+      // Log but don't block — booking will still be cancelled
+      refundError = refund?.error?.description ?? 'Razorpay refund failed.';
+      console.log('[refund] Razorpay refund failed (non-fatal):', refundError);
+    } else {
+      refundId = typeof refund.id === 'string' ? refund.id : '';
     }
 
-    refundId = typeof refund.id === 'string' ? refund.id : '';
     await adminClient
       .from('payments')
       .update({
-        status: 'refunded',
-        razorpay_refund_id: refundId,
-        refunded_at: new Date().toISOString(),
+        status: refundId ? 'refunded' : 'refund_failed',
+        razorpay_refund_id: refundId || null,
+        refunded_at: refundId ? new Date().toISOString() : null,
         payment_metadata: {
-          refund,
+          refund: refundId ? refund : null,
+          refund_error: refundError,
           refund_reason: 'Provider cancelled booking',
         },
       })
@@ -168,5 +174,5 @@ serve(async (req) => {
     read: false,
   });
 
-  return jsonResponse({ ok: true, refund_id: refundId || null });
+  return jsonResponse({ ok: true, refund_id: refundId || null, refund_error: refundError || null });
 });

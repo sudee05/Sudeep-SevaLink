@@ -219,21 +219,7 @@ export function LandingPage() {
                 className="h-80 w-full rounded-3xl object-cover sm:h-107.5 lg:h-130"
               />
             </div>
-            <div className="absolute -bottom-5 left-5 rounded-2xl border border-emerald-100 bg-white px-4 py-3 shadow-xl">
-              <div className="flex items-center gap-3">
-                <div className="rounded-xl bg-emerald-100 p-2 text-emerald-700">
-                  <ShieldCheck className="h-5 w-5" />
-                </div>
-                <div>
-                  <p className="text-sm font-semibold text-slate-900">Dual Vetting</p>
-                  <p className="text-xs text-slate-500">Verified pros and clients</p>
-                </div>
-              </div>
-            </div>
-            <div className="absolute right-3 top-24 rounded-2xl border border-orange-100 bg-white px-4 py-3 text-right shadow-lg">
-              <p className="text-lg font-bold text-slate-950">+45%</p>
-              <p className="text-xs text-slate-500">Provider revenue growth</p>
-            </div>
+           
           </div>
         </div>
       </section>
@@ -582,11 +568,6 @@ export function ServicesPage() {
   return (
     <motion.div {...fade}>
       <SectionHeader title="Services" subtitle="Browse service types available on SevaLink." />
-      <div className="mb-5 grid gap-3 lg:grid-cols-[1fr_2fr_160px]">
-        <Input placeholder="Search services" />
-        <LocationSelector className="lg:col-span-2" value={location} onChange={setLocation} />
-        <Button variant="outline">Filter</Button>
-      </div>
       <div className="mb-5 flex flex-wrap gap-2">
         <button
           type="button"
