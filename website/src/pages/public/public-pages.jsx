@@ -1,5 +1,5 @@
-﻿import { motion } from "framer-motion";
-import { useMemo, useState } from "react";
+import { motion, AnimatePresence } from "framer-motion";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import * as LucideIcons from "lucide-react";
 import {
@@ -23,6 +23,7 @@ import {
   useServiceQuery,
   useServicesQuery,
 } from "@/hooks/use-queries";
+import { supabase } from "@/lib/supabase";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -146,6 +147,125 @@ const qualitySteps = [
   },
 ];
 
+// ── Hero Carousel ──────────────────────────────────────────────────────────────
+
+function HeroCarousel({ fallbackSrc }) {
+  const [slides, setSlides] = useState([]);
+  const [active, setActive] = useState(0);
+  const [paused, setPaused] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const timerRef = useRef(null);
+
+  // Fetch carousel images from Supabase
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      setLoading(true);
+      try {
+        const { data, error } = await supabase
+          .from("hero_carousel")
+          .select("id, url, alt")
+          .order("display_order", { ascending: true });
+        if (!cancelled && data && !error) {
+          setSlides(data);
+        }
+      } catch (_) {
+        // silently fall back to static image
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, []);
+
+  const effectiveSlides = slides.length > 0
+    ? slides
+    : [{ id: "fallback", url: fallbackSrc, alt: "Professional consultation" }];
+
+  const prev = useCallback(() =>
+    setActive((i) => (i - 1 + effectiveSlides.length) % effectiveSlides.length),
+    [effectiveSlides.length]);
+
+  const next = useCallback(() =>
+    setActive((i) => (i + 1) % effectiveSlides.length),
+    [effectiveSlides.length]);
+
+  // Auto-advance
+  useEffect(() => {
+    if (paused || effectiveSlides.length <= 1) return;
+    timerRef.current = setInterval(next, 4000);
+    return () => clearInterval(timerRef.current);
+  }, [paused, next, effectiveSlides.length]);
+
+  return (
+    <div
+      className="relative"
+      onMouseEnter={() => setPaused(true)}
+      onMouseLeave={() => setPaused(false)}>
+      {/* Main frame */}
+      <div className="overflow-hidden rounded-4xl border border-blue-100 bg-white p-2 shadow-[0_28px_80px_rgba(44,77,193,0.18)]">
+        <div className="relative h-80 w-full rounded-3xl sm:h-[430px] lg:h-[520px]">
+          <AnimatePresence initial={false} mode="wait">
+            <motion.img
+              key={effectiveSlides[active]?.id ?? active}
+              src={effectiveSlides[active]?.url}
+              alt={effectiveSlides[active]?.alt ?? "Hero image"}
+              className="absolute inset-0 h-full w-full rounded-3xl object-cover"
+              initial={{ opacity: 0, scale: 1.04 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.97 }}
+              transition={{ duration: 0.55, ease: "easeInOut" }}
+            />
+          </AnimatePresence>
+
+          {/* Gradient overlay for controls */}
+          {effectiveSlides.length > 1 && (
+            <div className="absolute inset-0 rounded-3xl bg-linear-to-t from-black/30 via-transparent to-transparent" />
+          )}
+        </div>
+      </div>
+
+      {/* Prev / Next arrows — only if multiple slides */}
+      {effectiveSlides.length > 1 && (
+        <>
+          <button
+            onClick={prev}
+            aria-label="Previous slide"
+            className="absolute left-4 top-1/2 z-10 -translate-y-1/2 rounded-full bg-white/80 p-2 shadow-lg backdrop-blur-sm transition hover:bg-white hover:scale-110 active:scale-95">
+            <svg className="h-5 w-5 text-slate-700" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
+            </svg>
+          </button>
+          <button
+            onClick={next}
+            aria-label="Next slide"
+            className="absolute right-4 top-1/2 z-10 -translate-y-1/2 rounded-full bg-white/80 p-2 shadow-lg backdrop-blur-sm transition hover:bg-white hover:scale-110 active:scale-95">
+            <svg className="h-5 w-5 text-slate-700" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
+            </svg>
+          </button>
+
+          {/* Dot navigation */}
+          <div className="absolute bottom-5 left-1/2 z-10 flex -translate-x-1/2 gap-2">
+            {effectiveSlides.map((_, i) => (
+              <button
+                key={i}
+                onClick={() => setActive(i)}
+                aria-label={`Go to slide ${i + 1}`}
+                className={`rounded-full transition-all duration-300 ${
+                  i === active
+                    ? "w-6 h-2.5 bg-white shadow"
+                    : "w-2.5 h-2.5 bg-white/50 hover:bg-white/80"
+                }`}
+              />
+            ))}
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
+
 export function LandingPage() {
   const [location, setLocation] = useState("");
 
@@ -171,23 +291,7 @@ export function LandingPage() {
                 is the bridge to excellence and professional freedom.
               </p>
             </div>
-            <div className="grid gap-3 rounded-3xl border border-blue-100 bg-white p-3 shadow-[0_20px_60px_rgba(59,91,219,0.12)] sm:grid-cols-[1fr_1fr_146px]">
-              <div className="flex items-center gap-3 rounded-2xl border border-slate-100 px-4 py-3 text-slate-500">
-                <Search className="h-4 w-4 text-blue-700" />
-                <Input
-                  className="h-auto border-0 bg-transparent p-0 shadow-none focus-visible:ring-0"
-                  placeholder="Service needed"
-                />
-              </div>
-              <div className="rounded-2xl border border-slate-100 px-1 py-1">
-                <LocationSelector value={location} onChange={setLocation} />
-              </div>
-              <Link to="/register">
-                <Button className="h-full rounded-2xl bg-blue-700 px-6 text-white hover:bg-blue-800">
-                  Get Started
-                </Button>
-              </Link>
-            </div>
+         
             <div className="flex flex-wrap items-center gap-6">
               <div className="flex items-center gap-3">
                 <div className="flex -space-x-3">
@@ -211,16 +315,8 @@ export function LandingPage() {
             </div>
           </div>
 
-          <div className="relative">
-            <div className="overflow-hidden rounded-4xl border border-blue-100 bg-white p-2 shadow-[0_28px_80px_rgba(44,77,193,0.18)]">
-              <img
-                src={heroConsultation}
-                alt="Professional consultation"
-                className="h-80 w-full rounded-3xl object-cover sm:h-107.5 lg:h-130"
-              />
-            </div>
-           
-          </div>
+          <HeroCarousel fallbackSrc={heroConsultation} />
+
         </div>
       </section>
 

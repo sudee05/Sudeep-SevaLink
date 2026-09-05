@@ -25,7 +25,7 @@ import {
 } from "@/store/adminSlice";
 import { formatCurrency, formatDate } from "@/utils/format";
 import { supabase } from "@/lib/supabase";
-import { Bell, CheckCircle2, Clock, Pencil, Trash2, Plus, ShieldCheck, Wrench, X } from "lucide-react";
+import { Bell, CheckCircle2, Clock, Image, Pencil, Plus, ShieldCheck, Trash2, Upload, Wrench, X } from "lucide-react";
 
 const fade = {
   initial: { opacity: 0, y: 10 },
@@ -1361,6 +1361,183 @@ export function AdminNotificationsPage() {
               </div>
             )}
           </div>
+        </div>
+      )}
+    </motion.div>
+  );
+}
+
+// ── Admin Hero Carousel ───────────────────────────────────────────────────────
+
+export function AdminHeroCarouselPage() {
+  const [slides, setSlides] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [uploading, setUploading] = useState(false);
+  const [deletingId, setDeletingId] = useState(null);
+  const [error, setError] = useState("");
+  const [altText, setAltText] = useState("");
+  const [order, setOrder] = useState(0);
+  const fileInputRef = useCallback((node) => { if (node) node.value = ""; }, []);
+  const [fileInputKey, setFileInputKey] = useState(0);
+
+  const fetchSlides = useCallback(async () => {
+    setLoading(true);
+    setError("");
+    try {
+      const { data, err } = await supabase
+        .from("hero_carousel")
+        .select("*")
+        .order("display_order", { ascending: true });
+      setSlides(data || []);
+      if (err) setError(err.message);
+    } catch (e) {
+      setError(e.message);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => { fetchSlides(); }, [fetchSlides]);
+
+  async function handleUpload(e) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setUploading(true);
+    setError("");
+    try {
+      const ext = file.name.split(".").pop();
+      const fileName = `${Date.now()}_${Math.random().toString(36).slice(2)}.${ext}`;
+      const { error: upErr } = await supabase.storage
+        .from("hero-carousel")
+        .upload(fileName, file, { cacheControl: "3600", upsert: false });
+      if (upErr) throw upErr;
+
+      const { data: urlData } = supabase.storage
+        .from("hero-carousel")
+        .getPublicUrl(fileName);
+
+      const { error: insErr } = await supabase.from("hero_carousel").insert({
+        url: urlData.publicUrl,
+        alt: altText.trim() || "SevaLink hero image",
+        display_order: Number(order) || 0,
+      });
+      if (insErr) throw insErr;
+
+      setAltText("");
+      setOrder(0);
+      setFileInputKey((k) => k + 1); // resets file input
+      await fetchSlides();
+    } catch (err) {
+      setError(err.message || "Upload failed.");
+    } finally {
+      setUploading(false);
+    }
+  }
+
+  async function handleDelete(slide) {
+    if (!window.confirm(`Delete image "${slide.alt}"? This cannot be undone.`)) return;
+    setDeletingId(slide.id);
+    try {
+      // Extract file path from public URL
+      const urlParts = slide.url.split("/hero-carousel/");
+      const filePath = urlParts[1];
+      if (filePath) {
+        await supabase.storage.from("hero-carousel").remove([filePath]);
+      }
+      await supabase.from("hero_carousel").delete().eq("id", slide.id);
+      await fetchSlides();
+    } catch (err) {
+      setError(err.message || "Delete failed.");
+    } finally {
+      setDeletingId(null);
+    }
+  }
+
+  return (
+    <motion.div className="space-y-6" {...fade}>
+      <SectionHeader
+        title="Hero Carousel"
+        subtitle="Manage the images displayed in the landing page hero section."
+      />
+
+      {/* Upload Panel */}
+      <Card className="space-y-4">
+        <div className="flex items-center gap-2 mb-1">
+          <Upload className="h-4 w-4 text-primary" />
+          <h2 className="text-sm font-semibold">Upload New Image</h2>
+        </div>
+        <div className="grid gap-3 sm:grid-cols-[1fr_auto_auto]">
+          <label className="flex cursor-pointer items-center gap-3 rounded-xl border-2 border-dashed border-border bg-muted/30 px-4 py-3 text-sm text-muted-foreground transition hover:border-primary hover:bg-primary/5">
+            <Image className="h-5 w-5 shrink-0 text-primary" />
+            <span className="truncate">{uploading ? "Uploading…" : "Click to choose image (JPG, PNG, WebP)"}</span>
+            <input
+              key={fileInputKey}
+              type="file"
+              accept="image/*"
+              className="sr-only"
+              disabled={uploading}
+              onChange={handleUpload}
+            />
+          </label>
+          <Input
+            placeholder="Alt text"
+            value={altText}
+            onChange={(e) => setAltText(e.target.value)}
+            className="w-44"
+          />
+          <Input
+            type="number"
+            placeholder="Order"
+            value={order}
+            onChange={(e) => setOrder(e.target.value)}
+            className="w-24"
+          />
+        </div>
+        {error && <p className="text-sm text-red-500">{error}</p>}
+        <p className="text-xs text-muted-foreground">
+          <strong>Order</strong> determines the display sequence (lower = first). <strong>Alt text</strong> is shown to screen readers.
+        </p>
+      </Card>
+
+      {/* Current Slides Grid */}
+      {loading ? (
+        <LoadingGrid count={3} />
+      ) : slides.length === 0 ? (
+        <div className="rounded-2xl border border-dashed border-border py-16 text-center text-muted-foreground">
+          <Image className="mx-auto mb-3 h-10 w-10 opacity-30" />
+          <p className="text-sm">No carousel images yet. Upload one above.</p>
+        </div>
+      ) : (
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          {slides.map((slide) => (
+            <Card key={slide.id} className="overflow-hidden p-0">
+              <div className="relative h-44 bg-muted">
+                <img
+                  src={slide.url}
+                  alt={slide.alt}
+                  className="h-full w-full object-cover"
+                />
+                <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent" />
+                <span className="absolute left-3 bottom-3 rounded-full bg-black/50 px-2 py-0.5 text-xs text-white backdrop-blur-sm">
+                  Order: {slide.display_order}
+                </span>
+              </div>
+              <div className="flex items-center justify-between gap-3 p-3">
+                <p className="truncate text-sm font-medium text-foreground">{slide.alt}</p>
+                <Button
+                  size="sm"
+                  variant="danger"
+                  disabled={deletingId === slide.id}
+                  onClick={() => handleDelete(slide)}>
+                  {deletingId === slide.id ? (
+                    "…"
+                  ) : (
+                    <><Trash2 className="mr-1 h-3.5 w-3.5" /> Delete</>
+                  )}
+                </Button>
+              </div>
+            </Card>
+          ))}
         </div>
       )}
     </motion.div>

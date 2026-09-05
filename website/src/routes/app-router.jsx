@@ -51,6 +51,7 @@ import {
   AdminBookingsPage,
   AdminCategoriesPage,
   AdminDashboardPage,
+  AdminHeroCarouselPage,
   AdminProvidersPage,
   AdminReportsPage,
   AdminSectionPage,
@@ -162,6 +163,7 @@ export function AppRouter() {
         <Route path="services" element={<AdminServicesPage />} />
         <Route path="bookings" element={<AdminBookingsPage />} />
         <Route path="providers" element={<AdminProvidersPage />} />
+        <Route path="hero-carousel" element={<AdminHeroCarouselPage />} />
         <Route path=":section" element={<AdminSectionPage />} />
       </Route>
 
