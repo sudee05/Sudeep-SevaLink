@@ -1,4 +1,4 @@
-import { motion } from "framer-motion";
+﻿import { motion } from "framer-motion";
 import { useMemo, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import * as LucideIcons from "lucide-react";
@@ -617,50 +617,231 @@ export function ServicesPage() {
   );
 }
 
+
 export function ProvidersPage() {
-  const { data, isLoading } = useProvidersQuery();
-  const [location, setLocation] = useState("");
-  const [search, setSearch] = useState("");
-  const filteredProviders = (data || []).filter((provider) => {
-    const q = search.toLowerCase();
-    const matchesSearch =
-      !q ||
-      (provider.business_name || provider.name || "").toLowerCase().includes(q) ||
-      (provider.services_label || provider.service_names?.join(" ") || "").toLowerCase().includes(q);
-    const matchesLocation = !location || (provider.location || "").toLowerCase().includes(location.toLowerCase());
-    return matchesSearch && matchesLocation;
-  });
+  const steps = [
+    {
+      number: "01",
+      title: "Register",
+      description:
+        "Create your SevaLink provider account by entering your basic personal and business details.",
+    },
+    {
+      number: "02",
+      title: "Create Your Profile",
+      description:
+        "Add your service category, experience, location, pricing, contact details and other information.",
+    },
+    {
+      number: "03",
+      title: "Submit for Verification",
+      description:
+        "Submit the required details and certificates for verification by the SevaLink administration.",
+    },
+    {
+      number: "04",
+      title: "Get Approved",
+      description:
+        "After successful verification, your provider account will be approved by the administrator.",
+    },
+    {
+      number: "05",
+      title: "Receive Service Requests",
+      description:
+        "Customers can discover your services and send booking requests based on their requirements.",
+    },
+    {
+      number: "06",
+      title: "Accept & Provide Service",
+      description:
+        "Review requests, accept suitable bookings and provide the requested service to the customer.",
+    },
+    {
+      number: "07",
+      title: "Complete Booking",
+      description:
+        "Update the booking status after completing the service and keep track of your service history.",
+    },
+    {
+      number: "08",
+      title: "Build Your Reputation",
+      description:
+        "Customers can rate and review your service, helping you build trust and attract more customers.",
+    },
+  ];
 
   return (
-    <motion.div {...fade}>
+    <motion.div {...fade} className="space-y-8">
+
+      {/* Header */}
       <SectionHeader
-        title="Service Providers"
-        subtitle="Browse provider profiles, ratings, certificates and recent work."
+        title="Welcome to SevaLink"
+        subtitle="Become a trusted service provider and connect with customers who need your services."
       />
-      <div className="mb-5 grid gap-3 lg:grid-cols-[1fr_2fr_160px]">
-        <Input placeholder="Search providers" value={search} onChange={(event) => setSearch(event.target.value)} />
-        <LocationSelector value={location} onChange={setLocation} />
-        <Button
-          variant="outline"
-          onClick={() => {
-            setSearch("");
-            setLocation("");
-          }}>
-          Reset
-        </Button>
+
+      {/* Introduction */}
+      <div className="rounded-2xl border bg-card p-6 shadow-sm">
+        <h2 className="text-2xl font-bold">
+          How SevaLink Works for Providers
+        </h2>
+
+        <p className="mt-3 max-w-3xl text-sm leading-6 text-muted-foreground">
+          SevaLink connects service providers with customers looking for
+          reliable services. As a provider, you can create your profile,
+          submit your details for verification, receive service requests,
+          manage bookings and build your reputation through customer reviews.
+        </p>
       </div>
-      {isLoading ? (
-        <LoadingGrid />
-      ) : (
-        <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
-          {filteredProviders.map((provider) => (
-            <ProviderCard key={provider.id} provider={provider} />
+
+      {/* Working Flow */}
+      <div>
+        <div className="mb-6">
+          <h2 className="text-xl font-bold">
+            Provider Working Flow
+          </h2>
+
+          <p className="mt-1 text-sm text-muted-foreground">
+            Follow these steps to start providing services through SevaLink.
+          </p>
+        </div>
+
+        <div className="grid gap-5 md:grid-cols-2">
+          {steps.map((step, index) => (
+            <motion.div
+              key={step.number}
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: index * 0.08 }}
+              whileHover={{ y: -4 }}
+              className="relative rounded-2xl border bg-card p-6 shadow-sm"
+            >
+              {/* Step Number */}
+              <div className="mb-4 flex items-center gap-4">
+                <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-primary text-sm font-bold !text-white">
+                  {step.number}
+                </div>
+
+                <h3 className="text-lg font-semibold">
+                  {step.title}
+                </h3>
+              </div>
+
+              <p className="text-sm leading-6 text-muted-foreground">
+                {step.description}
+              </p>
+            </motion.div>
           ))}
         </div>
-      )}
+      </div>
+
+      {/* Simple Flow */}
+      <div className="rounded-2xl border bg-muted/30 p-6">
+        <h2 className="text-xl font-bold">
+          SevaLink Provider Journey
+        </h2>
+
+        <div className="mt-6 flex flex-wrap items-center justify-center gap-3">
+          {[
+            "Register",
+            "Profile",
+            "Verification",
+            "Approval",
+            "Service Request",
+            "Accept",
+            "Complete",
+            "Review",
+          ].map((item, index, array) => (
+            <div
+              key={item}
+              className="flex items-center gap-3"
+            >
+              <div className="rounded-xl border bg-card px-4 py-3 text-sm font-medium shadow-sm">
+                {item}
+              </div>
+
+              {index < array.length - 1 && (
+                <span className="text-lg text-muted-foreground">
+                  →
+                </span>
+              )}
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* Provider Benefits */}
+      <div className="rounded-2xl border bg-card p-6 shadow-sm">
+        <h2 className="text-xl font-bold">
+          Why Become a SevaLink Provider?
+        </h2>
+
+        <div className="mt-5 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+          <Benefit
+            title="Reach Customers"
+            description="Get discovered by customers looking for your services."
+          />
+
+          <Benefit
+            title="Manage Bookings"
+            description="Keep track of service requests and booking status."
+          />
+
+          <Benefit
+            title="Build Trust"
+            description="Receive ratings and reviews from your customers."
+          />
+
+          <Benefit
+            title="Grow Your Business"
+            description="Expand your customer base through SevaLink."
+          />
+        </div>
+      </div>
+
+      {/* Call to Action */}
+<div className="rounded-2xl bg-primary p-8 text-center">
+  <h2 className="text-2xl font-bold !text-white">
+    Ready to Join SevaLink?
+  </h2>
+
+  <p className="mx-auto mt-2 max-w-xl text-sm !text-white">
+    Register as a service provider and start connecting with customers
+    through SevaLink.
+  </p>
+
+  <Button
+    className="mt-5"
+    variant="secondary"
+    onClick={() => {
+      window.location.href = "/provider-register";
+    }}
+  >
+    Register as Provider
+  </Button>
+</div>
+
     </motion.div>
   );
 }
+
+
+/* Benefit Component */
+
+function Benefit({ title, description }) {
+  return (
+    <div className="rounded-xl border p-4">
+      <h3 className="font-semibold">
+        {title}
+      </h3>
+
+      <p className="mt-2 text-sm text-muted-foreground">
+        {description}
+      </p>
+    </div>
+  );
+}
+
+
 
 export function ServiceDetailsPage() {
   const { id } = useParams();
