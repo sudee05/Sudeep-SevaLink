@@ -13,8 +13,10 @@ import {
   MapPin,
   Paperclip,
   Send,
+  Search,
   Sparkles,
   X,
+  icons, CircleHelp
 } from "lucide-react";
 import {
   useBookingsQuery,
@@ -344,12 +346,22 @@ export function CustomerDashboardPage() {
   const [bookingProvider, setBookingProvider] = useState(null);
   const [bookingForm, setBookingForm] = useState({ booking_date: "", booking_time: "", address: "", notes: "" });
   const [isProcessingPayment, setIsProcessingPayment] = useState(false);
+  const [serviceSearch, setServiceSearch] = useState("");
   const providers = useProvidersByServiceQuery(selectedService?.id);
 
   const filteredServices = useMemo(() => {
-    if (selectedCategoryId === "all") return services.data || [];
-    return (services.data || []).filter((service) => String(service.category_id) === String(selectedCategoryId));
-  }, [services.data, selectedCategoryId]);
+    const byCategory =
+      selectedCategoryId === "all"
+        ? services.data || []
+        : (services.data || []).filter((service) => String(service.category_id) === String(selectedCategoryId));
+    if (!serviceSearch.trim()) return byCategory;
+    const q = serviceSearch.toLowerCase();
+    return byCategory.filter(
+      (service) =>
+        service.name?.toLowerCase().includes(q) ||
+        service.description?.toLowerCase().includes(q),
+    );
+  }, [services.data, selectedCategoryId, serviceSearch]);
 
   const visibleProviders = useMemo(() => {
     const priceLimit = Number(maxPrice);
@@ -477,7 +489,7 @@ export function CustomerDashboardPage() {
 
       <Card>
         <SectionHeader title="Choose a Service" subtitle="Start by selecting what you need." />
-        
+
         {services.isLoading || categories.isLoading ? (
           <LoadingGrid count={3} />
         ) : selectedService ? (
@@ -506,6 +518,17 @@ export function CustomerDashboardPage() {
           </div>
         ) : (
           <div className="space-y-4">
+            {/* Search bar */}
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+              <input
+                type="text"
+                placeholder="Search services..."
+                value={serviceSearch}
+                onChange={(e) => setServiceSearch(e.target.value)}
+                className="w-full rounded-xl border border-border bg-background py-2 pl-9 pr-4 text-sm outline-none transition focus:border-primary focus:ring-2 focus:ring-primary/20"
+              />
+            </div>
             <div className="flex flex-wrap gap-2">
               <button
                 type="button"
@@ -526,7 +549,8 @@ export function CustomerDashboardPage() {
                     setSelectedService(null);
                     setBookingProvider(null);
                   }}
-                  className={`rounded-full border px-4 py-2 text-sm font-medium transition ${selectedCategoryId === category.id ? "border-primary bg-primary text-white" : "border-border bg-card text-foreground hover:border-primary"}`}>
+                  className={`inline-flex items-center gap-1.5 rounded-full border px-4 py-2 text-sm font-medium transition ${selectedCategoryId === category.id ? "border-primary bg-primary text-white" : "border-border bg-card text-foreground hover:border-primary"}`}>
+                  {(() => { const Icon = icons[category.icon] ?? CircleHelp; return <Icon className="h-4 w-4" />; })()}
                   {category.name}
                 </button>
               ))}
@@ -539,15 +563,21 @@ export function CustomerDashboardPage() {
                   onClick={() => {
                     setSelectedService(service);
                     setBookingProvider(null);
+                    setServiceSearch("");
                   }}
-                  className="rounded-xl border border-border p-4 text-left opacity-100 transition duration-200 hover:border-primary hover:shadow-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20">
-                  <p className="text-xs uppercase tracking-wide text-muted-foreground">
-                    {service.category_name || service.category?.name || "Category"}
-                  </p>
-                  <p className="font-semibold">{service.name}</p>
-                  <p className="mt-1 line-clamp-2 text-sm text-muted-foreground">
-                    {service.description || "Available service"}
-                  </p>
+                  className=" flex justify-between rounded-xl border border-border p-4 text-left opacity-100 transition duration-200 hover:border-primary hover:shadow-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20">
+                  <div>
+                    <p className="text-xs uppercase tracking-wide text-muted-foreground">
+                      {service.category_name || service.category?.name || "Category"}
+                    </p>
+                    <p className="font-semibold">{service.name}</p>
+                    <p className="mt-1 line-clamp-2 text-sm text-muted-foreground">
+                      {service.description || "Available service"}
+                    </p>
+                  </div>
+                  <div>
+                    {(() => { const Icon = icons[service.icon] ?? CircleHelp; return <Icon className="h-12 w-12" />; })()}
+                  </div>
                 </button>
               ))}
             </div>
@@ -592,14 +622,23 @@ export function CustomerDashboardPage() {
                 return (
                   <Card key={provider.id} className="space-y-3">
                     <div>
-                      <h3 className="font-semibold">{provider.business_name || provider.name}</h3>
-                      <p className="text-sm text-muted-foreground">
-                        {provider.location || "Location not added"} | Rating {Number(provider.rating || 0).toFixed(1)}
-                      </p>
+                      <div className="flex items-center justify-between">
+                        <div>
+
+                          <h3 className="font-semibold">{provider.business_name || provider.name}</h3>
+                          <p className="text-sm text-muted-foreground">
+                            {provider.location || "Location not added"} | Rating {Number(provider.rating || 0).toFixed(1)}
+                          </p>
+                          <p className="text-sm text-muted-foreground">
+                            {provider.about || provider.description || "Provider details will appear here."}
+                          </p>
+                        </div>
+                        <div>
+                          <img src={provider.image_url} className="h-16 w-16 rounded-full" />
+                        </div>
+                      </div>
                     </div>
-                    <p className="text-sm text-muted-foreground">
-                      {provider.about || provider.description || "Provider details will appear here."}
-                    </p>
+
                     <div className="flex flex-wrap items-center justify-between gap-2">
                       <p className="text-sm font-semibold">
                         {Number(providerPrice || 0) ? formatCurrency(providerPrice) : "Price TBD"}

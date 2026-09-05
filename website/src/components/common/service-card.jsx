@@ -3,7 +3,6 @@ import { Card } from "@/components/ui/card";
 import { icons, CircleHelp } from "lucide-react";
 
 export function ServiceCard({ service }) {
-  console.log(service);
   const iconName = service.icon?.trim();
   const Icon = icons[iconName] ?? CircleHelp;
 
