@@ -84,111 +84,6 @@ function getTodayDateInputValue() {
   return new Date().toISOString().split("T")[0];
 }
 
-function BookingModal({
-  bookingForm,
-  bookingMutation,
-  bookingProvider,
-  isProcessingPayment,
-  onClose,
-  onSubmit,
-  selectedService,
-  setBookingForm,
-}) {
-  if (!bookingProvider) return null;
-
-  const providerName = bookingProvider.business_name || bookingProvider.name || "Provider";
-  const providerPrice = bookingProvider.price || bookingProvider.starting_price || bookingProvider.base_price;
-  const minBookingDate = getTodayDateInputValue();
-  const { totalAmount, depositAmount, balanceAmount } = getBookingPricing(bookingProvider);
-  const hasFixedPrice = Number.isFinite(totalAmount) && totalAmount > 0;
-
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/55 px-4 py-6 backdrop-blur-sm">
-      <div className="w-full max-w-2xl rounded-2xl border border-border bg-card p-5 shadow-2xl">
-        <div className="mb-5 flex items-start justify-between gap-4">
-          <div>
-            <p className="text-sm font-medium text-primary">{selectedService?.name}</p>
-            <h2 className="text-xl font-bold">Book {providerName}</h2>
-            <p className="mt-1 text-sm text-muted-foreground">
-              {Number(providerPrice || 0) ? formatCurrency(providerPrice) : "Price TBD"} |{" "}
-              {bookingProvider.location || "Location not added"}
-            </p>
-          </div>
-          <Button type="button" variant="ghost" size="icon" onClick={onClose} aria-label="Close booking form">
-            <X className="h-5 w-5" />
-          </Button>
-        </div>
-        <form className="grid gap-3 md:grid-cols-2" onSubmit={onSubmit}>
-          <label className="space-y-1 md:col-span-1">
-            <span className="text-sm font-medium text-foreground">Booking date</span>
-            <DatePicker
-              value={bookingForm.booking_date}
-              min={minBookingDate}
-              onChange={(date) => setBookingForm((form) => ({ ...form, booking_date: date }))}
-            />
-            <p className="text-xs text-muted-foreground">Choose today or a future date. Past dates are disabled.</p>
-          </label>
-          <label className="space-y-1 md:col-span-1">
-            <span className="text-sm font-medium text-foreground">Booking time</span>
-            <TimePicker
-              value={bookingForm.booking_time}
-              onChange={(time) => setBookingForm((form) => ({ ...form, booking_time: time }))}
-            />
-          </label>
-          <Input
-            required
-            placeholder="Service address"
-            className="md:col-span-2"
-            value={bookingForm.address}
-            onChange={(event) => setBookingForm((form) => ({ ...form, address: event.target.value }))}
-          />
-          <Textarea
-            placeholder="Special instructions"
-            className="md:col-span-2"
-            value={bookingForm.notes}
-            onChange={(event) => setBookingForm((form) => ({ ...form, notes: event.target.value }))}
-          />
-          <div className="rounded-xl border border-border bg-muted/30 p-4 text-sm md:col-span-2">
-            <div className="flex items-center gap-2 font-semibold text-foreground">
-              <CreditCard className="h-4 w-4" />
-              Payment summary
-            </div>
-            {hasFixedPrice ? (
-              <div className="mt-3 grid gap-2 text-muted-foreground sm:grid-cols-3">
-                <div className="rounded-lg bg-card px-3 py-2">
-                  <p className="text-xs uppercase tracking-wide">Total</p>
-                  <p className="text-base font-semibold text-foreground">{formatCurrency(totalAmount)}</p>
-                </div>
-                <div className="rounded-lg bg-card px-3 py-2">
-                  <p className="text-xs uppercase tracking-wide">Pay now</p>
-                  <p className="text-base font-semibold text-foreground">{formatCurrency(depositAmount)}</p>
-                  <p className="text-xs text-muted-foreground">15% booking deposit</p>
-                </div>
-                <div className="rounded-lg bg-card px-3 py-2">
-                  <p className="text-xs uppercase tracking-wide">Pay later</p>
-                  <p className="text-base font-semibold text-foreground">{formatCurrency(balanceAmount)}</p>
-                  <p className="text-xs text-muted-foreground">Paid directly to the provider after service</p>
-                </div>
-              </div>
-            ) : (
-              <p className="mt-2 text-muted-foreground">
-                This provider does not have a fixed price yet, so deposit payment is unavailable.
-              </p>
-            )}
-          </div>
-          <div className="flex flex-wrap gap-2 md:col-span-2">
-            <Button type="submit" disabled={bookingMutation.isPending || isProcessingPayment || !hasFixedPrice}>
-              {isProcessingPayment ? "Opening payment..." : bookingMutation.isPending ? "Booking..." : "Pay 15% & Book"}
-            </Button>
-            <Button type="button" variant="outline" onClick={onClose}>
-              Cancel
-            </Button>
-          </div>
-        </form>
-      </div>
-    </div>
-  );
-}
 
 function BookingChatPanel({ booking, userId }) {
   const queryClient = useQueryClient();
@@ -926,9 +821,6 @@ function ProfileFormCard({ initialProfileForm, onLogout, onSubmitProfile, profil
           <Button type="submit" disabled={profileMutation.isPending}>
             {profileMutation.isPending ? "Saving..." : "Save Profile"}
           </Button>
-          <Button type="button" variant="outline" onClick={onLogout}>
-            Logout
-          </Button>
         </div>
       </form>
     </Card>
@@ -1052,7 +944,8 @@ export function ProviderDetails() {
     );
 
   const rating = Number(provider.rating || 0);
-  const services = provider.services || [];
+  // service_rows is populated by attachProviderServices: [{ service_id, name, price }]
+  const services = provider.service_rows || [];
   const certificates = Array.isArray(provider.certificates) ? provider.certificates : [];
 
   return (
@@ -1119,24 +1012,63 @@ export function ProviderDetails() {
       </Card>
 
       {/* Services offered */}
-      {services.length > 0 && (
-        <Card className="space-y-3">
+      <Card className="space-y-4">
+        <div className="flex items-center justify-between">
           <h3 className="font-semibold">Services Offered</h3>
-          <div className="grid gap-2 sm:grid-cols-2">
-            {services.map((svc) => (
-              <div key={svc.id || svc.name} className="flex items-center justify-between rounded-xl border border-border px-4 py-3">
-                <div>
-                  <p className="text-sm font-medium">{svc.service_name || svc.name}</p>
-                  {svc.description && <p className="mt-0.5 text-xs text-muted-foreground">{svc.description}</p>}
+          {services.length > 0 && (
+            <span className="text-xs text-muted-foreground">{services.length} service{services.length !== 1 ? "s" : ""}</span>
+          )}
+        </div>
+        {services.length === 0 ? (
+          <p className="text-sm text-muted-foreground">No services listed by this provider yet.</p>
+        ) : (
+          <div className="grid gap-3 sm:grid-cols-2">
+            {services.map((svc) => {
+              const svcName = svc.service_name || svc.name || "Service";
+              const svcPrice = Number(svc.price || 0);
+              return (
+                <div
+                  key={svc.id || svc.name}
+                  className="flex flex-col gap-3 rounded-xl border border-border bg-card p-4 shadow-sm transition hover:border-primary/40 hover:shadow-md">
+                  {/* Service info */}
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="space-y-0.5">
+                      <p className="text-sm font-semibold leading-snug">{svcName}</p>
+                      {svc.description && (
+                        <p className="text-xs text-muted-foreground leading-relaxed">{svc.description}</p>
+                      )}
+                    </div>
+                    {svcPrice > 0 && (
+                      <span className="shrink-0 rounded-full bg-primary/10 px-2.5 py-0.5 text-xs font-bold text-primary">
+                        {formatCurrency(svcPrice)}
+                      </span>
+                    )}
+                  </div>
+                  {/* Book button */}
+                  <Button
+                    size="sm"
+                    className="w-full"
+                    onClick={() =>
+                      navigate("/customer/book-provider", {
+                        state: {
+                          provider,
+                          service: {
+                            id: svc.service_id || svc.id || null,
+                            name: svcName,
+                            price: svcPrice || undefined,
+                            description: svc.description || "",
+                          },
+                        },
+                      })
+                    }>
+                    Book this service
+                  </Button>
                 </div>
-                {svc.price > 0 && (
-                  <span className="shrink-0 text-sm font-semibold text-primary">{formatCurrency(svc.price)}</span>
-                )}
-              </div>
-            ))}
+              );
+            })}
           </div>
-        </Card>
-      )}
+        )}
+      </Card>
 
       {/* Customer reviews */}
       <Card className="space-y-4">
@@ -1162,9 +1094,6 @@ export function ProviderDetails() {
       </Card>
 
       <div className="flex justify-end gap-2">
-        <Button className="rounded-lg" onClick={() => navigate("/customer/book-provider", { state: { provider } })}>
-          Book Now
-        </Button>
         <Button variant="outline" onClick={() => navigate(-1)}>← Go Back</Button>
       </div>
     </motion.div>
@@ -1207,8 +1136,14 @@ export function BookProviderPage() {
   }
 
   const providerName = bookingProvider.business_name || bookingProvider.name || "Provider";
-  const providerPrice = bookingProvider.price || bookingProvider.starting_price || bookingProvider.base_price;
-  const { totalAmount, depositAmount, balanceAmount } = getBookingPricing(bookingProvider);
+  // Prefer the individual service's price; fall back to provider-level price
+  const servicePriceOverride = selectedService?.price && Number(selectedService.price) > 0
+    ? Number(selectedService.price)
+    : null;
+  const { totalAmount: baseTotalAmount, depositAmount: baseDeposit, balanceAmount: baseBalance } = getBookingPricing(bookingProvider);
+  const totalAmount = servicePriceOverride ?? baseTotalAmount;
+  const depositAmount = Math.max(1, Math.round(totalAmount * 0.15));
+  const balanceAmount = Math.max(totalAmount - depositAmount, 0);
   const hasFixedPrice = Number.isFinite(totalAmount) && totalAmount > 0;
   const minBookingDate = getTodayDateInputValue();
 
@@ -1300,7 +1235,7 @@ export function BookProviderPage() {
           <div>
             <h2 className="text-lg font-bold">{providerName}</h2>
             <p className="text-sm text-muted-foreground">
-              {Number(providerPrice || 0) ? formatCurrency(providerPrice) : "Price TBD"} &nbsp;|&nbsp;
+              {totalAmount > 0 ? formatCurrency(totalAmount) : "Price TBD"} &nbsp;|&nbsp;
               {bookingProvider.location || "Location not added"}
             </p>
             {selectedService && <p className="text-sm font-medium text-primary">{selectedService.name}</p>}

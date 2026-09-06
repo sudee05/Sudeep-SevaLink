@@ -25,7 +25,8 @@ import {
 } from "@/store/adminSlice";
 import { formatCurrency, formatDate } from "@/utils/format";
 import { supabase } from "@/lib/supabase";
-import { Bell, CheckCircle2, Clock, Image, Pencil, Plus, ShieldCheck, Trash2, Upload, Wrench, X } from "lucide-react";
+import { Bell, CheckCircle2, Clock, Image, Pencil, Plus, ShieldCheck, Trash2, Upload, Wrench, X, icons, CircleHelp
+} from "lucide-react";
 
 const fade = {
   initial: { opacity: 0, y: 10 },
@@ -608,6 +609,11 @@ export function AdminServicesPage() {
             <DataTable
               columns={[
                 {
+                  key:"Logo",
+                  label:"Logo",
+                  render: (row) => { const Icon = icons[row.icon] ?? CircleHelp; return <Icon className="h-8 w-8" />; },                                                    
+                },
+                {
                   key: "name",
                   label: "Service Name",
                   render: (row) => <span className="font-medium">{row.name}</span>,
@@ -1112,7 +1118,7 @@ export function AdminCategoriesPage() {
         <DataTable
           columns={[
             { key: "name", label: "Name", render: (row) => <span className="font-semibold">{row.name}</span> },
-            { key: "icon", label: "Icon Name", render: (row) => row.icon ? <code className="rounded bg-muted px-2 py-0.5 text-xs">{row.icon}</code> : <span className="text-muted-foreground">—</span> },
+            { key: "icon", label: "Icon", render: (row) => row.icon ? (() => { const Icon = icons[row.icon] ?? CircleHelp; return <Icon className="h-8 w-8 text-center" />;})() : <span className="text-muted-foreground">—</span> },
             { key: "description", label: "Description", render: (row) => row.description || "—" },
             { key: "created_at", label: "Created", render: (row) => formatDate(row.created_at) },
             {

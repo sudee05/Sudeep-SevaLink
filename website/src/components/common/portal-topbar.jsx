@@ -1,15 +1,15 @@
 import { useState } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
-import { Bell, CircleUser, Clock, ShieldCheck, Wrench, X } from 'lucide-react'
+import { Bell, CircleUser, Clock, LogOut, ShieldCheck, Wrench, X } from 'lucide-react'
 import { NavLink, useNavigate } from 'react-router-dom'
-import { useSelector } from 'react-redux'
+import { useDispatch, useSelector } from 'react-redux'
 import { ThemeToggle } from '@/components/common/theme-toggle'
 import { Button } from '@/components/ui/button'
 import { supabase } from '@/lib/supabase'
 import { Logo } from './logo'
 import { useAdminPendingItemsQuery, useNotificationsQuery } from '@/hooks/use-queries'
 import { useRealtimeNotifications } from '@/hooks/use-realtime'
-import { selectProfile } from '@/store/authSlice'
+import { selectProfile, signOut } from '@/store/authSlice'
 import { formatDate } from '@/utils/format'
 
 // ── Admin notification drawer ──────────────────────────────────
@@ -198,9 +198,10 @@ export function PortalTopbar({ title, nav = [], notificationPath, notificationCo
 
   useRealtimeNotifications(notificationUserId)
 
+  const dispatch = useDispatch()
+
   async function logout() {
-    const { error } = await supabase.auth.signOut()
-    if (error) throw new Error(error.message)
+    await dispatch(signOut())
   }
 
   return (
@@ -269,6 +270,15 @@ export function PortalTopbar({ title, nav = [], notificationPath, notificationCo
               >
                 <CircleUser className="h-5 w-5" />
               </NavLink>
+              <button
+                type="button"
+                onClick={logout}
+                title="Logout"
+                className="inline-flex h-10 w-10 items-center justify-center rounded-2xl border border-border bg-card text-muted-foreground transition hover:bg-red-50 hover:text-red-600 dark:hover:bg-red-900/20"
+                aria-label="Logout"
+              >
+                <LogOut className="h-4 w-4" />
+              </button>
             </>
           )}
 
