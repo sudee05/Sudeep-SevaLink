@@ -1,4 +1,4 @@
-import { motion, AnimatePresence } from "framer-motion";
+﻿import { motion, AnimatePresence } from "framer-motion";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import * as LucideIcons from "lucide-react";
@@ -671,26 +671,127 @@ export function ServicesPage() {
 
   return (
     <motion.div {...fade}>
-      <SectionHeader
+
+
+      {/* =====================================================
+          CUSTOMER WORKFLOW
+          ===================================================== */}
+      <section className="mb-5 mt-10 rounded-2xl border bg-card p-6 shadow-sm md:p-8">
+
+        <div className="text-center">
+          <p className="text-sm font-semibold uppercase tracking-[0.18em] text-primary">
+            Simple & Easy
+          </p>
+
+          <h2 className="mt-2 text-2xl font-bold text-foreground md:text-3xl">
+            How to Book a Service
+          </h2>
+
+          <p className="mx-auto mt-3 max-w-2xl text-sm leading-6 text-muted-foreground">
+            Getting the service you need is simple. Follow these four steps
+            to find a trusted provider and book your service.
+          </p>
+        </div>
+
+
+        {/* Workflow */}
+        <div className="relative mt-10">
+
+          {/* Connecting Line - Desktop */}
+          <div className="absolute left-[12%] right-[12%] top-6 hidden h-px bg-border md:block" />
+
+          <div className="relative grid gap-8 md:grid-cols-4">
+
+
+            {/* Step 1 */}
+            <div className="relative text-center">
+
+              <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-primary text-sm font-bold !text-white">
+                01
+              </div>
+
+              <h3 className="mt-4 font-semibold text-foreground">
+                Find a Service
+              </h3>
+
+              <p className="mt-2 text-sm leading-6 text-muted-foreground">
+                Browse services and use categories, location and filters
+                to find the service you need.
+              </p>
+
+            </div>
+
+
+            {/* Step 2 */}
+            <div className="relative text-center">
+
+              <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-primary text-sm font-bold !text-white">
+                02
+              </div>
+
+              <h3 className="mt-4 font-semibold text-foreground">
+                Choose a Provider
+              </h3>
+
+              <p className="mt-2 text-sm leading-6 text-muted-foreground">
+                Compare providers, check their information, verification
+                status and customer ratings.
+              </p>
+
+            </div>
+
+
+            {/* Step 3 */}
+            <div className="relative text-center">
+
+              <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-primary text-sm font-bold !text-white">
+                03
+              </div>
+
+              <h3 className="mt-4 font-semibold text-foreground">
+                Book the Service
+              </h3>
+
+              <p className="mt-2 text-sm leading-6 text-muted-foreground">
+                Select the provider, choose your requirements and submit
+                your booking request.
+              </p>
+
+            </div>
+
+
+            {/* Step 4 */}
+            <div className="relative text-center">
+
+              <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-primary text-sm font-bold !text-white">
+                04
+              </div>
+
+              <h3 className="mt-4 font-semibold text-foreground">
+                Get Your Service
+              </h3>
+
+              <p className="mt-2 text-sm leading-6 text-muted-foreground">
+                The provider accepts your request and delivers the
+                requested service.
+              </p>
+
+            </div>
+
+          </div>
+        </div>
+      </section>
+
+ <SectionHeader
         title="Services"
-        subtitle="Browse service types available on SevaLink."
+        subtitle="Find trusted service providers for your needs."
       />
 
-      <div className="mb-5 grid gap-3 lg:grid-cols-[1fr_2fr_160px]">
-        <Input placeholder="Search services" />
-
-        <LocationSelector
-          className="lg:col-span-2"
-          value={location}
-          onChange={setLocation}
-        />
-
-        <Button variant="outline">
-          Filter
-        </Button>
-      </div>
-
+      {/* =====================================================
+          CATEGORIES
+          ===================================================== */}
       <div className="mb-5 flex flex-wrap gap-2">
+
         <button
           type="button"
           onClick={() => setSelectedCategoryId("all")}
@@ -704,6 +805,7 @@ export function ServicesPage() {
         </button>
 
         {(categories.data || []).map((category) => (
+
           <button
             key={category.id}
             type="button"
@@ -716,49 +818,69 @@ export function ServicesPage() {
           >
             {category.name}
           </button>
+
         ))}
+
       </div>
 
+
+      {/* =====================================================
+          SERVICES
+          ===================================================== */}
       {isLoading || categories.isLoading ? (
+
         <LoadingGrid />
+
       ) : (
+
         <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+
           {filteredServices.map((service) => (
+
             <ServiceCard
               key={service.id}
               service={service}
             />
+
           ))}
+
         </div>
+
       )}
 
-      {/* =====================================================
-          HOW IT WORKS
-          ===================================================== */}
 
+      {/* =====================================================
+          HOW IT WORKS - DETAILED
+          ===================================================== */}
       <section
         id="how-it-works"
         className="mt-14 rounded-2xl border bg-card p-6 shadow-sm md:p-8"
       >
+
         <div className="text-center">
+
           <p className="text-sm font-semibold uppercase tracking-[0.18em] text-primary">
-            Simple Process
+            Customer Guide
           </p>
 
           <h2 className="mt-2 text-2xl font-bold text-foreground md:text-3xl">
-            How SevaLink Works
+            Understanding the Booking Process
           </h2>
 
           <p className="mx-auto mt-3 max-w-2xl text-sm leading-6 text-muted-foreground">
-            Find the service you need, choose a trusted provider, book the
-            service, and manage your booking through SevaLink.
+            SevaLink makes it easier to discover trusted professionals,
+            submit service requests and manage your bookings.
           </p>
+
         </div>
+
 
         <div className="mt-8 grid gap-5 md:grid-cols-3">
 
+
           {/* Step 1 */}
           <div className="rounded-2xl border bg-background p-6 text-center transition-shadow hover:shadow-md">
+
             <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-primary text-sm font-bold !text-white">
               01
             </div>
@@ -769,12 +891,15 @@ export function ServicesPage() {
 
             <p className="mt-2 text-sm leading-6 text-muted-foreground">
               Browse available services and use categories, location and
-              filters to find what you need.
+              filters to find the right service for your requirement.
             </p>
+
           </div>
+
 
           {/* Step 2 */}
           <div className="rounded-2xl border bg-background p-6 text-center transition-shadow hover:shadow-md">
+
             <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-primary text-sm font-bold !text-white">
               02
             </div>
@@ -787,10 +912,13 @@ export function ServicesPage() {
               View provider information, verification details, services and
               ratings before making your booking.
             </p>
+
           </div>
+
 
           {/* Step 3 */}
           <div className="rounded-2xl border bg-background p-6 text-center transition-shadow hover:shadow-md">
+
             <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-primary text-sm font-bold !text-white">
               03
             </div>
@@ -800,13 +928,16 @@ export function ServicesPage() {
             </h3>
 
             <p className="mt-2 text-sm leading-6 text-muted-foreground">
-              Submit your booking request, manage the booking and receive the
-              requested service from the provider.
+              Submit your booking request, manage the booking and receive
+              the requested service from the provider.
             </p>
+
           </div>
 
         </div>
+
       </section>
+
     </motion.div>
   );
 }
@@ -889,6 +1020,40 @@ export function ProvidersPage() {
     manage bookings and build your reputation through customer reviews.
   </p>
 </div>
+   {/* Simple Flow */}
+      <div className="rounded-2xl border bg-white p-6">
+        <h2 className="text-xl font-bold">
+          SevaLink Provider Journey
+        </h2>
+
+        <div className="mt-6 flex flex-wrap items-center justify-center gap-3">
+          {[
+            "Register",
+            "Profile",
+            "Verification",
+            "Approval",
+            "Service Request",
+            "Accept",
+            "Complete",
+            "Review",
+          ].map((item, index, array) => (
+            <div
+              key={item}
+              className="flex items-center gap-3"
+            >
+              <div className="rounded-xl border bg-primary text-white px-4 py-3 text-sm font-medium shadow-sm">
+                {item}
+              </div>
+
+              {index < array.length - 1 && (
+                <span className="text-lg text-muted-foreground">
+                  →
+                </span>
+              )}
+            </div>
+          ))}
+        </div>
+      </div>
 
       {/* Working Flow */}
       <div>
@@ -927,41 +1092,6 @@ export function ProvidersPage() {
                 {step.description}
               </p>
             </motion.div>
-          ))}
-        </div>
-      </div>
-
-      {/* Simple Flow */}
-      <div className="rounded-2xl border bg-muted/30 p-6">
-        <h2 className="text-xl font-bold">
-          SevaLink Provider Journey
-        </h2>
-
-        <div className="mt-6 flex flex-wrap items-center justify-center gap-3">
-          {[
-            "Register",
-            "Profile",
-            "Verification",
-            "Approval",
-            "Service Request",
-            "Accept",
-            "Complete",
-            "Review",
-          ].map((item, index, array) => (
-            <div
-              key={item}
-              className="flex items-center gap-3"
-            >
-              <div className="rounded-xl border bg-card px-4 py-3 text-sm font-medium shadow-sm">
-                {item}
-              </div>
-
-              {index < array.length - 1 && (
-                <span className="text-lg text-muted-foreground">
-                  →
-                </span>
-              )}
-            </div>
           ))}
         </div>
       </div>
