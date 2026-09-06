@@ -224,7 +224,10 @@ export function LandingPage() {
         </div>
       </section>
 
-      <section className="bg-white px-4 py-18 lg:px-8">
+      <section
+  id="about-sevalink"
+  className="bg-white px-4 py-18 lg:px-8"
+>
         <div className="mx-auto grid max-w-7xl gap-10 lg:grid-cols-[1fr_1.1fr] lg:items-center">
           <div className="grid grid-cols-2 gap-4">
             <div className="flex h-full items-center justify-center rounded-[1.75rem] bg-blue-50 text-blue-700">
@@ -560,40 +563,154 @@ export function ServicesPage() {
   const { data, isLoading } = useServicesQuery();
   const [selectedCategoryId, setSelectedCategoryId] = useState("all");
   const [location, setLocation] = useState("");
+
   const filteredServices = useMemo(() => {
     if (selectedCategoryId === "all") return data || [];
-    return (data || []).filter((service) => String(service.category_id) === String(selectedCategoryId));
+
+    return (data || []).filter(
+      (service) =>
+        String(service.category_id) === String(selectedCategoryId)
+    );
   }, [data, selectedCategoryId]);
 
   return (
     <motion.div {...fade}>
-      <SectionHeader title="Services" subtitle="Browse service types available on SevaLink." />
+      <SectionHeader
+        title="Services"
+        subtitle="Browse service types available on SevaLink."
+      />
+
+      <div className="mb-5 grid gap-3 lg:grid-cols-[1fr_2fr_160px]">
+        <Input placeholder="Search services" />
+
+        <LocationSelector
+          className="lg:col-span-2"
+          value={location}
+          onChange={setLocation}
+        />
+
+        <Button variant="outline">
+          Filter
+        </Button>
+      </div>
+
       <div className="mb-5 flex flex-wrap gap-2">
         <button
           type="button"
           onClick={() => setSelectedCategoryId("all")}
-          className={`rounded-full border px-4 py-2 text-sm font-medium transition ${selectedCategoryId === "all" ? "border-primary bg-primary text-white" : "border-border bg-card text-foreground hover:border-primary"}`}>
+          className={`rounded-full border px-4 py-2 text-sm font-medium transition ${
+            selectedCategoryId === "all"
+              ? "border-primary bg-primary text-white"
+              : "border-border bg-card text-foreground hover:border-primary"
+          }`}
+        >
           All
         </button>
+
         {(categories.data || []).map((category) => (
           <button
             key={category.id}
             type="button"
             onClick={() => setSelectedCategoryId(category.id)}
-            className={`rounded-full border px-4 py-2 text-sm font-medium transition ${selectedCategoryId === category.id ? "border-primary bg-primary text-white" : "border-border bg-card text-foreground hover:border-primary"}`}>
+            className={`rounded-full border px-4 py-2 text-sm font-medium transition ${
+              selectedCategoryId === category.id
+                ? "border-primary bg-primary text-white"
+                : "border-border bg-card text-foreground hover:border-primary"
+            }`}
+          >
             {category.name}
           </button>
         ))}
       </div>
+
       {isLoading || categories.isLoading ? (
         <LoadingGrid />
       ) : (
         <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
           {filteredServices.map((service) => (
-            <ServiceCard key={service.id} service={service} />
+            <ServiceCard
+              key={service.id}
+              service={service}
+            />
           ))}
         </div>
       )}
+
+      {/* =====================================================
+          HOW IT WORKS
+          ===================================================== */}
+
+      <section
+        id="how-it-works"
+        className="mt-14 rounded-2xl border bg-card p-6 shadow-sm md:p-8"
+      >
+        <div className="text-center">
+          <p className="text-sm font-semibold uppercase tracking-[0.18em] text-primary">
+            Simple Process
+          </p>
+
+          <h2 className="mt-2 text-2xl font-bold text-foreground md:text-3xl">
+            How SevaLink Works
+          </h2>
+
+          <p className="mx-auto mt-3 max-w-2xl text-sm leading-6 text-muted-foreground">
+            Find the service you need, choose a trusted provider, book the
+            service, and manage your booking through SevaLink.
+          </p>
+        </div>
+
+        <div className="mt-8 grid gap-5 md:grid-cols-3">
+
+          {/* Step 1 */}
+          <div className="rounded-2xl border bg-background p-6 text-center transition-shadow hover:shadow-md">
+            <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-primary text-sm font-bold !text-white">
+              01
+            </div>
+
+            <h3 className="mt-4 font-semibold text-foreground">
+              Find a Service
+            </h3>
+
+            <p className="mt-2 text-sm leading-6 text-muted-foreground">
+              Browse available services and use categories, location and
+              filters to find what you need.
+            </p>
+          </div>
+
+          {/* Step 2 */}
+          <div className="rounded-2xl border bg-background p-6 text-center transition-shadow hover:shadow-md">
+            <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-primary text-sm font-bold !text-white">
+              02
+            </div>
+
+            <h3 className="mt-4 font-semibold text-foreground">
+              Choose a Provider
+            </h3>
+
+            <p className="mt-2 text-sm leading-6 text-muted-foreground">
+              View provider information, verification details, services and
+              ratings before making your booking.
+            </p>
+          </div>
+
+          {/* Step 3 */}
+          <div className="rounded-2xl border bg-background p-6 text-center transition-shadow hover:shadow-md">
+            <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-primary text-sm font-bold !text-white">
+              03
+            </div>
+
+            <h3 className="mt-4 font-semibold text-foreground">
+              Book & Get Service
+            </h3>
+
+            <p className="mt-2 text-sm leading-6 text-muted-foreground">
+              Submit your booking request, manage the booking and receive the
+              requested service from the provider.
+            </p>
+          </div>
+
+        </div>
+      </section>
     </motion.div>
   );
 }
@@ -661,18 +778,21 @@ export function ProvidersPage() {
       />
 
       {/* Introduction */}
-      <div className="rounded-2xl border bg-card p-6 shadow-sm">
-        <h2 className="text-2xl font-bold">
-          How SevaLink Works for Providers
-        </h2>
+<div
+  id="provider-guide"
+  className="rounded-2xl border bg-card p-6 shadow-sm"
+>
+  <h2 className="text-2xl font-bold">
+    How SevaLink Works for Providers
+  </h2>
 
-        <p className="mt-3 max-w-3xl text-sm leading-6 text-muted-foreground">
-          SevaLink connects service providers with customers looking for
-          reliable services. As a provider, you can create your profile,
-          submit your details for verification, receive service requests,
-          manage bookings and build your reputation through customer reviews.
-        </p>
-      </div>
+  <p className="mt-3 max-w-3xl text-sm leading-6 text-muted-foreground">
+    SevaLink connects service providers with customers looking for
+    reliable services. As a provider, you can create your profile,
+    submit your details for verification, receive service requests,
+    manage bookings and build your reputation through customer reviews.
+  </p>
+</div>
 
       {/* Working Flow */}
       <div>
@@ -790,15 +910,14 @@ export function ProvidersPage() {
     through SevaLink.
   </p>
 
+ <Link to="/register?type=provider">
   <Button
     className="mt-5"
     variant="secondary"
-    onClick={() => {
-      window.location.href = "/provider-register";
-    }}
   >
     Register as Provider
   </Button>
+</Link>
 </div>
 
     </motion.div>
