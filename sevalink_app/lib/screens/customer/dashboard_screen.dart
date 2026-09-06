@@ -1,11 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:lucide_icons_flutter/lucide_icons.dart';
 import '../../models/models.dart';
 import '../../providers/app_providers.dart';
 import '../../services/supabase_api.dart' as api;
 import '../../services/razorpay_service.dart';
 import '../../theme/app_theme.dart';
+import '../../utils/lucide_icon_helper.dart';
 import 'package:intl/intl.dart';
 
 final _categoriesProvider = FutureProvider<List<ServiceCategory>>((ref) => api.getCategories());
@@ -208,8 +210,8 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                   scrollDirection: Axis.horizontal,
                   child: Row(
                     children: [
-                      _categoryChip('All', 'all'),
-                      ...cats.map((c) => _categoryChip(c.name, c.id)),
+                      _categoryChip('All', 'all', null),
+                      ...cats.map((c) => _categoryChip(c.name, c.id, c.icon)),
                     ],
                   ),
                 ),
@@ -246,8 +248,9 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
     );
   }
 
-  Widget _categoryChip(String label, String id) {
+  Widget _categoryChip(String label, String id, String? iconName) {
     final selected = _selectedCategoryId == id;
+    final iconData = lucideIconFor(iconName, fallback: LucideIcons.layoutGrid);
     return Padding(
       padding: const EdgeInsets.only(right: 8),
       child: GestureDetector(
@@ -258,7 +261,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
         }),
         child: AnimatedContainer(
           duration: const Duration(milliseconds: 200),
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
           decoration: BoxDecoration(
             color: selected ? AppColors.primary : Colors.transparent,
             borderRadius: BorderRadius.circular(20),
@@ -266,13 +269,20 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
               color: selected ? AppColors.primary : AppColors.darkBorder,
             ),
           ),
-          child: Text(
-            label,
-            style: TextStyle(
-              color: selected ? Colors.white : null,
-              fontWeight: selected ? FontWeight.w600 : FontWeight.w400,
-              fontSize: 13,
-            ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(iconData, size: 14, color: selected ? Colors.white : AppColors.primary),
+              const SizedBox(width: 6),
+              Text(
+                label,
+                style: TextStyle(
+                  color: selected ? Colors.white : null,
+                  fontWeight: selected ? FontWeight.w600 : FontWeight.w400,
+                  fontSize: 13,
+                ),
+              ),
+            ],
           ),
         ),
       ),
@@ -469,8 +479,11 @@ class _ServiceTile extends StatelessWidget {
                 color: AppColors.primary.withOpacity(0.12),
                 borderRadius: BorderRadius.circular(10),
               ),
-              child: const Icon(Icons.home_repair_service_outlined,
-                  color: AppColors.primary, size: 22),
+              child: Icon(
+                lucideIconFor(service.icon),
+                color: AppColors.primary,
+                size: 22,
+              ),
             ),
             const SizedBox(width: 12),
             Expanded(

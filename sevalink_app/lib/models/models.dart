@@ -77,6 +77,7 @@ class ServiceModel {
   final String? description;
   final String? categoryId;
   final String? categoryName;
+  final String? icon;
 
   const ServiceModel({
     required this.id,
@@ -84,6 +85,7 @@ class ServiceModel {
     this.description,
     this.categoryId,
     this.categoryName,
+    this.icon,
   });
 
   factory ServiceModel.fromJson(Map<String, dynamic> json) {
@@ -94,6 +96,7 @@ class ServiceModel {
       description: json['description'] as String?,
       categoryId: (json['category_id'] ?? category?['id'])?.toString(),
       categoryName: (json['category_name'] ?? category?['name']) as String?,
+      icon: json['icon'] as String?,
     );
   }
 }

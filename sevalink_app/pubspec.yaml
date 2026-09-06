@@ -38,6 +38,7 @@ dependencies:
 
   # Icons
   cupertino_icons: ^1.0.8
+  lucide_icons_flutter: ^3.0.0
 
   # Cached images
   cached_network_image: ^3.4.1

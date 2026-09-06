@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { useForm } from 'react-hook-form'
 import { z } from 'zod'
 import { zodResolver } from '@hookform/resolvers/zod'
-import { Link, useNavigate } from 'react-router-dom'
+import { Link, Navigate, useNavigate } from 'react-router-dom'
 import { motion } from 'framer-motion'
 import { useDispatch, useSelector } from 'react-redux'
 import { Button } from '@/components/ui/button'
@@ -15,6 +15,8 @@ import {
   resetPassword,
   updatePassword,
   selectAuthLoading,
+  selectIsAuthenticated,
+  selectUserRole,
   clearError,
 } from '@/store/authSlice'
 import { useSearchParams } from "react-router-dom";
@@ -146,6 +148,11 @@ function RegisterForm() {
 }
 
 export function CustomerLoginPage() {
+  const isAuthenticated = useSelector(selectIsAuthenticated)
+  const role = useSelector(selectUserRole)
+
+  if (isAuthenticated) return <Navigate to={getRedirectPath(role)} replace />
+
   return (
     <AuthShell
       title="Sign In"
@@ -159,6 +166,11 @@ export function CustomerLoginPage() {
 }
 
 export function CustomerRegisterPage() {
+  const isAuthenticated = useSelector(selectIsAuthenticated)
+  const role = useSelector(selectUserRole)
+
+  if (isAuthenticated) return <Navigate to={getRedirectPath(role)} replace />
+
   return (
     <AuthShell
       title="Create Account"

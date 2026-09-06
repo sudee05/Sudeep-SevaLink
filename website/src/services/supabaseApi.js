@@ -163,7 +163,7 @@ async function getProviderServiceMap(providerIds) {
 
   const { data, error } = await supabase
     .from("provider_services")
-    .select("provider_id, service_id, price, services(name)")
+    .select("provider_id, service_id, price, services(id, name, description)")
     .in("provider_id", providerIds);
   if (error) throw error;
 
@@ -171,7 +171,12 @@ async function getProviderServiceMap(providerIds) {
     const serviceName = row.services?.name;
     if (!serviceName) return map;
     if (!map[row.provider_id]) map[row.provider_id] = [];
-    map[row.provider_id].push({ service_id: row.service_id, name: serviceName, price: Number(row.price || 0) });
+    map[row.provider_id].push({
+      service_id: row.service_id,
+      name: serviceName,
+      description: row.services?.description || "",
+      price: Number(row.price || 0),
+    });
     return map;
   }, {});
 }

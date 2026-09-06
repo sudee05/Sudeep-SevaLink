@@ -7,6 +7,7 @@ import {
   ClipboardList,
   FileText,
   FolderOpen,
+  Image,
   LayoutDashboard,
   MessageSquareWarning,
   Package,
@@ -40,6 +41,7 @@ export const adminNav = [
   { label: 'Services', path: '/sevalink-admin/services', icon: Wrench },
   { label: 'Bookings', path: '/sevalink-admin/bookings', icon: ClipboardList },
   { label: 'Reports', path: '/sevalink-admin/reports', icon: Briefcase },
+  { label: 'Hero Carousel', path: '/sevalink-admin/hero-carousel', icon: Image },
   { label: 'Complaints', path: '/sevalink-admin/complaints', icon: MessageSquareWarning },
   { label: 'Settings', path: '/sevalink-admin/settings', icon: Settings },
 ]

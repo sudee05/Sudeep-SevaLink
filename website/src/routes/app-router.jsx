@@ -29,11 +29,13 @@ import {
   BookingPaymentPage,
   BookingSuccessPage,
   BookingTrackingPage,
+  BookProviderPage,
   CustomerBookingDetailsPage,
   CustomerBookingsPage,
   CustomerDashboardPage,
   CustomerNotificationsPage,
   CustomerProfilePage,
+  ProviderDetails,
 } from '@/pages/customer/customer-pages'
 import {
   ProviderAnalyticsPage,
@@ -49,6 +51,7 @@ import {
   AdminBookingsPage,
   AdminCategoriesPage,
   AdminDashboardPage,
+  AdminHeroCarouselPage,
   AdminProvidersPage,
   AdminReportsPage,
   AdminSectionPage,
@@ -122,6 +125,8 @@ export function AppRouter() {
         <Route path="booking/success" element={<BookingSuccessPage />} />
         <Route path="booking/failed" element={<BookingFailedPage />} />
         <Route path="booking/tracking/:id" element={<BookingTrackingPage />} />
+        <Route path="provider-details/:id" element={<ProviderDetails />} />
+        <Route path="book-provider" element={<BookProviderPage />} />
       </Route>
 
       {/* Provider Portal — protected, requires "provider" role */}
@@ -158,6 +163,7 @@ export function AppRouter() {
         <Route path="services" element={<AdminServicesPage />} />
         <Route path="bookings" element={<AdminBookingsPage />} />
         <Route path="providers" element={<AdminProvidersPage />} />
+        <Route path="hero-carousel" element={<AdminHeroCarouselPage />} />
         <Route path=":section" element={<AdminSectionPage />} />
       </Route>
 

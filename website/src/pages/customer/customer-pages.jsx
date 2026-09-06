@@ -1,4 +1,4 @@
-import { Link, useNavigate, useParams } from "react-router-dom";
+import { Link, useLocation, useNavigate, useParams } from "react-router-dom";
 import { motion } from "framer-motion";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
@@ -24,6 +24,7 @@ import {
   useConversationByBookingQuery,
   useMessagesQuery,
   useNotificationsQuery,
+  useProviderQuery,
   useProvidersByServiceQuery,
   useServicesQuery,
 } from "@/hooks/use-queries";
@@ -45,6 +46,7 @@ import {
   createBookingComplaint,
   createBookingFeedback,
   ensureConversationForBooking,
+  getProviderFeedback,
   isBookingChatEnabled,
   markAllNotificationsRead,
   markConversationRead,
@@ -82,111 +84,6 @@ function getTodayDateInputValue() {
   return new Date().toISOString().split("T")[0];
 }
 
-function BookingModal({
-  bookingForm,
-  bookingMutation,
-  bookingProvider,
-  isProcessingPayment,
-  onClose,
-  onSubmit,
-  selectedService,
-  setBookingForm,
-}) {
-  if (!bookingProvider) return null;
-
-  const providerName = bookingProvider.business_name || bookingProvider.name || "Provider";
-  const providerPrice = bookingProvider.price || bookingProvider.starting_price || bookingProvider.base_price;
-  const minBookingDate = getTodayDateInputValue();
-  const { totalAmount, depositAmount, balanceAmount } = getBookingPricing(bookingProvider);
-  const hasFixedPrice = Number.isFinite(totalAmount) && totalAmount > 0;
-
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/55 px-4 py-6 backdrop-blur-sm">
-      <div className="w-full max-w-2xl rounded-2xl border border-border bg-card p-5 shadow-2xl">
-        <div className="mb-5 flex items-start justify-between gap-4">
-          <div>
-            <p className="text-sm font-medium text-primary">{selectedService?.name}</p>
-            <h2 className="text-xl font-bold">Book {providerName}</h2>
-            <p className="mt-1 text-sm text-muted-foreground">
-              {Number(providerPrice || 0) ? formatCurrency(providerPrice) : "Price TBD"} |{" "}
-              {bookingProvider.location || "Location not added"}
-            </p>
-          </div>
-          <Button type="button" variant="ghost" size="icon" onClick={onClose} aria-label="Close booking form">
-            <X className="h-5 w-5" />
-          </Button>
-        </div>
-        <form className="grid gap-3 md:grid-cols-2" onSubmit={onSubmit}>
-          <label className="space-y-1 md:col-span-1">
-            <span className="text-sm font-medium text-foreground">Booking date</span>
-            <DatePicker
-              value={bookingForm.booking_date}
-              min={minBookingDate}
-              onChange={(date) => setBookingForm((form) => ({ ...form, booking_date: date }))}
-            />
-            <p className="text-xs text-muted-foreground">Choose today or a future date. Past dates are disabled.</p>
-          </label>
-          <label className="space-y-1 md:col-span-1">
-            <span className="text-sm font-medium text-foreground">Booking time</span>
-            <TimePicker
-              value={bookingForm.booking_time}
-              onChange={(time) => setBookingForm((form) => ({ ...form, booking_time: time }))}
-            />
-          </label>
-          <Input
-            required
-            placeholder="Service address"
-            className="md:col-span-2"
-            value={bookingForm.address}
-            onChange={(event) => setBookingForm((form) => ({ ...form, address: event.target.value }))}
-          />
-          <Textarea
-            placeholder="Special instructions"
-            className="md:col-span-2"
-            value={bookingForm.notes}
-            onChange={(event) => setBookingForm((form) => ({ ...form, notes: event.target.value }))}
-          />
-          <div className="rounded-xl border border-border bg-muted/30 p-4 text-sm md:col-span-2">
-            <div className="flex items-center gap-2 font-semibold text-foreground">
-              <CreditCard className="h-4 w-4" />
-              Payment summary
-            </div>
-            {hasFixedPrice ? (
-              <div className="mt-3 grid gap-2 text-muted-foreground sm:grid-cols-3">
-                <div className="rounded-lg bg-card px-3 py-2">
-                  <p className="text-xs uppercase tracking-wide">Total</p>
-                  <p className="text-base font-semibold text-foreground">{formatCurrency(totalAmount)}</p>
-                </div>
-                <div className="rounded-lg bg-card px-3 py-2">
-                  <p className="text-xs uppercase tracking-wide">Pay now</p>
-                  <p className="text-base font-semibold text-foreground">{formatCurrency(depositAmount)}</p>
-                  <p className="text-xs text-muted-foreground">15% booking deposit</p>
-                </div>
-                <div className="rounded-lg bg-card px-3 py-2">
-                  <p className="text-xs uppercase tracking-wide">Pay later</p>
-                  <p className="text-base font-semibold text-foreground">{formatCurrency(balanceAmount)}</p>
-                  <p className="text-xs text-muted-foreground">Paid directly to the provider after service</p>
-                </div>
-              </div>
-            ) : (
-              <p className="mt-2 text-muted-foreground">
-                This provider does not have a fixed price yet, so deposit payment is unavailable.
-              </p>
-            )}
-          </div>
-          <div className="flex flex-wrap gap-2 md:col-span-2">
-            <Button type="submit" disabled={bookingMutation.isPending || isProcessingPayment || !hasFixedPrice}>
-              {isProcessingPayment ? "Opening payment..." : bookingMutation.isPending ? "Booking..." : "Pay 15% & Book"}
-            </Button>
-            <Button type="button" variant="outline" onClick={onClose}>
-              Cancel
-            </Button>
-          </div>
-        </form>
-      </div>
-    </div>
-  );
-}
 
 function BookingChatPanel({ booking, userId }) {
   const queryClient = useQueryClient();
@@ -343,9 +240,6 @@ export function CustomerDashboardPage() {
   const [selectedCategoryId, setSelectedCategoryId] = useState("all");
   const [location, setLocation] = useState("");
   const [maxPrice, setMaxPrice] = useState("");
-  const [bookingProvider, setBookingProvider] = useState(null);
-  const [bookingForm, setBookingForm] = useState({ booking_date: "", booking_time: "", address: "", notes: "" });
-  const [isProcessingPayment, setIsProcessingPayment] = useState(false);
   const [serviceSearch, setServiceSearch] = useState("");
   const providers = useProvidersByServiceQuery(selectedService?.id);
 
@@ -372,92 +266,6 @@ export function CustomerDashboardPage() {
       return matchesLocation && matchesPrice;
     });
   }, [providers.data, location, maxPrice]);
-
-  const bookingMutation = useMutation({
-    mutationFn: createBookingWithPayment,
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["bookings"] });
-      setBookingProvider(null);
-      setBookingForm({ booking_date: "", booking_time: "", address: "", notes: "" });
-    },
-    onError: (error) => toast.error(error.message || "Could not create booking"),
-  });
-
-  async function handleBookingSubmit(event) {
-    event.preventDefault();
-    if (!profile?.id || !selectedService || !bookingProvider) return;
-
-    const { totalAmount, depositAmount, balanceAmount } = getBookingPricing(bookingProvider);
-    if (!Number.isFinite(totalAmount) || totalAmount <= 0) {
-      toast.error("This provider does not have a fixed price yet.");
-      return;
-    }
-
-    setIsProcessingPayment(true);
-    try {
-      const payment = await payWithRazorpay({
-        amount: depositAmount,
-        name: "SevaLink booking deposit",
-        description: `${selectedService.name} booking for ${bookingProvider.business_name || bookingProvider.name || "provider"}`,
-        notes: {
-          booking_type: "service_booking_deposit",
-          service_title: selectedService.name,
-          provider_name: bookingProvider.business_name || bookingProvider.name || "",
-          customer_name: profile.full_name || "",
-          deposit_amount: String(depositAmount),
-          balance_amount: String(balanceAmount),
-        },
-        prefill: {
-          name: profile.full_name || "",
-          email: profile.email || "",
-          contact: profile.phone || "",
-        },
-        theme: {
-          color: "#0f766e",
-        },
-      });
-
-      await bookingMutation.mutateAsync({
-        booking: {
-          customer_id: profile.id,
-          provider_id: bookingProvider.id,
-          service_id: selectedService.id,
-          service_title: selectedService.name,
-          provider_name: bookingProvider.business_name || bookingProvider.name || "",
-          customer_name: profile.full_name || "",
-          booking_date: bookingForm.booking_date,
-          booking_time: bookingForm.booking_time,
-          address: bookingForm.address,
-          notes: bookingForm.notes,
-          amount: totalAmount,
-        },
-        payment: {
-          booking_id: null,
-          razorpay_payment_id: payment?.razorpay_payment_id || "",
-          razorpay_order_id: payment?.razorpay_order_id || "",
-          razorpay_signature: payment?.razorpay_signature || "",
-          amount: depositAmount,
-          currency: "INR",
-          status: "captured",
-          payment_method: "razorpay",
-          payment_metadata: {
-            service_title: selectedService.name,
-            provider_name: bookingProvider.business_name || bookingProvider.name || "",
-            customer_name: profile.full_name || "",
-            deposit_amount: String(depositAmount),
-            balance_amount: String(balanceAmount),
-          },
-        },
-      });
-
-      toast.success(`Deposit paid. The remaining ${formatCurrency(balanceAmount)} is due after the service.`);
-      navigate("/customer/bookings");
-    } catch (error) {
-      toast.error(error.message || "Could not complete payment");
-    } finally {
-      setIsProcessingPayment(false);
-    }
-  }
 
   return (
     <motion.div className="space-y-6" {...fade}>
@@ -643,9 +451,11 @@ export function CustomerDashboardPage() {
                       <p className="text-sm font-semibold">
                         {Number(providerPrice || 0) ? formatCurrency(providerPrice) : "Price TBD"}
                       </p>
-                      <Button size="sm" onClick={() => setBookingProvider(provider)}>
-                        Book
-                      </Button>
+                      <div className='flex justify-end gap-2'>
+                        <Button size="sm" className="rounded-lg" onClick={() => navigate(`/customer/provider-details/${provider.id}`)}>View Details</Button>
+                        <Button size="sm" className="rounded-lg" onClick={() => navigate("/customer/book-provider", { state: { provider, service: selectedService } })}>Book</Button>
+                      </div>
+
                     </div>
                   </Card>
                 );
@@ -660,16 +470,6 @@ export function CustomerDashboardPage() {
         </Card>
       )}
 
-      <BookingModal
-        bookingForm={bookingForm}
-        bookingMutation={bookingMutation}
-        bookingProvider={bookingProvider}
-        isProcessingPayment={isProcessingPayment}
-        onClose={() => setBookingProvider(null)}
-        onSubmit={handleBookingSubmit}
-        selectedService={selectedService}
-        setBookingForm={setBookingForm}
-      />
     </motion.div>
   );
 }
@@ -682,7 +482,6 @@ export function CustomerBookingsPage() {
       <SectionHeader
         title="Booking History"
         subtitle="Track, reschedule, and manage bookings."
-        action={<Button>Export</Button>}
       />
       <DataTable
         columns={[
@@ -807,9 +606,6 @@ export function CustomerBookingDetailsPage() {
               </Button>
             </>
           )}
-          <Button variant="outline" className="w-full">
-            Download Invoice
-          </Button>
           {!["completed", "cancelled", "rejected"].includes(booking.status) && (
             <Button
               variant="danger"
@@ -1025,9 +821,6 @@ function ProfileFormCard({ initialProfileForm, onLogout, onSubmitProfile, profil
           <Button type="submit" disabled={profileMutation.isPending}>
             {profileMutation.isPending ? "Saving..." : "Save Profile"}
           </Button>
-          <Button type="button" variant="outline" onClick={onLogout}>
-            Logout
-          </Button>
         </div>
       </form>
     </Card>
@@ -1123,6 +916,367 @@ export function BookingTrackingPage() {
           <Button className="mt-4">Call Provider</Button>
         </Card>
       </div>
+    </motion.div>
+  );
+}
+
+export function ProviderDetails() {
+  const { id } = useParams();
+  const navigate = useNavigate();
+  const { data: provider, isLoading, error } = useProviderQuery(id);
+  const [feedback, setFeedback] = useState([]);
+
+  useEffect(() => {
+    if (!id) return;
+    getProviderFeedback(id).then(setFeedback).catch(() => { });
+  }, [id]);
+
+  if (isLoading) return <LoadingGrid count={3} />;
+  if (error || !provider)
+    return (
+      <motion.div className="space-y-4" {...fade}>
+        <SectionHeader title="Provider Details" subtitle="Could not load provider information." />
+        <Card>
+          <p className="text-sm text-muted-foreground">Provider not found or an error occurred.</p>
+          <Button className="mt-4" variant="outline" onClick={() => navigate(-1)}>Go Back</Button>
+        </Card>
+      </motion.div>
+    );
+
+  const rating = Number(provider.rating || 0);
+  // service_rows is populated by attachProviderServices: [{ service_id, name, price }]
+  const services = provider.service_rows || [];
+  const certificates = Array.isArray(provider.certificates) ? provider.certificates : [];
+
+  return (
+    <motion.div className="space-y-6" {...fade}>
+      <SectionHeader title="Provider Details" subtitle="View provider details and book a service." />
+
+      {/* Hero card */}
+      <Card>
+        <div className="flex flex-col gap-6 sm:flex-row sm:items-start">
+          {/* Avatar */}
+          <div className="shrink-0">
+            {provider.image_url ? (
+              <img
+                src={provider.image_url}
+                alt={provider.business_name}
+                className="h-28 w-28 rounded-2xl object-cover ring-2 ring-primary/20"
+                onError={(e) => { e.currentTarget.style.display = "none"; }}
+              />
+            ) : (
+              <div className="flex h-28 w-28 items-center justify-center rounded-2xl bg-primary/10 text-3xl font-bold text-primary">
+                {(provider.business_name || "P")[0].toUpperCase()}
+              </div>
+            )}
+          </div>
+
+          {/* Info */}
+          <div className="flex-1 space-y-2">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <div>
+                <h2 className="text-xl font-bold">{provider.business_name || provider.name}</h2>
+                {provider.location && (
+                  <p className="flex items-center gap-1 text-sm text-muted-foreground">
+                    <MapPin className="h-3.5 w-3.5" /> {provider.location}
+                  </p>
+                )}
+              </div>
+              <div className="flex items-center gap-1 rounded-full bg-amber-50 px-3 py-1 text-sm font-semibold text-amber-600 dark:bg-amber-900/20 dark:text-amber-400">
+                ★ {rating.toFixed(1)}
+                <span className="font-normal text-muted-foreground">/ 5</span>
+              </div>
+            </div>
+
+            {provider.experience && (
+              <p className="text-sm text-muted-foreground">
+                <span className="font-medium text-foreground">Experience:</span> {provider.experience}
+              </p>
+            )}
+
+            {provider.about && (
+              <p className="text-sm text-muted-foreground">{provider.about}</p>
+            )}
+
+            {certificates.length > 0 && (
+              <div className="flex flex-wrap gap-2 pt-1">
+                {certificates.map((cert, i) => (
+                  <span key={i} className="rounded-full border border-primary/30 bg-primary/5 px-3 py-0.5 text-xs font-medium text-primary">
+                    {cert}
+                  </span>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+      </Card>
+
+      {/* Services offered */}
+      <Card className="space-y-4">
+        <div className="flex items-center justify-between">
+          <h3 className="font-semibold">Services Offered</h3>
+          {services.length > 0 && (
+            <span className="text-xs text-muted-foreground">{services.length} service{services.length !== 1 ? "s" : ""}</span>
+          )}
+        </div>
+        {services.length === 0 ? (
+          <p className="text-sm text-muted-foreground">No services listed by this provider yet.</p>
+        ) : (
+          <div className="grid gap-3 sm:grid-cols-2">
+            {services.map((svc) => {
+              const svcName = svc.service_name || svc.name || "Service";
+              const svcPrice = Number(svc.price || 0);
+              return (
+                <div
+                  key={svc.id || svc.name}
+                  className="flex flex-col gap-3 rounded-xl border border-border bg-card p-4 shadow-sm transition hover:border-primary/40 hover:shadow-md">
+                  {/* Service info */}
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="space-y-0.5">
+                      <p className="text-sm font-semibold leading-snug">{svcName}</p>
+                      {svc.description && (
+                        <p className="text-xs text-muted-foreground leading-relaxed">{svc.description}</p>
+                      )}
+                    </div>
+                    {svcPrice > 0 && (
+                      <span className="shrink-0 rounded-full bg-primary/10 px-2.5 py-0.5 text-xs font-bold text-primary">
+                        {formatCurrency(svcPrice)}
+                      </span>
+                    )}
+                  </div>
+                  {/* Book button */}
+                  <Button
+                    size="sm"
+                    className="w-full"
+                    onClick={() =>
+                      navigate("/customer/book-provider", {
+                        state: {
+                          provider,
+                          service: {
+                            id: svc.service_id || svc.id || null,
+                            name: svcName,
+                            price: svcPrice || undefined,
+                            description: svc.description || "",
+                          },
+                        },
+                      })
+                    }>
+                    Book this service
+                  </Button>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </Card>
+
+      {/* Customer reviews */}
+      <Card className="space-y-4">
+        <h3 className="font-semibold">Customer Reviews</h3>
+        {feedback.length === 0 ? (
+          <p className="text-sm text-muted-foreground">No reviews yet.</p>
+        ) : (
+          <div className="space-y-3">
+            {feedback.map((item) => (
+              <div key={item.id} className="rounded-xl border border-border p-4 space-y-1">
+                <div className="flex items-center justify-between">
+                  <p className="text-sm font-medium">{item.profiles?.full_name || "Customer"}</p>
+                  <span className="text-xs text-amber-500 font-semibold">★ {item.rating ?? "-"}</span>
+                </div>
+                {item.comment && <p className="text-sm text-muted-foreground">{item.comment}</p>}
+                {item.bookings?.service_title && (
+                  <p className="text-xs text-muted-foreground">Service: {item.bookings.service_title}</p>
+                )}
+              </div>
+            ))}
+          </div>
+        )}
+      </Card>
+
+      <div className="flex justify-end gap-2">
+        <Button variant="outline" onClick={() => navigate(-1)}>← Go Back</Button>
+      </div>
+    </motion.div>
+  );
+}
+
+export function BookProviderPage() {
+  const { state } = useLocation();
+  const navigate = useNavigate();
+  const toast = useToast();
+  const queryClient = useQueryClient();
+  const profile = useSelector(selectProfile);
+
+  const bookingProvider = state?.provider ?? null;
+  const selectedService = state?.service ?? null;
+
+  const [bookingForm, setBookingForm] = useState({ booking_date: "", booking_time: "", address: "", notes: "" });
+  const [isProcessingPayment, setIsProcessingPayment] = useState(false);
+
+  const bookingMutation = useMutation({
+    mutationFn: createBookingWithPayment,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["bookings"] });
+      toast.success("Booking confirmed!");
+      navigate("/customer/bookings");
+    },
+    onError: (error) => toast.error(error.message || "Could not create booking"),
+  });
+
+  if (!bookingProvider) {
+    return (
+      <motion.div className="space-y-4" {...fade}>
+        <SectionHeader title="Book a Provider" subtitle="No provider selected." />
+        <Card>
+          <p className="text-sm text-muted-foreground">Please go back and select a provider to book.</p>
+          <Button className="mt-4" variant="outline" onClick={() => navigate(-1)}>Go Back</Button>
+        </Card>
+      </motion.div>
+    );
+  }
+
+  const providerName = bookingProvider.business_name || bookingProvider.name || "Provider";
+  // Prefer the individual service's price; fall back to provider-level price
+  const servicePriceOverride = selectedService?.price && Number(selectedService.price) > 0
+    ? Number(selectedService.price)
+    : null;
+  const { totalAmount: baseTotalAmount, depositAmount: baseDeposit, balanceAmount: baseBalance } = getBookingPricing(bookingProvider);
+  const totalAmount = servicePriceOverride ?? baseTotalAmount;
+  const depositAmount = Math.max(1, Math.round(totalAmount * 0.15));
+  const balanceAmount = Math.max(totalAmount - depositAmount, 0);
+  const hasFixedPrice = Number.isFinite(totalAmount) && totalAmount > 0;
+  const minBookingDate = getTodayDateInputValue();
+
+  async function handleSubmit(event) {
+    event.preventDefault();
+    if (!profile?.id || !bookingProvider) return;
+    if (!hasFixedPrice) {
+      toast.error("This provider does not have a fixed price yet.");
+      return;
+    }
+    setIsProcessingPayment(true);
+    try {
+      const payment = await payWithRazorpay({
+        amount: depositAmount,
+        name: "SevaLink booking deposit",
+        description: `${selectedService?.name ?? "Service"} booking for ${providerName}`,
+        notes: {
+          booking_type: "service_booking_deposit",
+          service_title: selectedService?.name ?? "",
+          provider_name: providerName,
+          customer_name: profile.full_name || "",
+          deposit_amount: String(depositAmount),
+          balance_amount: String(balanceAmount),
+        },
+        prefill: {
+          name: profile.full_name || "",
+          email: profile.email || "",
+          contact: profile.phone || "",
+        },
+        theme: { color: "#0f766e" },
+      });
+
+      await bookingMutation.mutateAsync({
+        booking: {
+          customer_id: profile.id,
+          provider_id: bookingProvider.id,
+          service_id: selectedService?.id ?? null,
+          service_title: selectedService?.name ?? "",
+          provider_name: providerName,
+          customer_name: profile.full_name || "",
+          booking_date: bookingForm.booking_date,
+          booking_time: bookingForm.booking_time,
+          address: bookingForm.address,
+          notes: bookingForm.notes,
+          amount: totalAmount,
+        },
+        payment: {
+          booking_id: null,
+          razorpay_payment_id: payment?.razorpay_payment_id || "",
+          razorpay_order_id: payment?.razorpay_order_id || "",
+          razorpay_signature: payment?.razorpay_signature || "",
+          amount: depositAmount,
+          currency: "INR",
+          status: "captured",
+          payment_method: "razorpay",
+          payment_metadata: {
+            service_title: selectedService?.name ?? "",
+            provider_name: providerName,
+            customer_name: profile.full_name || "",
+            deposit_amount: String(depositAmount),
+            balance_amount: String(balanceAmount),
+          },
+        },
+      });
+    } catch (error) {
+      toast.error(error.message || "Could not complete payment");
+    } finally {
+      setIsProcessingPayment(false);
+    }
+  }
+
+  return (
+    <motion.div className="space-y-6" {...fade}>
+      <SectionHeader
+        title={`Book ${providerName}`}
+        subtitle={selectedService ? `Booking for: ${selectedService.name}` : "Complete your booking details below."}
+      />
+
+      <Card>
+        {/* Provider summary */}
+        <div className="mb-6 flex items-start gap-4">
+          {bookingProvider.image_url ? (
+            <img src={bookingProvider.image_url} alt={providerName} className="h-16 w-16 rounded-2xl object-cover" onError={(e) => { e.currentTarget.style.display = "none"; }} />
+          ) : (
+            <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-primary/10 text-2xl font-bold text-primary">
+              {providerName[0].toUpperCase()}
+            </div>
+          )}
+          <div>
+            <h2 className="text-lg font-bold">{providerName}</h2>
+            <p className="text-sm text-muted-foreground">
+              {totalAmount > 0 ? formatCurrency(totalAmount) : "Price TBD"} &nbsp;|&nbsp;
+              {bookingProvider.location || "Location not added"}
+            </p>
+            {selectedService && <p className="text-sm font-medium text-primary">{selectedService.name}</p>}
+          </div>
+        </div>
+
+        <form className="grid gap-4 md:grid-cols-2" onSubmit={handleSubmit}>
+          <label className="space-y-1">
+            <span className="text-sm font-medium">Booking date</span>
+            <DatePicker value={bookingForm.booking_date} min={minBookingDate} onChange={(date) => setBookingForm((f) => ({ ...f, booking_date: date }))} />
+            <p className="text-xs text-muted-foreground">Choose today or a future date.</p>
+          </label>
+          <label className="space-y-1">
+            <span className="text-sm font-medium">Booking time</span>
+            <TimePicker value={bookingForm.booking_time} onChange={(time) => setBookingForm((f) => ({ ...f, booking_time: time }))} />
+          </label>
+          <Input required placeholder="Service address" className="md:col-span-2" value={bookingForm.address} onChange={(e) => setBookingForm((f) => ({ ...f, address: e.target.value }))} />
+          <Textarea placeholder="Special instructions" className="md:col-span-2" value={bookingForm.notes} onChange={(e) => setBookingForm((f) => ({ ...f, notes: e.target.value }))} />
+
+          {/* Payment summary */}
+          <div className="rounded-xl border border-border bg-muted/30 p-4 text-sm md:col-span-2">
+            <div className="flex items-center gap-2 font-semibold"><CreditCard className="h-4 w-4" /> Payment summary</div>
+            {hasFixedPrice ? (
+              <div className="mt-3 grid gap-2 text-muted-foreground sm:grid-cols-3">
+                <div className="rounded-lg bg-card px-3 py-2"><p className="text-xs uppercase tracking-wide">Total</p><p className="text-base font-semibold text-foreground">{formatCurrency(totalAmount)}</p></div>
+                <div className="rounded-lg bg-card px-3 py-2"><p className="text-xs uppercase tracking-wide">Pay now</p><p className="text-base font-semibold text-foreground">{formatCurrency(depositAmount)}</p><p className="text-xs">15% deposit</p></div>
+                <div className="rounded-lg bg-card px-3 py-2"><p className="text-xs uppercase tracking-wide">Pay later</p><p className="text-base font-semibold text-foreground">{formatCurrency(balanceAmount)}</p><p className="text-xs">After service</p></div>
+              </div>
+            ) : (
+              <p className="mt-2 text-muted-foreground">This provider does not have a fixed price yet.</p>
+            )}
+          </div>
+
+          <div className="flex flex-wrap gap-2 md:col-span-2">
+            <Button type="submit" disabled={bookingMutation.isPending || isProcessingPayment || !hasFixedPrice}>
+              {isProcessingPayment ? "Opening payment..." : bookingMutation.isPending ? "Booking..." : "Pay 15% & Book"}
+            </Button>
+            <Button type="button" variant="outline" onClick={() => navigate(-1)}>Cancel</Button>
+          </div>
+        </form>
+      </Card>
     </motion.div>
   );
 }
