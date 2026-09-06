@@ -404,6 +404,7 @@ export function AdminProvidersPage() {
             },
           ]}
           rows={visibleRows}
+          pageSize={10}
         />
       ) : (
         <EmptyState title="No providers found" />
@@ -648,6 +649,7 @@ export function AdminServicesPage() {
                 },
               ]}
               rows={visibleRows}
+              pageSize={10}
             />
           ) : (
             <EmptyState title="No services in catalog" />
@@ -706,6 +708,7 @@ export function AdminServicesPage() {
               },
             ]}
             rows={requests}
+            pageSize={10}
           />
         ) : (
           <EmptyState title="No service requests" />
@@ -872,6 +875,7 @@ export function AdminBookingsPage() {
             },
           ]}
           rows={visibleRows}
+          pageSize={10}
         />
       ) : (
         <EmptyState title="No bookings found" />

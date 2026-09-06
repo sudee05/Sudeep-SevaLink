@@ -286,7 +286,7 @@ export function ProviderDashboardPage() {
               ),
             },
           ]}
-          rows={providerBookings}
+          rows={providerBookings.slice(0, 5)}
         />
       </Card>
     </motion.div>
@@ -323,6 +323,7 @@ export function ProviderBookingsPage() {
           },
         ]}
         rows={data}
+        pageSize={10}
       />
     </motion.div>
   );
