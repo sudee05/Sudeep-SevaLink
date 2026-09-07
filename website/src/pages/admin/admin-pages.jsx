@@ -609,8 +609,8 @@ export function AdminServicesPage() {
             <DataTable
               columns={[
                 {
-                  key:"Logo",
-                  label:"Logo",
+                  key:"icon",
+                  label:"Icon",
                   render: (row) => { const Icon = icons[row.icon] ?? CircleHelp; return <Icon className="h-8 w-8" />; },                                                    
                 },
                 {

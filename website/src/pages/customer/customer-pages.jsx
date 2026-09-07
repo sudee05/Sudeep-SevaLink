@@ -295,7 +295,7 @@ export function CustomerDashboardPage() {
         </Card>
       </div>
 
-      <Card>
+      <Card className="relative">
         <SectionHeader title="Choose a Service" subtitle="Start by selecting what you need." />
 
         {services.isLoading || categories.isLoading ? (
@@ -327,7 +327,7 @@ export function CustomerDashboardPage() {
         ) : (
           <div className="space-y-4">
             {/* Search bar */}
-            <div className="relative">
+            <div className="absolute top-9 right-2 w-1/4">
               <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
               <input
                 type="text"

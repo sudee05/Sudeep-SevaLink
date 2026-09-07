@@ -43,5 +43,4 @@ export const adminNav = [
   { label: 'Reports', path: '/sevalink-admin/reports', icon: Briefcase },
   { label: 'Hero Carousel', path: '/sevalink-admin/hero-carousel', icon: Image },
   { label: 'Complaints', path: '/sevalink-admin/complaints', icon: MessageSquareWarning },
-  { label: 'Settings', path: '/sevalink-admin/settings', icon: Settings },
 ]
