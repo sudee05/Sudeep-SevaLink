@@ -505,6 +505,7 @@ export function CustomerBookingsPage() {
           },
         ]}
         rows={data}
+        pageSize={10}
       />
     </motion.div>
   );
