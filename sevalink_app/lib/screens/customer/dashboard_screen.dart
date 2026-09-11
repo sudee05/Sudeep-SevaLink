@@ -1,13 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import 'package:lucide_icons_flutter/lucide_icons.dart';
 import '../../models/models.dart';
 import '../../providers/app_providers.dart';
 import '../../services/supabase_api.dart' as api;
 import '../../services/razorpay_service.dart';
 import '../../theme/app_theme.dart';
-import '../../utils/lucide_icon_helper.dart';
+import '../../widgets/lucide_network_icon.dart';
 import 'package:intl/intl.dart';
 
 final _categoriesProvider = FutureProvider<List<ServiceCategory>>((ref) => api.getCategories());
@@ -250,7 +249,6 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
 
   Widget _categoryChip(String label, String id, String? iconName) {
     final selected = _selectedCategoryId == id;
-    final iconData = lucideIconFor(iconName, fallback: LucideIcons.layoutGrid);
     return Padding(
       padding: const EdgeInsets.only(right: 8),
       child: GestureDetector(
@@ -272,7 +270,11 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
           child: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Icon(iconData, size: 14, color: selected ? Colors.white : AppColors.primary),
+              LucideNetworkIcon(
+                name: iconName,
+                size: 14,
+                color: selected ? Colors.white : AppColors.primary,
+              ),
               const SizedBox(width: 6),
               Text(
                 label,
@@ -479,8 +481,8 @@ class _ServiceTile extends StatelessWidget {
                 color: AppColors.primary.withOpacity(0.12),
                 borderRadius: BorderRadius.circular(10),
               ),
-              child: Icon(
-                lucideIconFor(service.icon),
+              child: LucideNetworkIcon(
+                name: service.icon,
                 color: AppColors.primary,
                 size: 22,
               ),

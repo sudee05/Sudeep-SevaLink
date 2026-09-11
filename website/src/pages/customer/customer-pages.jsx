@@ -16,12 +16,13 @@ import {
   Search,
   Sparkles,
   X,
-  icons, CircleHelp
 } from "lucide-react";
+import { getLucideIcon } from "@/utils/lucide";
 import {
   useBookingsQuery,
   useCategoriesQuery,
   useConversationByBookingQuery,
+  useCustomerBookingsQuery,
   useMessagesQuery,
   useNotificationsQuery,
   useProviderQuery,
@@ -46,6 +47,7 @@ import {
   createBookingComplaint,
   createBookingFeedback,
   ensureConversationForBooking,
+  getCustomerServiceSubmissionStatus,
   getProviderFeedback,
   isBookingChatEnabled,
   markAllNotificationsRead,
@@ -358,7 +360,7 @@ export function CustomerDashboardPage() {
                     setBookingProvider(null);
                   }}
                   className={`inline-flex items-center gap-1.5 rounded-full border px-4 py-2 text-sm font-medium transition ${selectedCategoryId === category.id ? "border-primary bg-primary text-white" : "border-border bg-card text-foreground hover:border-primary"}`}>
-                  {(() => { const Icon = icons[category.icon] ?? CircleHelp; return <Icon className="h-4 w-4" />; })()}
+                  {(() => { const Icon = getLucideIcon(category.icon); return <Icon className="h-4 w-4" />; })()}
                   {category.name}
                 </button>
               ))}
@@ -384,7 +386,7 @@ export function CustomerDashboardPage() {
                     </p>
                   </div>
                   <div>
-                    {(() => { const Icon = icons[service.icon] ?? CircleHelp; return <Icon className="h-12 w-12" />; })()}
+                    {(() => { const Icon = getLucideIcon(service.icon); return <Icon className="h-12 w-12" />; })()}
                   </div>
                 </button>
               ))}
@@ -513,19 +515,41 @@ export function CustomerBookingsPage() {
 
 export function CustomerBookingDetailsPage() {
   const { id } = useParams();
-  const { data = [] } = useBookingsQuery();
   const profile = useSelector(selectProfile);
+  // Use customer-scoped query so customer_id matches auth.uid() for RLS inserts
+  const { data = [] } = useCustomerBookingsQuery(profile?.id);
   const toast = useToast();
   const queryClient = useQueryClient();
   const [feedback, setFeedback] = useState({ rating: "5", comment: "" });
   const [complaint, setComplaint] = useState({ subject: "", comment: "" });
+  const [submissionStatus, setSubmissionStatus] = useState({ feedback: false, complaint: false, loading: true });
   const booking = data.find((item) => item.id === id) || data[0];
+  const submissionLoading = Boolean(booking?.service_id && profile?.id && submissionStatus.loading);
+
+  useEffect(() => {
+    let active = true;
+    if (!booking?.service_id || !profile?.id) {
+      return () => { active = false; };
+    }
+
+    setSubmissionStatus((status) => ({ ...status, loading: true }));
+    getCustomerServiceSubmissionStatus({ serviceId: booking.service_id, customerId: profile.id })
+      .then((status) => {
+        if (active) setSubmissionStatus({ ...status, loading: false });
+      })
+      .catch(() => {
+        if (active) setSubmissionStatus({ feedback: false, complaint: false, loading: false });
+      });
+
+    return () => { active = false; };
+  }, [booking?.service_id, profile?.id]);
 
   const feedbackMutation = useMutation({
     mutationFn: createBookingFeedback,
     onSuccess: () => {
       toast.success("Feedback submitted.");
       setFeedback({ rating: "5", comment: "" });
+      setSubmissionStatus((status) => ({ ...status, feedback: true }));
     },
     onError: (error) => toast.error(error.message || "Could not submit feedback"),
   });
@@ -533,8 +557,9 @@ export function CustomerBookingDetailsPage() {
   const complaintMutation = useMutation({
     mutationFn: createBookingComplaint,
     onSuccess: () => {
-      toast.success("Complaint submitted.");
+      toast.success("Complaint submitted. We will get in touch with you within 2-7 working days.");
       setComplaint({ subject: "", comment: "" });
+      setSubmissionStatus((status) => ({ ...status, complaint: true }));
     },
     onError: (error) => toast.error(error.message || "Could not submit complaint"),
   });
@@ -556,6 +581,7 @@ export function CustomerBookingDetailsPage() {
       booking_id: booking.id,
       provider_id: booking.provider_id,
       customer_id: profile.id,
+      service_id: booking.service_id,
       rating: Number(feedback.rating),
       comment: feedback.comment,
     });
@@ -621,46 +647,62 @@ export function CustomerBookingDetailsPage() {
       <div className="grid gap-4 lg:grid-cols-2">
         <Card>
           <h3 className="mb-3 font-semibold">Feedback</h3>
-          <form className="space-y-3" onSubmit={handleFeedbackSubmit}>
-            <Select
-              value={feedback.rating}
-              onChange={(event) => setFeedback((form) => ({ ...form, rating: event.target.value }))}
-              options={[
-                { label: "5 - Excellent", value: "5" },
-                { label: "4 - Good", value: "4" },
-                { label: "3 - Okay", value: "3" },
-                { label: "2 - Poor", value: "2" },
-                { label: "1 - Bad", value: "1" },
-              ]}
-            />
-            <Textarea
-              placeholder="Share feedback for the provider"
-              value={feedback.comment}
-              onChange={(event) => setFeedback((form) => ({ ...form, comment: event.target.value }))}
-            />
-            <Button type="submit" disabled={feedbackMutation.isPending}>
-              {feedbackMutation.isPending ? "Submitting..." : "Submit Feedback"}
-            </Button>
-          </form>
+          {submissionStatus.feedback ? (
+            <p className="rounded-xl border border-emerald-500/30 bg-emerald-500/10 p-4 text-sm text-emerald-700 dark:text-emerald-300">
+              Feedback already submitted for this service.
+            </p>
+          ) : (
+            <form className="space-y-3" onSubmit={handleFeedbackSubmit}>
+              <Select
+                value={feedback.rating}
+                disabled={submissionLoading}
+                onChange={(event) => setFeedback((form) => ({ ...form, rating: event.target.value }))}
+                options={[
+                  { label: "5 - Excellent", value: "5" },
+                  { label: "4 - Good", value: "4" },
+                  { label: "3 - Okay", value: "3" },
+                  { label: "2 - Poor", value: "2" },
+                  { label: "1 - Bad", value: "1" },
+                ]}
+              />
+              <Textarea
+                placeholder="Share feedback for the provider"
+                disabled={submissionLoading}
+                value={feedback.comment}
+                onChange={(event) => setFeedback((form) => ({ ...form, comment: event.target.value }))}
+              />
+              <Button type="submit" disabled={submissionLoading || feedbackMutation.isPending}>
+                {feedbackMutation.isPending ? "Submitting..." : "Submit Feedback"}
+              </Button>
+            </form>
+          )}
         </Card>
         <Card>
           <h3 className="mb-3 font-semibold">Complaint</h3>
-          <form className="space-y-3" onSubmit={handleComplaintSubmit}>
-            <Input
-              required
-              placeholder="Subject"
-              value={complaint.subject}
-              onChange={(event) => setComplaint((form) => ({ ...form, subject: event.target.value }))}
-            />
-            <Textarea
-              placeholder="Describe the issue"
-              value={complaint.comment}
-              onChange={(event) => setComplaint((form) => ({ ...form, comment: event.target.value }))}
-            />
-            <Button type="submit" variant="danger" disabled={complaintMutation.isPending}>
-              {complaintMutation.isPending ? "Submitting..." : "Submit Complaint"}
-            </Button>
-          </form>
+          {submissionStatus.complaint ? (
+            <p className="rounded-xl border border-emerald-500/30 bg-emerald-500/10 p-4 text-sm text-emerald-700 dark:text-emerald-300">
+              Complaint already submitted for this service. We will get in touch with you within 2-7 working days.
+            </p>
+          ) : (
+            <form className="space-y-3" onSubmit={handleComplaintSubmit}>
+              <Input
+                required
+                disabled={submissionLoading}
+                placeholder="Subject"
+                value={complaint.subject}
+                onChange={(event) => setComplaint((form) => ({ ...form, subject: event.target.value }))}
+              />
+              <Textarea
+                placeholder="Describe the issue"
+                disabled={submissionLoading}
+                value={complaint.comment}
+                onChange={(event) => setComplaint((form) => ({ ...form, comment: event.target.value }))}
+              />
+              <Button type="submit" variant="danger" disabled={submissionLoading || complaintMutation.isPending}>
+                {complaintMutation.isPending ? "Submitting..." : "Submit Complaint"}
+              </Button>
+            </form>
+          )}
         </Card>
       </div>
       <BookingChatPanel booking={booking} userId={profile?.id} />

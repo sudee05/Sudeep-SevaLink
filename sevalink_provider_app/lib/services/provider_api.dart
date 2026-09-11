@@ -73,7 +73,12 @@ class ProviderApi {
     }
     if (normalized.contains('network') ||
         normalized.contains('socket') ||
-        normalized.contains('connection')) {
+        normalized.contains('connection') ||
+        normalized.contains('failed host lookup') ||
+        normalized.contains('host lookup') ||
+        normalized.contains('timed out') ||
+        normalized.contains('timeout') ||
+        normalized.contains('network is unreachable')) {
       return 'Please check your internet connection and try again.';
     }
 

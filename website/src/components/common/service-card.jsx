@@ -1,10 +1,9 @@
 import { Link } from "react-router-dom";
 import { Card } from "@/components/ui/card";
-import { icons, CircleHelp } from "lucide-react";
+import { getLucideIcon } from "@/utils/lucide";
 
 export function ServiceCard({ service }) {
-  const iconName = service.icon?.trim();
-  const Icon = icons[iconName] ?? CircleHelp;
+  const Icon = getLucideIcon(service.icon);
 
   return (
     <Card className="group flex min-h-44 flex-col justify-between transition hover:-translate-y-1 hover:shadow-lg">

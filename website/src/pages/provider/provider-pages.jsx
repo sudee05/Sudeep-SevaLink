@@ -878,31 +878,96 @@ export function ProviderReviewsPage() {
     };
   }, []);
 
+  // Compute summary stats
+  const avgRating = feedback.length
+    ? (feedback.reduce((sum, f) => sum + Number(f.rating || 0), 0) / feedback.length).toFixed(1)
+    : null;
+  const ratingCounts = [5, 4, 3, 2, 1].map((star) => ({
+    star,
+    count: feedback.filter((f) => Number(f.rating) === star).length,
+  }));
+
+  function StarDisplay({ rating }) {
+    return (
+      <span className="flex items-center gap-0.5">
+        {[1, 2, 3, 4, 5].map((s) => (
+          <span key={s} className={s <= rating ? "text-amber-400" : "text-muted-foreground/30"}>★</span>
+        ))}
+      </span>
+    );
+  }
+
   return (
-    <motion.div className="space-y-4" {...fade}>
-      <SectionHeader title="Reviews" subtitle="Customer feedback for your completed bookings." />
+    <motion.div className="space-y-5" {...fade}>
+      <SectionHeader title="Customer Reviews" subtitle="Ratings and feedback from your completed bookings." />
+
       {loading ? (
         <LoadingGrid count={3} />
       ) : !providerRecord ? (
         <Card className="text-sm text-muted-foreground">Complete your provider profile to receive feedback.</Card>
-      ) : feedback.length ? (
-        <DataTable
-          columns={[
-            { key: "booking", label: "Booking", render: (row) => row.bookings?.booking_code || row.booking_id },
-            { key: "service", label: "Service", render: (row) => row.bookings?.service_title || "-" },
-            { key: "customer", label: "Customer", render: (row) => row.profiles?.full_name || "-" },
-            { key: "rating", label: "Rating", render: (row) => `${row.rating}/5` },
-            { key: "comment", label: "Comment", render: (row) => row.comment || "-" },
-            { key: "created_at", label: "Created", render: (row) => formatDate(row.created_at) },
-          ]}
-          rows={feedback}
-        />
       ) : (
-        <Card className="text-sm text-muted-foreground">No feedback yet.</Card>
+        <>
+          {/* Summary card */}
+          {feedback.length > 0 && (
+            <Card className="flex flex-col gap-4 sm:flex-row sm:items-center sm:gap-8">
+              <div className="text-center">
+                <p className="text-5xl font-bold text-amber-500">{avgRating}</p>
+                <StarDisplay rating={Math.round(Number(avgRating))} />
+                <p className="mt-1 text-xs text-muted-foreground">{feedback.length} review{feedback.length !== 1 ? "s" : ""}</p>
+              </div>
+              <div className="flex-1 space-y-1.5">
+                {ratingCounts.map(({ star, count }) => (
+                  <div key={star} className="flex items-center gap-2 text-xs">
+                    <span className="w-3 text-right text-muted-foreground">{star}</span>
+                    <span className="text-amber-400">★</span>
+                    <div className="flex-1 overflow-hidden rounded-full bg-muted h-2">
+                      <div
+                        className="h-2 rounded-full bg-amber-400 transition-all"
+                        style={{ width: feedback.length ? `${(count / feedback.length) * 100}%` : "0%" }}
+                      />
+                    </div>
+                    <span className="w-4 text-muted-foreground">{count}</span>
+                  </div>
+                ))}
+              </div>
+            </Card>
+          )}
+
+          {/* Review cards */}
+          {feedback.length === 0 ? (
+            <Card className="text-sm text-muted-foreground">No feedback yet. Completed bookings will appear here.</Card>
+          ) : (
+            <div className="space-y-3">
+              {feedback.map((item) => (
+                <Card key={item.id} className="space-y-2">
+                  <div className="flex flex-wrap items-start justify-between gap-2">
+                    <div>
+                      <p className="text-sm font-semibold">{item.profiles?.full_name || "Customer"}</p>
+                      {item.bookings?.service_title && (
+                        <p className="text-xs text-muted-foreground">
+                          Service: {item.bookings.service_title}
+                          {item.bookings.booking_code ? ` · #${item.bookings.booking_code}` : ""}
+                        </p>
+                      )}
+                    </div>
+                    <div className="flex flex-col items-end gap-0.5">
+                      <StarDisplay rating={Number(item.rating)} />
+                      <span className="text-[11px] text-muted-foreground">{formatDate(item.created_at)}</span>
+                    </div>
+                  </div>
+                  {item.comment && (
+                    <p className="text-sm text-muted-foreground border-t border-border pt-2">{item.comment}</p>
+                  )}
+                </Card>
+              ))}
+            </div>
+          )}
+        </>
       )}
     </motion.div>
   );
 }
+
 
 export function ProviderNotificationsPage() {
   const queryClient = useQueryClient();

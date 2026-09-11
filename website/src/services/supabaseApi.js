@@ -415,12 +415,52 @@ export async function getAdminUsers() {
 }
 
 export async function getAdminComplaints() {
-  const { data, error } = await supabase
+  // Keep this query independent from optional foreign-key relationships. Some
+  // Supabase projects have the complaint table but not its relationship cache.
+  const { data: complaints, error } = await supabase
     .from("booking_complaints")
-    .select("*, profiles(full_name), services(name), providers(business_name), bookings(booking_code)")
+    .select("*")
     .order("created_at", { ascending: false });
   if (error) throw error;
-  return data;
+
+  const rows = complaints || [];
+  const ids = (key) => [...new Set(rows.map((row) => row[key]).filter(Boolean))];
+  const customerIds = ids("customer_id");
+  const providerIds = ids("provider_id");
+  const serviceIds = ids("service_id");
+  const bookingIds = ids("booking_id");
+
+  const [profiles, providers, services, bookings] = await Promise.all([
+    customerIds.length
+      ? supabase.from("profiles").select("id, full_name").in("id", customerIds)
+      : Promise.resolve({ data: [], error: null }),
+    providerIds.length
+      ? supabase.from("providers").select("id, business_name").in("id", providerIds)
+      : Promise.resolve({ data: [], error: null }),
+    serviceIds.length
+      ? supabase.from("services").select("id, name").in("id", serviceIds)
+      : Promise.resolve({ data: [], error: null }),
+    bookingIds.length
+      ? supabase.from("bookings").select("id, booking_code").in("id", bookingIds)
+      : Promise.resolve({ data: [], error: null }),
+  ]);
+
+  const relatedError = [profiles, providers, services, bookings].find((result) => result.error)?.error;
+  if (relatedError) throw relatedError;
+
+  const byId = (result) => new Map((result.data || []).map((item) => [item.id, item]));
+  const profileById = byId(profiles);
+  const providerById = byId(providers);
+  const serviceById = byId(services);
+  const bookingById = byId(bookings);
+
+  return rows.map((row) => ({
+    ...row,
+    profiles: profileById.get(row.customer_id) || null,
+    providers: providerById.get(row.provider_id) || null,
+    services: serviceById.get(row.service_id) || null,
+    bookings: bookingById.get(row.booking_id) || null,
+  }));
 }
 
 // ── Bookings ──────────────────────────────────────────────────
@@ -587,6 +627,9 @@ export async function createBookingFeedback(feedback) {
     if (isMissingBookingFeedbackTableError(error)) {
       throw new Error("Feedback is not enabled in the database yet. Run the booking feedback SQL patch in Supabase.");
     }
+    if (error.code === "23505") {
+      throw new Error("You have already submitted feedback for this service.");
+    }
     throw error;
   }
   return data;
@@ -594,8 +637,40 @@ export async function createBookingFeedback(feedback) {
 
 export async function createBookingComplaint(complaint) {
   const { data, error } = await supabase.from("booking_complaints").insert(complaint).select().single();
+  if (error?.code === "23505") {
+    throw new Error("You have already submitted a complaint for this service.");
+  }
   if (error) throw error;
   return data;
+}
+
+export async function getCustomerServiceSubmissionStatus({ serviceId, customerId }) {
+  if (!serviceId || !customerId) return { feedback: false, complaint: false };
+
+  const [feedbackResult, complaintResult] = await Promise.all([
+    supabase
+      .from("booking_feedback")
+      .select("id")
+      .eq("service_id", serviceId)
+      .eq("customer_id", customerId)
+      .limit(1),
+    supabase
+      .from("booking_complaints")
+      .select("id")
+      .eq("service_id", serviceId)
+      .eq("customer_id", customerId)
+      .limit(1),
+  ]);
+
+  if (feedbackResult.error && !isMissingBookingFeedbackTableError(feedbackResult.error)) {
+    throw feedbackResult.error;
+  }
+  if (complaintResult.error) throw complaintResult.error;
+
+  return {
+    feedback: !feedbackResult.error && (feedbackResult.data || []).length > 0,
+    complaint: (complaintResult.data || []).length > 0,
+  };
 }
 
 export async function getProviderFeedback(providerId) {
