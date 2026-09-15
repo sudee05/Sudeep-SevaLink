@@ -353,6 +353,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                   children: visible
                       .map((p) => _ProviderCard(
                             provider: p,
+                            onViewDetail: () => context.push('/customer/providers/${p.id}'),
                             onBook: () => setState(() => _bookingProvider = p),
                           ))
                       .toList(),
@@ -515,9 +516,14 @@ class _ServiceTile extends StatelessWidget {
 
 class _ProviderCard extends StatelessWidget {
   final ProviderModel provider;
+  final VoidCallback onViewDetail;
   final VoidCallback onBook;
 
-  const _ProviderCard({required this.provider, required this.onBook});
+  const _ProviderCard({
+    required this.provider,
+    required this.onViewDetail,
+    required this.onBook,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -584,12 +590,22 @@ class _ProviderCard extends StatelessWidget {
                       : 'Price TBD',
                   style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 15),
                 ),
-                ElevatedButton(
-                  onPressed: onBook,
-                  style: ElevatedButton.styleFrom(
-                    padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
-                  ),
-                  child: const Text('Book'),
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  alignment: WrapAlignment.end,
+                  children: [
+                    OutlinedButton.icon(
+                      onPressed: onViewDetail,
+                      icon: const Icon(Icons.info_outline, size: 16),
+                      label: const Text('View Detail'),
+                    ),
+                    ElevatedButton.icon(
+                      onPressed: onBook,
+                      icon: const Icon(Icons.calendar_month_outlined, size: 16),
+                      label: const Text('Book'),
+                    ),
+                  ],
                 ),
               ],
             ),

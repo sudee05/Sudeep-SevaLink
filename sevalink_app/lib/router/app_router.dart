@@ -10,6 +10,7 @@ import '../screens/customer/customer_shell.dart';
 import '../screens/customer/dashboard_screen.dart';
 import '../screens/customer/bookings_screen.dart';
 import '../screens/customer/booking_detail_screen.dart';
+import '../screens/customer/provider_detail_screen.dart';
 import '../screens/customer/notifications_screen.dart';
 import '../screens/customer/profile_screen.dart';
 import '../screens/customer/payment_screen.dart';
@@ -60,6 +61,10 @@ GoRouter buildRouter(WidgetRef ref) {
           ),
           GoRoute(path: '/customer/notifications', builder: (ctx, _) => const NotificationsScreen()),
           GoRoute(path: '/customer/profile', builder: (ctx, _) => const ProfileScreen()),
+          GoRoute(
+            path: '/customer/providers/:id',
+            builder: (ctx, state) => ProviderDetailScreen(providerId: state.pathParameters['id']!),
+          ),
         ],
       ),
 

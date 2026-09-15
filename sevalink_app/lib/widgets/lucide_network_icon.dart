@@ -15,7 +15,7 @@ class LucideNetworkIcon extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final iconName = name?.trim().toLowerCase();
+    final iconName = _toLucideKebabCase(name);
     if (iconName == null || iconName.isEmpty) {
       return Icon(Icons.help_outline, size: size, color: color);
     }
@@ -41,4 +41,18 @@ class LucideNetworkIcon extends StatelessWidget {
           Icon(Icons.help_outline, size: size, color: color),
     );
   }
+}
+
+String? _toLucideKebabCase(String? value) {
+  final trimmed = value?.trim();
+  if (trimmed == null || trimmed.isEmpty) return null;
+
+  return trimmed
+      .replaceAllMapped(
+        RegExp(r'([a-z0-9])([A-Z])'),
+        (match) => '${match.group(1)}-${match.group(2)}',
+      )
+      .replaceAll(RegExp(r'[\s_]+'), '-')
+      .replaceAll(RegExp(r'-+'), '-')
+      .toLowerCase();
 }

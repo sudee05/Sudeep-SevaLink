@@ -27,9 +27,18 @@ class EmptyProviderProfile extends StatelessWidget {
             ),
             const SizedBox(height: 8),
             Text(
-              'Set up your business profile first to manage bookings and services.',
+              'Complete your provider profile on the website first, then return to this app to manage bookings and services.',
               style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                     color: const Color(0xFF6B7280),
+                  ),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 12),
+            SelectableText(
+              'https://sudeep-seva-link.vercel.app/login',
+              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                    color: Theme.of(context).colorScheme.primary,
+                    fontWeight: FontWeight.w700,
                   ),
               textAlign: TextAlign.center,
             ),

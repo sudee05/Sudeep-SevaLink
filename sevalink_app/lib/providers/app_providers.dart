@@ -15,6 +15,7 @@ class AuthState {
   const AuthState({this.profile, this.user, this.isLoading = false, this.error});
 
   bool get isAuthenticated => user != null && profile != null;
+  bool get hasSession => user != null;
 
   AuthState copyWith({AppUser? profile, User? user, bool? isLoading, String? error}) => AuthState(
         profile: profile ?? this.profile,
@@ -35,7 +36,12 @@ class AuthNotifier extends StateNotifier<AuthState> {
     if (session?.user != null) {
       try {
         final profile = await api.getProfile(session!.user.id);
-        state = AuthState(user: session.user, profile: profile, isLoading: false);
+        if (profile.role == 'customer') {
+          state = AuthState(user: session.user, profile: profile, isLoading: false);
+        } else {
+          await api.signOut();
+          state = const AuthState(isLoading: false);
+        }
       } catch (_) {
         state = const AuthState(isLoading: false);
       }
@@ -46,10 +52,17 @@ class AuthNotifier extends StateNotifier<AuthState> {
     Supabase.instance.client.auth.onAuthStateChange.listen((data) async {
       final event = data.event;
       final session = data.session;
-      if (event == AuthChangeEvent.signedIn && session != null) {
+      if ((event == AuthChangeEvent.signedIn ||
+              event == AuthChangeEvent.initialSession) &&
+          session != null) {
         try {
           final profile = await api.getProfile(session.user.id);
-          state = AuthState(user: session.user, profile: profile);
+          if (profile.role == 'customer') {
+            state = AuthState(user: session.user, profile: profile);
+          } else {
+            await api.signOut();
+            state = const AuthState();
+          }
         } catch (_) {
           state = AuthState(user: session.user);
         }
