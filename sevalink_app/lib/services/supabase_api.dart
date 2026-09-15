@@ -12,6 +12,10 @@ Future<Map<String, dynamic>> signInWithEmail({
   final res = await supabase.auth.signInWithPassword(email: email, password: password);
   if (res.user == null) throw Exception('Sign in failed');
   final profile = await getProfile(res.user!.id);
+  if (profile.role != 'customer') {
+    await supabase.auth.signOut();
+    throw Exception('Invalid account. Please log in with a customer account.');
+  }
   return {'user': res.user, 'profile': profile};
 }
 
@@ -28,6 +32,8 @@ Future<Map<String, dynamic>> signUpWithEmail({
     data: {'full_name': fullName, 'phone': phone, 'role': role},
   );
   if (res.user == null) throw Exception('Registration failed');
+  // Do not let an auto-created session bypass the email confirmation screen.
+  if (res.session != null) await supabase.auth.signOut();
   return {'user': res.user};
 }
 
@@ -69,7 +75,7 @@ Future<List<ServiceCategory>> getCategories() async {
 Future<List<ServiceModel>> getServices() async {
   final data = await supabase
       .from('services')
-      .select('id, name, description, category_id, category:categories(id, name)')
+      .select('id, name, description, category_id, icon, category:categories(id, name)')
       .order('name');
   return (data as List).map((e) => ServiceModel.fromJson(e)).toList();
 }
@@ -114,6 +120,49 @@ Future<List<ProviderModel>> getProvidersByService(String serviceId) async {
       price: priceMap[p.id] ?? p.price,
       imageUrl: p.imageUrl,
       verified: p.verified,
+      experience: p.experience,
+      certificates: p.certificates,
+      services: p.services,
+    );
+  }).toList();
+}
+
+Future<ProviderModel> getProviderById(String providerId) async {
+  final data =
+      await supabase.from('providers').select('*').eq('id', providerId).single();
+  final provider = ProviderModel.fromJson(Map<String, dynamic>.from(data as Map));
+  final services = await getProviderServiceRows(provider.id);
+  return ProviderModel(
+    id: provider.id,
+    businessName: provider.businessName,
+    name: provider.name,
+    location: provider.location,
+    rating: provider.rating,
+    about: provider.about,
+    price: provider.price,
+    imageUrl: provider.imageUrl,
+    verified: provider.verified,
+    experience: provider.experience,
+    certificates: provider.certificates,
+    services: services,
+  );
+}
+
+Future<List<ProviderServiceModel>> getProviderServiceRows(String providerId) async {
+  final data = await supabase
+      .from('provider_services')
+      .select('id, service_id, price, service:services(id, name, description)')
+      .eq('provider_id', providerId);
+
+  return (data as List).map((row) {
+    final map = Map<String, dynamic>.from(row as Map);
+    final service = Map<String, dynamic>.from((map['service'] ?? {}) as Map);
+    return ProviderServiceModel(
+      id: map['id']?.toString() ?? map['service_id'].toString(),
+      serviceId: map['service_id'].toString(),
+      name: service['name'] as String? ?? 'Service',
+      description: service['description'] as String? ?? '',
+      price: (map['price'] as num?)?.toDouble() ?? 0,
     );
   }).toList();
 }

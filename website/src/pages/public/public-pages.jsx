@@ -1,7 +1,6 @@
 ﻿import { motion, AnimatePresence } from "framer-motion";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link, useParams } from "react-router-dom";
-import * as LucideIcons from "lucide-react";
 import {
   ArrowRight,
   BadgeCheck,
@@ -13,9 +12,9 @@ import {
   ShieldCheck,
   SlidersHorizontal,
   Sparkles,
-  Tag,
   Users,
 } from "lucide-react";
+import { getLucideIcon } from "@/utils/lucide";
 import {
   useCategoriesQuery,
   useProviderQuery,
@@ -591,14 +590,6 @@ const CARD_PALETTES = [
   { bg: 'bg-fuchsia-50 dark:bg-fuchsia-950/40', icon: 'text-fuchsia-600 dark:text-fuchsia-400', iconBg: 'bg-fuchsia-100 dark:bg-fuchsia-900/50', border: 'border-fuchsia-200 dark:border-fuchsia-800' },
   { bg: 'bg-orange-50 dark:bg-orange-950/40', icon: 'text-orange-600 dark:text-orange-400', iconBg: 'bg-orange-100 dark:bg-orange-900/50', border: 'border-orange-200 dark:border-orange-800' },
 ]
-
-function getLucideIcon(iconName) {
-  if (!iconName) return Tag
-  // Support PascalCase and common variants
-  const key = iconName.replace(/-([a-z])/g, (_, c) => c.toUpperCase())
-  const Icon = LucideIcons[key] || LucideIcons[iconName]
-  return Icon || Tag
-}
 
 export function CategoriesPage() {
   const { data, isLoading } = useCategoriesQuery();

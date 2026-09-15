@@ -50,6 +50,7 @@ import {
 import {
   AdminBookingsPage,
   AdminCategoriesPage,
+  AdminComplaintsPage,
   AdminDashboardPage,
   AdminHeroCarouselPage,
   AdminProvidersPage,
@@ -164,6 +165,7 @@ export function AppRouter() {
         <Route path="bookings" element={<AdminBookingsPage />} />
         <Route path="providers" element={<AdminProvidersPage />} />
         <Route path="hero-carousel" element={<AdminHeroCarouselPage />} />
+        <Route path="complaints" element={<AdminComplaintsPage />} />
         <Route path=":section" element={<AdminSectionPage />} />
       </Route>
 

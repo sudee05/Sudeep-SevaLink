@@ -62,11 +62,11 @@ class _EmailVerificationScreenState extends State<EmailVerificationScreen> {
                     size: 40, color: AppColors.primary),
               ),
               const SizedBox(height: 28),
-              Text('Verify Your Email',
+              Text('Confirm Your Email',
                   style: Theme.of(context).textTheme.headlineMedium?.copyWith(fontWeight: FontWeight.w800)),
               const SizedBox(height: 10),
               Text(
-                'We sent a verification link to your email.\nPlease check your inbox and click the link.',
+                'A confirmation link has been sent to your email.\nConfirm your account, then come back and log in.',
                 textAlign: TextAlign.center,
                 style: Theme.of(context).textTheme.bodyMedium,
               ),

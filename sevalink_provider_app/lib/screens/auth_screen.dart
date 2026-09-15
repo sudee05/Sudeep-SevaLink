@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../services/provider_api.dart';
+import 'email_confirmation_screen.dart';
 
 String? _required(String? value) =>
     (value == null || value.trim().isEmpty) ? 'Required' : null;
@@ -14,7 +15,9 @@ String? _emailValidator(String? value) {
 }
 
 class AuthScreen extends StatefulWidget {
-  const AuthScreen({super.key});
+  const AuthScreen({super.key, this.initialError});
+
+  final String? initialError;
 
   @override
   State<AuthScreen> createState() => _AuthScreenState();
@@ -29,7 +32,22 @@ class _AuthScreenState extends State<AuthScreen> {
   bool _signup = false;
   bool _busy = false;
   bool _showPassword = false;
+  bool _showConfirmation = false;
   String? _error;
+
+  @override
+  void initState() {
+    super.initState();
+    _error = widget.initialError;
+  }
+
+  @override
+  void didUpdateWidget(covariant AuthScreen oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.initialError != oldWidget.initialError) {
+      _error = widget.initialError;
+    }
+  }
 
   @override
   void dispose() {
@@ -54,6 +72,7 @@ class _AuthScreenState extends State<AuthScreen> {
           email: _email.text.trim(),
           password: _password.text,
         );
+        if (mounted) setState(() => _showConfirmation = true);
       } else {
         await ProviderApi.signIn(_email.text.trim(), _password.text);
       }
@@ -71,6 +90,16 @@ class _AuthScreenState extends State<AuthScreen> {
 
   @override
   Widget build(BuildContext context) {
+    if (_showConfirmation) {
+      return EmailConfirmationScreen(
+        onLogin: () => setState(() {
+          _showConfirmation = false;
+          _password.clear();
+          _error = null;
+        }),
+      );
+    }
+
     final cs = Theme.of(context).colorScheme;
     return Scaffold(
       backgroundColor: const Color(0xFFF7F8FC),

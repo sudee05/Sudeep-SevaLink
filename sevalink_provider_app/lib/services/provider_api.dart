@@ -9,6 +9,8 @@ import '../models/service_item.dart';
 class ProviderApi {
   static SupabaseClient get client => Supabase.instance.client;
   static User? get currentUser => client.auth.currentUser;
+  static const _invalidProviderRoleMessage =
+      'Invalid account. Please log in with a provider account.';
 
   // ── Auth ──────────────────────────────────────────────────────
 
@@ -17,6 +19,7 @@ class ProviderApi {
       final response =
           await client.auth.signInWithPassword(email: email, password: password);
       if (response.user == null) throw Exception('Login failed');
+      await ensureProviderRole(response.user!.id);
     } catch (error) {
       throw Exception(authErrorMessage(error, signingUp: false));
     }
@@ -35,12 +38,27 @@ class ProviderApi {
         data: {'full_name': fullName, 'phone': phone, 'role': 'provider'},
       );
       if (response.user == null) throw Exception('Signup failed');
+      // Supabase may return a temporary session when email confirmation is disabled.
+      // Keep registration on the confirmation screen until the user logs in.
+      if (response.session != null) await client.auth.signOut();
     } catch (error) {
       throw Exception(authErrorMessage(error, signingUp: true));
     }
   }
 
   static Future<void> signOut() => client.auth.signOut();
+
+  static Future<void> ensureProviderRole(String userId) async {
+    final profile = await client
+        .from('profiles')
+        .select('role')
+        .eq('id', userId)
+        .maybeSingle();
+    if (profile?['role'] != 'provider') {
+      await client.auth.signOut();
+      throw Exception(_invalidProviderRoleMessage);
+    }
+  }
 
   static String authErrorMessage(Object error, {required bool signingUp}) {
     final message = error is AuthException
@@ -52,6 +70,9 @@ class ProviderApi {
         normalized.contains('invalid credentials') ||
         normalized.contains('email or password')) {
       return 'Invalid email or password.';
+    }
+    if (normalized.contains('provider account')) {
+      return _invalidProviderRoleMessage;
     }
     if (normalized.contains('email') &&
         (normalized.contains('invalid') ||
@@ -73,7 +94,12 @@ class ProviderApi {
     }
     if (normalized.contains('network') ||
         normalized.contains('socket') ||
-        normalized.contains('connection')) {
+        normalized.contains('connection') ||
+        normalized.contains('failed host lookup') ||
+        normalized.contains('host lookup') ||
+        normalized.contains('timed out') ||
+        normalized.contains('timeout') ||
+        normalized.contains('network is unreachable')) {
       return 'Please check your internet connection and try again.';
     }
 
@@ -89,9 +115,13 @@ class ProviderApi {
     if (user == null) return null;
     final profile = await client
         .from('profiles')
-        .select('id, full_name, phone, approval_status')
+        .select('id, full_name, phone, role, approval_status')
         .eq('id', user.id)
         .maybeSingle();
+    if (profile?['role'] != 'provider') {
+      await client.auth.signOut();
+      throw Exception(_invalidProviderRoleMessage);
+    }
     final provider = await client
         .from('providers')
         .select('*')

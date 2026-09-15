@@ -111,6 +111,9 @@ class ProviderModel {
   final double? price;
   final String? imageUrl;
   final bool verified;
+  final String? experience;
+  final List<String> certificates;
+  final List<ProviderServiceModel> services;
 
   const ProviderModel({
     required this.id,
@@ -122,21 +125,64 @@ class ProviderModel {
     this.price,
     this.imageUrl,
     this.verified = false,
+    this.experience,
+    this.certificates = const [],
+    this.services = const [],
   });
 
   String get displayName => businessName ?? name ?? 'Provider';
 
-  factory ProviderModel.fromJson(Map<String, dynamic> json) => ProviderModel(
-        id: json['id'].toString(),
-        businessName: json['business_name'] as String?,
-        name: json['name'] as String?,
-        location: json['location'] as String?,
-        rating: (json['rating'] as num?)?.toDouble() ?? 0,
-        about: (json['about'] ?? json['description']) as String?,
-        price: ((json['price'] ?? json['starting_price'] ?? json['base_price'] ?? json['service_price']) as num?)
-            ?.toDouble(),
-        imageUrl: json['image_url'] as String?,
-        verified: json['verified'] as bool? ?? false,
+  factory ProviderModel.fromJson(Map<String, dynamic> json) {
+    final serviceRows = json['service_rows'];
+    return ProviderModel(
+      id: json['id'].toString(),
+      businessName: json['business_name'] as String?,
+      name: json['name'] as String?,
+      location: json['location'] as String?,
+      rating: (json['rating'] as num?)?.toDouble() ?? 0,
+      about: (json['about'] ?? json['description']) as String?,
+      price: ((json['price'] ??
+              json['starting_price'] ??
+              json['base_price'] ??
+              json['service_price'])
+          as num?)
+          ?.toDouble(),
+      imageUrl: json['image_url'] as String?,
+      verified: json['verified'] as bool? ?? false,
+      experience: json['experience'] as String?,
+      certificates: ((json['certificates'] as List?) ?? const [])
+          .map((item) => item.toString())
+          .toList(),
+      services: ((serviceRows as List?) ?? const [])
+          .map((item) =>
+              ProviderServiceModel.fromJson(Map<String, dynamic>.from(item as Map)))
+          .toList(),
+    );
+  }
+}
+
+class ProviderServiceModel {
+  final String id;
+  final String serviceId;
+  final String name;
+  final String description;
+  final double price;
+
+  const ProviderServiceModel({
+    required this.id,
+    required this.serviceId,
+    required this.name,
+    this.description = '',
+    this.price = 0,
+  });
+
+  factory ProviderServiceModel.fromJson(Map<String, dynamic> json) =>
+      ProviderServiceModel(
+        id: (json['id'] ?? json['service_id'] ?? json['name']).toString(),
+        serviceId: (json['service_id'] ?? json['id'] ?? '').toString(),
+        name: (json['service_name'] ?? json['name'] ?? 'Service').toString(),
+        description: json['description'] as String? ?? '',
+        price: (json['price'] as num?)?.toDouble() ?? 0,
       );
 }
 

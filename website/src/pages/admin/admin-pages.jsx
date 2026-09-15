@@ -25,8 +25,10 @@ import {
 } from "@/store/adminSlice";
 import { formatCurrency, formatDate } from "@/utils/format";
 import { supabase } from "@/lib/supabase";
-import { Bell, CheckCircle2, Clock, Image, Pencil, Plus, ShieldCheck, Trash2, Upload, Wrench, X, icons, CircleHelp
+import { getAdminComplaints } from "@/services/supabaseApi";
+import { Bell, CheckCircle2, Clock, Image, Pencil, Plus, ShieldCheck, Trash2, Upload, Wrench, X
 } from "lucide-react";
+import { getLucideIcon } from "@/utils/lucide";
 
 const fade = {
   initial: { opacity: 0, y: 10 },
@@ -210,7 +212,7 @@ export function AdminDashboardPage() {
         <RevenueAreaChart data={stats.data?.trends || []} />
         <BookingBarChart data={stats.data?.trends || []} />
       </div>
-      <div className="grid gap-4 xl:grid-cols-2">
+      {/* <div className="grid gap-4 xl:grid-cols-2"> */}
         <Card>
           <SectionHeader title="Latest Bookings" subtitle="Newest activity in marketplace." />
           <DataTable
@@ -230,7 +232,7 @@ export function AdminDashboardPage() {
             rows={(bookings.data || []).slice(0, 5)}
           />
         </Card>
-        <Card>
+        {/* <Card>
           <SectionHeader title="Recent Activities" subtitle="Internal operations timeline." />
           <div className="space-y-3 text-sm text-muted-foreground">
             {(stats.data?.latestActivities || []).map((item) => (
@@ -242,8 +244,8 @@ export function AdminDashboardPage() {
               <p className="py-4 text-center text-sm text-muted-foreground">No recent activity.</p>
             )}
           </div>
-        </Card>
-      </div>
+        </Card> */}
+      {/* </div> */}
     </motion.div>
   );
 }
@@ -612,7 +614,7 @@ export function AdminServicesPage() {
                 {
                   key:"icon",
                   label:"Icon",
-                  render: (row) => { const Icon = icons[row.icon] ?? CircleHelp; return <Icon className="h-8 w-8" />; },                                                    
+                  render: (row) => { const Icon = getLucideIcon(row.icon); return <Icon className="h-8 w-8" />; },
                 },
                 {
                   key: "name",
@@ -1122,7 +1124,7 @@ export function AdminCategoriesPage() {
         <DataTable
           columns={[
             { key: "name", label: "Name", render: (row) => <span className="font-semibold">{row.name}</span> },
-            { key: "icon", label: "Icon", render: (row) => row.icon ? (() => { const Icon = icons[row.icon] ?? CircleHelp; return <Icon className="h-8 w-8 text-center" />;})() : <span className="text-muted-foreground">—</span> },
+            { key: "icon", label: "Icon", render: (row) => row.icon ? (() => { const Icon = getLucideIcon(row.icon); return <Icon className="h-8 w-8 text-center" />;})() : <span className="text-muted-foreground">—</span> },
             { key: "description", label: "Description", render: (row) => row.description || "—" },
             { key: "created_at", label: "Created", render: (row) => formatDate(row.created_at) },
             {
@@ -1550,6 +1552,205 @@ export function AdminHeroCarouselPage() {
           ))}
         </div>
       )}
+    </motion.div>
+  );
+}
+
+// ── Admin Complaints ──────────────────────────────────────────
+
+export function AdminComplaintsPage() {
+  const [complaints, setComplaints] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+  const [updatingId, setUpdatingId] = useState(null);
+  const [selectedComplaint, setSelectedComplaint] = useState(null);
+
+  async function load() {
+    setLoading(true);
+    setError(null);
+    try {
+      const data = await getAdminComplaints();
+      setComplaints(data || []);
+    } catch (err) {
+      setError(err.message || "Failed to load complaints");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  useEffect(() => { load(); }, []);
+
+  async function handleStatusChange(id, newStatus) {
+    setUpdatingId(id);
+    try {
+      const { error: err } = await supabase
+        .from("booking_complaints")
+        .update({ status: newStatus })
+        .eq("id", id);
+      if (err) throw err;
+      setComplaints((prev) =>
+        prev.map((c) => (c.id === id ? { ...c, status: newStatus } : c))
+      );
+      setSelectedComplaint((current) =>
+        current?.id === id ? { ...current, status: newStatus } : current
+      );
+    } catch {
+      // silent — row stays as is
+    } finally {
+      setUpdatingId(null);
+    }
+  }
+
+  const statusVariant = (s) => {
+    if (s === "resolved" || s === "closed") return "success";
+    if (s === "in_review") return "warning";
+    return "secondary";
+  };
+
+  return (
+    <motion.div className="space-y-5" {...fade}>
+      <SectionHeader
+        title="Complaints"
+        subtitle="Review escalations, quality issues, and resolution timelines."
+        action={
+          <Button size="sm" variant="outline" onClick={load} disabled={loading}>
+            Refresh
+          </Button>
+        }
+      />
+
+      {loading ? (
+        <LoadingGrid count={3} />
+      ) : error ? (
+        <ErrorState description={error} onRetry={load} />
+      ) : complaints.length === 0 ? (
+        <EmptyState title="No complaints" description="No complaints have been filed yet." />
+      ) : (
+        <div className="grid gap-4 md:grid-cols-2">
+          {complaints.map((row) => (
+            <Card
+              key={row.id}
+              className="cursor-pointer space-y-4 transition hover:-translate-y-0.5 hover:shadow-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+              role="button"
+              tabIndex={0}
+              onClick={() => setSelectedComplaint(row)}
+              onKeyDown={(event) => {
+                if (event.key === "Enter" || event.key === " ") {
+                  event.preventDefault();
+                  setSelectedComplaint(row);
+                }
+              }}>
+              <div className="flex items-start justify-between gap-3">
+                <div className="min-w-0">
+                  <p className="font-mono text-xs text-muted-foreground">
+                    {row.bookings?.booking_code || row.booking_id?.slice(0, 8) || "—"}
+                  </p>
+                  <h2 className="mt-1 truncate text-base font-semibold">{row.subject || "Untitled complaint"}</h2>
+                </div>
+                <Badge variant={statusVariant(row.status)}>{row.status || "open"}</Badge>
+              </div>
+
+              <p className="line-clamp-4 whitespace-pre-wrap text-sm text-muted-foreground">
+                {row.comment || "No description provided."}
+              </p>
+
+              <div className="grid gap-2 border-t border-border pt-3 text-sm sm:grid-cols-2">
+                <div>
+                  <span className="text-muted-foreground">Customer</span>
+                  <p className="truncate font-medium">{row.profiles?.full_name || "—"}</p>
+                </div>
+                <div>
+                  <span className="text-muted-foreground">Provider</span>
+                  <p className="truncate font-medium">{row.providers?.business_name || "—"}</p>
+                </div>
+                <div>
+                  <span className="text-muted-foreground">Service</span>
+                  <p className="truncate font-medium">{row.services?.name || "—"}</p>
+                </div>
+                <div>
+                  <span className="text-muted-foreground">Filed</span>
+                  <p className="font-medium">{formatDate(row.created_at)}</p>
+                </div>
+              </div>
+
+              <div onClick={(event) => event.stopPropagation()}>
+                <Select
+                  value={row.status || "open"}
+                  disabled={updatingId === row.id}
+                  options={[
+                    { label: "Open", value: "open" },
+                    { label: "In Review", value: "in_review" },
+                    { label: "Resolved", value: "resolved" },
+                    { label: "Closed", value: "closed" },
+                  ]}
+                  onChange={(event) => handleStatusChange(row.id, event.target.value)}
+                />
+              </div>
+            </Card>
+          ))}
+        </div>
+      )}
+
+      <Modal
+        open={!!selectedComplaint}
+        onClose={() => setSelectedComplaint(null)}
+        title={selectedComplaint?.subject || "Complaint details"}>
+        {selectedComplaint && (
+          <div className="space-y-5">
+            <div className="flex flex-wrap items-center gap-2">
+              <Badge variant={statusVariant(selectedComplaint.status)}>
+                {selectedComplaint.status || "open"}
+              </Badge>
+              <span className="text-xs text-muted-foreground">
+                Filed {formatDate(selectedComplaint.created_at)}
+              </span>
+            </div>
+
+            <div className="grid gap-3 rounded-xl border border-border bg-muted/30 p-4 text-sm sm:grid-cols-2">
+              <div>
+                <span className="text-muted-foreground">Booking</span>
+                <p className="font-medium">
+                  {selectedComplaint.bookings?.booking_code || selectedComplaint.booking_id || "—"}
+                </p>
+              </div>
+              <div>
+                <span className="text-muted-foreground">Customer</span>
+                <p className="font-medium">{selectedComplaint.profiles?.full_name || "—"}</p>
+              </div>
+              <div>
+                <span className="text-muted-foreground">Provider</span>
+                <p className="font-medium">{selectedComplaint.providers?.business_name || "—"}</p>
+              </div>
+              <div>
+                <span className="text-muted-foreground">Service</span>
+                <p className="font-medium">{selectedComplaint.services?.name || "—"}</p>
+              </div>
+            </div>
+
+            <div>
+              <h3 className="mb-2 text-sm font-semibold">Description</h3>
+              <p className="whitespace-pre-wrap break-words text-sm leading-6 text-muted-foreground">
+                {selectedComplaint.comment || "No description provided."}
+              </p>
+            </div>
+
+            <div>
+              <label className="mb-2 block text-sm font-semibold">Update status</label>
+              <Select
+                value={selectedComplaint.status || "open"}
+                disabled={updatingId === selectedComplaint.id}
+                options={[
+                  { label: "Open", value: "open" },
+                  { label: "In Review", value: "in_review" },
+                  { label: "Resolved", value: "resolved" },
+                  { label: "Closed", value: "closed" },
+                ]}
+                onChange={(event) => handleStatusChange(selectedComplaint.id, event.target.value)}
+              />
+            </div>
+          </div>
+        )}
+      </Modal>
     </motion.div>
   );
 }
