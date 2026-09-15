@@ -42,7 +42,7 @@ const Map<String, IconData> _lucideIconMap = {
   'creditcard': LucideIcons.creditCard,
 
   // Home / Services
-  'bathroomscale': LucideIcons.bathroomScale,
+  'bathroomscale': LucideIcons.scale,
   'bed': LucideIcons.bed,
   'brickswall': LucideIcons.brickWall,
   'brickwall': LucideIcons.brickWall,
@@ -100,7 +100,7 @@ const Map<String, IconData> _lucideIconMap = {
   'refrigerator': LucideIcons.refrigerator,
   'ruler': LucideIcons.ruler,
   'scissors': LucideIcons.scissors,
-  'screwdriver': LucideIcons.screwdriver,
+  'screwdriver': LucideIcons.wrench,
   'settings': LucideIcons.settings,
   'settings2': LucideIcons.settings2,
   'shield': LucideIcons.shield,
@@ -120,7 +120,7 @@ const Map<String, IconData> _lucideIconMap = {
   'toolbox': LucideIcons.wrench,
   'trash': LucideIcons.trash,
   'trash2': LucideIcons.trash2,
-  'tree': LucideIcons.tree,
+  'tree': LucideIcons.treeDeciduous,
   'treepine': LucideIcons.treePine,
   'treesdeciduous': LucideIcons.trees,
   'trees': LucideIcons.trees,
