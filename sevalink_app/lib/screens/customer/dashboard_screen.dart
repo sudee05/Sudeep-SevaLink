@@ -590,22 +590,24 @@ class _ProviderCard extends StatelessWidget {
                       : 'Price TBD',
                   style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 15),
                 ),
-                Wrap(
-                  spacing: 8,
-                  runSpacing: 8,
-                  alignment: WrapAlignment.end,
-                  children: [
-                    OutlinedButton.icon(
-                      onPressed: onViewDetail,
-                      icon: const Icon(Icons.info_outline, size: 16),
-                      label: const Text('View Detail'),
-                    ),
-                    ElevatedButton.icon(
-                      onPressed: onBook,
-                      icon: const Icon(Icons.calendar_month_outlined, size: 16),
-                      label: const Text('Book'),
-                    ),
-                  ],
+                Expanded(
+                  child: Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    alignment: WrapAlignment.end,
+                    children: [
+                      OutlinedButton.icon(
+                        onPressed: onViewDetail,
+                        icon: const Icon(Icons.info_outline, size: 16),
+                        label: const Text('View Detail'),
+                      ),
+                      ElevatedButton.icon(
+                        onPressed: onBook,
+                        icon: const Icon(Icons.calendar_month_outlined, size: 16),
+                        label: const Text('Book'),
+                      ),
+                    ],
+                  ),
                 ),
               ],
             ),
