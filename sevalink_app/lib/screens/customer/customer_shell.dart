@@ -51,7 +51,7 @@ class CustomerShell extends ConsumerWidget {
             ],
           ),
         ),
-        leadingWidth: 130,
+        leadingWidth: 160,
         actions: [
           // Theme toggle
           Consumer(builder: (ctx, ref, _) {

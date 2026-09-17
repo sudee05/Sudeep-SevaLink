@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'screens/auth_gate.dart';
+import 'theme/app_theme.dart';
 
 const String supabaseUrl = 'https://giygtxqatkrgjeuojgma.supabase.co';
 const String supabaseAnonKey =
@@ -13,50 +14,36 @@ Future<void> main() async {
   runApp(const SevaLinkProviderApp());
 }
 
-class SevaLinkProviderApp extends StatelessWidget {
+class SevaLinkProviderApp extends StatefulWidget {
   const SevaLinkProviderApp({super.key});
+
+  @override
+  State<SevaLinkProviderApp> createState() => _SevaLinkProviderAppState();
+
+  /// Allows any descendant to call `SevaLinkProviderApp.of(context).toggleTheme()`.
+  static _SevaLinkProviderAppState of(BuildContext context) =>
+      context.findAncestorStateOfType<_SevaLinkProviderAppState>()!;
+}
+
+class _SevaLinkProviderAppState extends State<SevaLinkProviderApp> {
+  ThemeMode _themeMode = ThemeMode.dark;
+
+  void toggleTheme() {
+    setState(() {
+      _themeMode =
+          _themeMode == ThemeMode.dark ? ThemeMode.light : ThemeMode.dark;
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
       title: 'SevaLink Provider',
       debugShowCheckedModeBanner: false,
-      theme: ThemeData(
-        useMaterial3: true,
-        colorScheme: ColorScheme.fromSeed(
-          seedColor: const Color(0xFF5B5FEF),
-          brightness: Brightness.light,
-        ),
-        scaffoldBackgroundColor: const Color(0xFFF7F8FC),
-        cardTheme: CardThemeData(
-          color: Colors.white,
-          elevation: 0,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(10),
-            side: const BorderSide(color: Color(0xFFE5E7EB)),
-          ),
-        ),
-        inputDecorationTheme: InputDecorationTheme(
-          filled: true,
-          fillColor: Colors.white,
-          border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
-          enabledBorder: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(10),
-            borderSide: const BorderSide(color: Color(0xFFD8DDE8)),
-          ),
-          focusedBorder: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(10),
-            borderSide: const BorderSide(color: Color(0xFF5B5FEF), width: 1.5),
-          ),
-          contentPadding:
-              const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-        ),
-        tabBarTheme: const TabBarThemeData(
-          dividerColor: Colors.transparent,
-        ),
-      ),
+      theme: AppTheme.light(),
+      darkTheme: AppTheme.dark(),
+      themeMode: _themeMode,
       home: const AuthGate(),
     );
   }
 }
-            

@@ -30,6 +30,27 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
   String _locationFilter = '';
   String _maxPrice = '';
 
+  final _scrollController = ScrollController();
+  final _serviceSectionKey = GlobalKey();
+
+  @override
+  void dispose() {
+    _scrollController.dispose();
+    super.dispose();
+  }
+
+  void _scrollToServices() {
+    final ctx = _serviceSectionKey.currentContext;
+    if (ctx != null) {
+      Scrollable.ensureVisible(
+        ctx,
+        duration: const Duration(milliseconds: 500),
+        curve: Curves.easeInOut,
+        alignment: 0.0, // scroll target to top of viewport
+      );
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final profile = ref.watch(authProvider).profile;
@@ -51,6 +72,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
           ref.invalidate(_bookingsProvider);
         },
         child: CustomScrollView(
+          controller: _scrollController,
           slivers: [
             SliverPadding(
               padding: const EdgeInsets.all(16),
@@ -64,6 +86,50 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                   const SizedBox(height: 4),
                   Text('Find and book home services near you',
                       style: Theme.of(context).textTheme.bodyMedium),
+                  const SizedBox(height: 16),
+
+                  // ── Stats row ──────────────────────────────────
+                  Row(
+                    children: [
+                      Expanded(
+                        child: _StatCard(
+                          'Total Bookings',
+                          '$totalBookings',
+                          Icons.receipt_long_outlined,
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: _StatCard(
+                          'Pending',
+                          '$pending',
+                          Icons.hourglass_top_rounded,
+                          color: Colors.orange,
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 8),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: _StatCard(
+                          'Completed',
+                          '$completed',
+                          Icons.check_circle_outline,
+                          color: Colors.green,
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: _StatCard(
+                          'Services',
+                          '$totalServices',
+                          Icons.home_repair_service_outlined,
+                        ),
+                      ),
+                    ],
+                  ),
                   const SizedBox(height: 20),
 
                   Card(
@@ -131,11 +197,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                             child: ElevatedButton.icon(
                               icon: const Icon(Icons.add_circle_outline),
                               label: const Text('Create a new booking'),
-                              onPressed: () {
-                                ScaffoldMessenger.of(context).showSnackBar(
-                                  const SnackBar(content: Text('Select a service below to continue.')),
-                                );
-                              },
+                              onPressed: _scrollToServices,
                             ),
                           ),
                         ],
@@ -145,7 +207,10 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                   const SizedBox(height: 20),
 
                   // Service selection card
-                  _buildServiceSection(context, categoriesAsync, servicesAsync),
+                  KeyedSubtree(
+                    key: _serviceSectionKey,
+                    child: _buildServiceSection(context, categoriesAsync, servicesAsync),
+                  ),
 
                   // Providers section
                   if (_selectedService != null) ...[
@@ -584,26 +649,43 @@ class _ProviderCard extends StatelessWidget {
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Text(
-                  provider.price != null && provider.price! > 0
-                      ? fmt.format(provider.price!)
-                      : 'Price TBD',
-                  style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 15),
+                Flexible(
+                  child: Text(
+                    provider.price != null && provider.price! > 0
+                        ? fmt.format(provider.price!)
+                        : 'Price TBD',
+                    style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 15),
+                    overflow: TextOverflow.ellipsis,
+                  ),
                 ),
                 Wrap(
-                  spacing: 8,
-                  runSpacing: 8,
+                  spacing: 6,
+                  runSpacing: 6,
                   alignment: WrapAlignment.end,
                   children: [
                     OutlinedButton.icon(
                       onPressed: onViewDetail,
-                      icon: const Icon(Icons.info_outline, size: 16),
-                      label: const Text('View Detail'),
+                      icon: const Icon(Icons.info_outline, size: 13),
+                      label: const Text('Details',
+                          style: TextStyle(fontSize: 12)),
+                      style: OutlinedButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 10, vertical: 6),
+                        visualDensity: VisualDensity.compact,
+                        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                      ),
                     ),
                     ElevatedButton.icon(
                       onPressed: onBook,
-                      icon: const Icon(Icons.calendar_month_outlined, size: 16),
-                      label: const Text('Book'),
+                      icon: const Icon(Icons.calendar_month_outlined, size: 13),
+                      label: const Text('Book',
+                          style: TextStyle(fontSize: 12)),
+                      style: ElevatedButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 10, vertical: 6),
+                        visualDensity: VisualDensity.compact,
+                        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                      ),
                     ),
                   ],
                 ),

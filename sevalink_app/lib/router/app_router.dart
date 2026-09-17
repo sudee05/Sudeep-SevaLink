@@ -16,39 +16,75 @@ import '../screens/customer/profile_screen.dart';
 import '../screens/customer/payment_screen.dart';
 import '../screens/customer/booking_success_screen.dart';
 
+// ── Navigator keys — created once at module level ─────────────
 final _rootNavigatorKey = GlobalKey<NavigatorState>();
 final _shellNavigatorKey = GlobalKey<NavigatorState>();
 
-GoRouter buildRouter(WidgetRef ref) {
-  final authState = ref.watch(authProvider);
+/// Bridges Riverpod auth state into a ChangeNotifier so GoRouter can
+/// re-evaluate its redirect via [refreshListenable] without being
+/// recreated (which would cause "Multiple widgets used the same GlobalKey").
+class _AuthNotifier extends ChangeNotifier {
+  bool _isAuthenticated;
+  bool _isLoading;
 
-  return GoRouter(
+  _AuthNotifier({required bool isAuthenticated, required bool isLoading})
+      : _isAuthenticated = isAuthenticated,
+        _isLoading = isLoading;
+
+  bool get isAuthenticated => _isAuthenticated;
+  bool get isLoading => _isLoading;
+
+  void update({required bool isAuthenticated, required bool isLoading}) {
+    if (_isAuthenticated != isAuthenticated || _isLoading != isLoading) {
+      _isAuthenticated = isAuthenticated;
+      _isLoading = isLoading;
+      notifyListeners();
+    }
+  }
+}
+
+/// The GoRouter is created **exactly once** inside this Provider.
+/// Auth changes are pushed into [_AuthNotifier] so GoRouter re-runs
+/// its redirect logic without recreating itself.
+final routerProvider = Provider<GoRouter>((ref) {
+  final authState = ref.read(authProvider);
+  final notifier = _AuthNotifier(
+    isAuthenticated: authState.isAuthenticated,
+    isLoading: authState.isLoading,
+  );
+
+  ref.listen(authProvider, (_, next) {
+    notifier.update(
+      isAuthenticated: next.isAuthenticated,
+      isLoading: next.isLoading,
+    );
+  });
+
+  final router = GoRouter(
     navigatorKey: _rootNavigatorKey,
     initialLocation: authState.isAuthenticated ? '/customer' : '/login',
+    refreshListenable: notifier,
     redirect: (context, state) {
-      final isAuth = authState.isAuthenticated;
-      final isLoading = authState.isLoading;
+      if (notifier.isLoading) return null;
+
       final path = state.uri.path;
-
-      if (isLoading) return null;
-
       final isAuthRoute = path.startsWith('/login') ||
           path.startsWith('/register') ||
           path.startsWith('/forgot-password') ||
           path.startsWith('/verify-email');
 
-      if (!isAuth && !isAuthRoute) return '/login';
-      if (isAuth && isAuthRoute) return '/customer';
+      if (!notifier.isAuthenticated && !isAuthRoute) return '/login';
+      if (notifier.isAuthenticated && isAuthRoute) return '/customer';
       return null;
     },
     routes: [
-      // ── Auth Routes ────────────────────────────────────────
+      // ── Auth Routes ──────────────────────────────────────────
       GoRoute(path: '/login', builder: (ctx, _) => const LoginScreen()),
       GoRoute(path: '/register', builder: (ctx, _) => const RegisterScreen()),
       GoRoute(path: '/forgot-password', builder: (ctx, _) => const ForgotPasswordScreen()),
       GoRoute(path: '/verify-email', builder: (ctx, _) => const EmailVerificationScreen()),
 
-      // ── Customer Portal (shell with bottom nav) ────────────
+      // ── Customer Portal (shell with bottom nav) ──────────────
       ShellRoute(
         navigatorKey: _shellNavigatorKey,
         builder: (ctx, state, child) => CustomerShell(child: child),
@@ -68,7 +104,7 @@ GoRouter buildRouter(WidgetRef ref) {
         ],
       ),
 
-      // ── Full-screen customer routes (outside shell) ────────
+      // ── Full-screen customer routes (outside shell) ──────────
       GoRoute(path: '/customer/payment', builder: (ctx, _) => const PaymentScreen()),
       GoRoute(path: '/customer/booking/success', builder: (ctx, _) => const BookingSuccessScreen()),
       GoRoute(path: '/customer/booking/failed', builder: (ctx, _) => const BookingFailedScreen()),
@@ -78,4 +114,10 @@ GoRouter buildRouter(WidgetRef ref) {
       ),
     ],
   );
-}
+
+  ref.onDispose(() => notifier.dispose());
+  return router;
+});
+
+/// Convenience shim — main.dart uses this so it stays unchanged.
+GoRouter buildRouter(WidgetRef ref) => ref.watch(routerProvider);
