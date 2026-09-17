@@ -151,14 +151,14 @@ Future<ProviderModel> getProviderById(String providerId) async {
 Future<List<ProviderServiceModel>> getProviderServiceRows(String providerId) async {
   final data = await supabase
       .from('provider_services')
-      .select('id, service_id, price, service:services(id, name, description)')
+      .select('service_id, price, service:services(id, name, description)')
       .eq('provider_id', providerId);
 
   return (data as List).map((row) {
     final map = Map<String, dynamic>.from(row as Map);
     final service = Map<String, dynamic>.from((map['service'] ?? {}) as Map);
     return ProviderServiceModel(
-      id: map['id']?.toString() ?? map['service_id'].toString(),
+      id: map['service_id'].toString(),
       serviceId: map['service_id'].toString(),
       name: service['name'] as String? ?? 'Service',
       description: service['description'] as String? ?? '',

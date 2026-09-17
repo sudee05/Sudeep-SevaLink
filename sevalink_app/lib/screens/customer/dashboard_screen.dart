@@ -658,36 +658,24 @@ class _ProviderCard extends StatelessWidget {
                     overflow: TextOverflow.ellipsis,
                   ),
                 ),
-                Wrap(
-                  spacing: 6,
-                  runSpacing: 6,
-                  alignment: WrapAlignment.end,
-                  children: [
-                    OutlinedButton.icon(
-                      onPressed: onViewDetail,
-                      icon: const Icon(Icons.info_outline, size: 13),
-                      label: const Text('Details',
-                          style: TextStyle(fontSize: 12)),
-                      style: OutlinedButton.styleFrom(
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 10, vertical: 6),
-                        visualDensity: VisualDensity.compact,
-                        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                Expanded(
+                  child: Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    alignment: WrapAlignment.end,
+                    children: [
+                      OutlinedButton.icon(
+                        onPressed: onViewDetail,
+                        icon: const Icon(Icons.info_outline, size: 16),
+                        label: const Text('View Detail'),
                       ),
-                    ),
-                    ElevatedButton.icon(
-                      onPressed: onBook,
-                      icon: const Icon(Icons.calendar_month_outlined, size: 13),
-                      label: const Text('Book',
-                          style: TextStyle(fontSize: 12)),
-                      style: ElevatedButton.styleFrom(
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 10, vertical: 6),
-                        visualDensity: VisualDensity.compact,
-                        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                      ElevatedButton.icon(
+                        onPressed: onBook,
+                        icon: const Icon(Icons.calendar_month_outlined, size: 16),
+                        label: const Text('Book'),
                       ),
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
               ],
             ),
