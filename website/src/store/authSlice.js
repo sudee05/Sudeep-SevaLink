@@ -46,7 +46,7 @@ export const signInWithEmail = createAsyncThunk(
 
 export const signUpWithEmail = createAsyncThunk(
   'auth/signUp',
-  async ({ email, password, fullName, phone, role = 'customer' }, { rejectWithValue }) => {
+  async ({ email, password, fullName, phone, address = '', role = 'customer' }, { rejectWithValue }) => {
     try {
       const { data, error } = await supabase.auth.signUp({
         email,
@@ -55,13 +55,14 @@ export const signUpWithEmail = createAsyncThunk(
           data: {
             full_name: fullName,
             phone,
+            address,
             role,
           },
         },
       })
       if (error) throw error
 
-      // Update the profile with phone if provided
+      // Update the profile with address and phone if provided
       if (data.user) {
         await supabase
           .from('profiles')
@@ -69,6 +70,7 @@ export const signUpWithEmail = createAsyncThunk(
             id: data.user.id,
             full_name: fullName,
             phone: phone || '',
+            address: address || '',
             role,
           })
       }

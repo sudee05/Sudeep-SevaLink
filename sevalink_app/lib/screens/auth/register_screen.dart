@@ -1,6 +1,8 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:image_picker/image_picker.dart';
 import '../../providers/app_providers.dart';
 import '../../theme/app_theme.dart';
 import '../widgets/sevalink_logo.dart';
@@ -18,8 +20,11 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
   final _emailCtrl = TextEditingController();
   final _phoneCtrl = TextEditingController();
   final _passCtrl = TextEditingController();
+  final _addressCtrl = TextEditingController();
   String _role = 'customer';
   bool _obscure = true;
+  File? _avatarFile;
+  bool _pickingImage = false;
 
   @override
   void dispose() {
@@ -27,7 +32,25 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
     _emailCtrl.dispose();
     _phoneCtrl.dispose();
     _passCtrl.dispose();
+    _addressCtrl.dispose();
     super.dispose();
+  }
+
+  Future<void> _pickAvatar() async {
+    setState(() => _pickingImage = true);
+    try {
+      final picked = await ImagePicker().pickImage(
+        source: ImageSource.gallery,
+        maxWidth: 512,
+        maxHeight: 512,
+        imageQuality: 85,
+      );
+      if (picked != null && mounted) {
+        setState(() => _avatarFile = File(picked.path));
+      }
+    } finally {
+      if (mounted) setState(() => _pickingImage = false);
+    }
   }
 
   Future<void> _submit() async {
@@ -37,7 +60,9 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
           password: _passCtrl.text,
           fullName: _nameCtrl.text.trim(),
           phone: _phoneCtrl.text.trim(),
+          address: _addressCtrl.text.trim(),
           role: _role,
+          avatarFile: _avatarFile,
         );
     if (err != null && mounted) {
       showSnack(context, err, isError: true);
@@ -61,7 +86,59 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
               children: [
                 const SizedBox(height: 32),
                 const SevalinkLogo(),
-                const SizedBox(height: 40),
+                const SizedBox(height: 28),
+
+                // ── Avatar picker ──────────────────────────────
+                Center(
+                  child: GestureDetector(
+                    onTap: _pickingImage ? null : _pickAvatar,
+                    child: Stack(
+                      children: [
+                        CircleAvatar(
+                          radius: 44,
+                          backgroundColor: AppColors.primary.withValues(alpha: 0.12),
+                          backgroundImage:
+                              _avatarFile != null ? FileImage(_avatarFile!) : null,
+                          child: _avatarFile == null
+                              ? Icon(Icons.person_outline,
+                                  size: 44, color: AppColors.primary)
+                              : null,
+                        ),
+                        Positioned(
+                          bottom: 0,
+                          right: 0,
+                          child: Container(
+                            padding: const EdgeInsets.all(6),
+                            decoration: BoxDecoration(
+                              color: AppColors.primary,
+                              shape: BoxShape.circle,
+                              border: Border.all(
+                                  color: Theme.of(context).scaffoldBackgroundColor,
+                                  width: 2),
+                            ),
+                            child: _pickingImage
+                                ? const SizedBox(
+                                    width: 12,
+                                    height: 12,
+                                    child: CircularProgressIndicator(
+                                        strokeWidth: 2, color: Colors.white))
+                                : const Icon(Icons.camera_alt,
+                                    size: 12, color: Colors.white),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Center(
+                  child: Text('Profile photo (optional)',
+                      style: Theme.of(context)
+                          .textTheme
+                          .bodySmall
+                          ?.copyWith(color: AppColors.darkMuted)),
+                ),
+                const SizedBox(height: 24),
                 Text('Create Account',
                     style: Theme.of(context).textTheme.headlineMedium?.copyWith(fontWeight: FontWeight.w800)),
                 const SizedBox(height: 6),
@@ -110,12 +187,33 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                 TextFormField(
                   controller: _phoneCtrl,
                   keyboardType: TextInputType.phone,
+                  maxLength: 10,
                   decoration: const InputDecoration(
-                    hintText: 'Phone number',
+                    hintText: 'Phone number (10 digits)',
                     prefixIcon: Icon(Icons.phone_outlined),
+                    counterText: '',
+                  ),
+                  validator: (v) {
+                    if (v == null || v.trim().isEmpty) return 'Phone number is required';
+                    final digits = v.trim().replaceAll(RegExp(r'\s+'), '');
+                    if (!RegExp(r'^[6-9]\d{9}$').hasMatch(digits)) {
+                      return 'Enter a valid 10-digit mobile number';
+                    }
+                    return null;
+                  },
+                ),
+                const SizedBox(height: 12),
+                TextFormField(
+                  controller: _addressCtrl,
+                  keyboardType: TextInputType.streetAddress,
+                  maxLines: 2,
+                  decoration: const InputDecoration(
+                    hintText: 'Address',
+                    prefixIcon: Icon(Icons.location_on_outlined),
+                    alignLabelWithHint: true,
                   ),
                   validator: (v) =>
-                      v == null || v.trim().length < 10 ? 'Enter a valid phone' : null,
+                      v == null || v.trim().isEmpty ? 'Address is required' : null,
                 ),
                 const SizedBox(height: 12),
                 TextFormField(

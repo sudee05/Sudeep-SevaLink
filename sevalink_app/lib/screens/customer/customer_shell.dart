@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../providers/app_providers.dart';
 import '../../theme/app_theme.dart';
+import '../widgets/sevalink_logo.dart';
 
 
 class CustomerShell extends ConsumerWidget {
@@ -24,32 +25,9 @@ class CustomerShell extends ConsumerWidget {
 
     return Scaffold(
       appBar: AppBar(
-        leading: Padding(
-          padding: const EdgeInsets.only(left: 16),
-          child: Row(
-            children: [
-              Container(
-                width: 30,
-                height: 30,
-                decoration: BoxDecoration(
-                  gradient: const LinearGradient(
-                    colors: [AppColors.primary, AppColors.primaryDark],
-                  ),
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: const Icon(Icons.handshake_outlined, color: Colors.white, size: 16),
-              ),
-              const SizedBox(width: 8),
-              const Text(
-                'SevaLink',
-                style: TextStyle(
-                  color: AppColors.primary,
-                  fontWeight: FontWeight.w800,
-                  fontSize: 18,
-                ),
-              ),
-            ],
-          ),
+        leading: const Padding(
+          padding: EdgeInsets.only(left: 12),
+          child: SevalinkLogo(height: 28),
         ),
         leadingWidth: 160,
         actions: [

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../main.dart';
 import '../models/provider_profile.dart';
 import '../services/provider_api.dart';
 import 'dashboard_page.dart';
@@ -54,22 +55,12 @@ class _ProviderShellState extends State<ProviderShell> {
       appBar: AppBar(
         title: Row(
           children: [
-            Container(
-              padding: const EdgeInsets.all(4),
-              decoration: BoxDecoration(
-                color: Theme.of(context)
-                    .colorScheme
-                    .primary
-                    .withValues(alpha: 0.1),
-                borderRadius: BorderRadius.circular(6),
-              ),
-              child: Icon(
-                Icons.storefront_rounded,
-                size: 18,
-                color: Theme.of(context).colorScheme.primary,
-              ),
+            Image.asset(
+              'assets/sevalink_logo.png',
+              height: 30,
+              fit: BoxFit.contain,
             ),
-            const SizedBox(width: 8),
+            const SizedBox(width: 10),
             Text(
               _titleForIndex(_index),
               style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 16),
@@ -77,6 +68,16 @@ class _ProviderShellState extends State<ProviderShell> {
           ],
         ),
         actions: [
+          // Theme toggle
+          IconButton(
+            tooltip: 'Toggle theme',
+            onPressed: () => SevaLinkProviderApp.of(context).toggleTheme(),
+            icon: Icon(
+              Theme.of(context).brightness == Brightness.dark
+                  ? Icons.light_mode_outlined
+                  : Icons.dark_mode_outlined,
+            ),
+          ),
           IconButton(
             tooltip: 'Refresh',
             onPressed: _loadProfile,

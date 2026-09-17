@@ -1,3 +1,4 @@
+import 'dart:io';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../models/chat_message.dart';
@@ -30,16 +31,40 @@ class ProviderApi {
     required String phone,
     required String email,
     required String password,
+    String address = '',
+    File? avatarFile,
   }) async {
     try {
       final response = await client.auth.signUp(
         email: email,
         password: password,
-        data: {'full_name': fullName, 'phone': phone, 'role': 'provider'},
+        data: {
+          'full_name': fullName,
+          'phone': phone,
+          'address': address,
+          'role': 'provider',
+        },
       );
       if (response.user == null) throw Exception('Signup failed');
-      // Supabase may return a temporary session when email confirmation is disabled.
-      // Keep registration on the confirmation screen until the user logs in.
+
+      // Upload avatar if provided
+      if (avatarFile != null) {
+        try {
+          final ext = avatarFile.path.split('.').last;
+          final path = '${response.user!.id}/avatar.$ext';
+          await client.storage.from('avatars').upload(
+            path,
+            avatarFile,
+            fileOptions: const FileOptions(upsert: true),
+          );
+          final url = client.storage.from('avatars').getPublicUrl(path);
+          await client.from('profiles').update({'avatar_url': url}).eq('id', response.user!.id);
+        } catch (_) {
+          // Non-fatal
+        }
+      }
+
+      // Keep on confirmation screen until user explicitly logs in.
       if (response.session != null) await client.auth.signOut();
     } catch (error) {
       throw Exception(authErrorMessage(error, signingUp: true));

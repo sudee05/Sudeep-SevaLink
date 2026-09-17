@@ -1,3 +1,4 @@
+import 'dart:io';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../models/models.dart';
 
@@ -24,14 +25,39 @@ Future<Map<String, dynamic>> signUpWithEmail({
   required String password,
   required String fullName,
   required String phone,
+  String address = '',
   String role = 'customer',
+  File? avatarFile,
 }) async {
   final res = await supabase.auth.signUp(
     email: email,
     password: password,
-    data: {'full_name': fullName, 'phone': phone, 'role': role},
+    data: {
+      'full_name': fullName,
+      'phone': phone,
+      'address': address,
+      'role': role,
+    },
   );
   if (res.user == null) throw Exception('Registration failed');
+
+  // Upload avatar if provided
+  if (avatarFile != null) {
+    try {
+      final ext = avatarFile.path.split('.').last;
+      final path = '${res.user!.id}/avatar.$ext';
+      await supabase.storage.from('avatars').upload(
+        path,
+        avatarFile,
+        fileOptions: const FileOptions(upsert: true),
+      );
+      final url = supabase.storage.from('avatars').getPublicUrl(path);
+      await supabase.from('profiles').update({'avatar_url': url}).eq('id', res.user!.id);
+    } catch (_) {
+      // Avatar upload failure is non-fatal
+    }
+  }
+
   // Do not let an auto-created session bypass the email confirmation screen.
   if (res.session != null) await supabase.auth.signOut();
   return {'user': res.user};

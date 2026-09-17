@@ -659,22 +659,42 @@ class _ProviderCard extends StatelessWidget {
                   ),
                 ),
                 Expanded(
-                  child: Wrap(
-                    spacing: 8,
-                    runSpacing: 8,
-                    alignment: WrapAlignment.end,
-                    children: [
-                      OutlinedButton.icon(
-                        onPressed: onViewDetail,
-                        icon: const Icon(Icons.info_outline, size: 16),
-                        label: const Text('View Detail'),
-                      ),
-                      ElevatedButton.icon(
-                        onPressed: onBook,
-                        icon: const Icon(Icons.calendar_month_outlined, size: 16),
-                        label: const Text('Book'),
-                      ),
-                    ],
+                  child: FittedBox(
+                    fit: BoxFit.scaleDown,
+                    alignment: Alignment.centerRight,
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.end,
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        OutlinedButton.icon(
+                          onPressed: onViewDetail,
+                          icon: const Icon(Icons.info_outline, size: 12),
+                          label: const Text('Details'),
+                          style: OutlinedButton.styleFrom(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 8,
+                              vertical: 4,
+                            ),
+                            minimumSize: const Size(0, 32),
+                            tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                          ),
+                        ),
+                        const SizedBox(width: 4),
+                        ElevatedButton.icon(
+                          onPressed: onBook,
+                          icon: const Icon(Icons.calendar_month_outlined, size: 12),
+                          label: const Text('Book'),
+                          style: ElevatedButton.styleFrom(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 8,
+                              vertical: 4,
+                            ),
+                            minimumSize: const Size(0, 32),
+                            tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
                 ),
               ],

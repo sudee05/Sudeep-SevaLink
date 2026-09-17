@@ -127,14 +127,18 @@ function RegisterForm() {
   const schema = useMemo(() => z.object({
     name: z.string().min(2, 'Full name is required'),
     email: z.string().email('Enter a valid email'),
-    phone: z.string().min(10, 'Enter a valid phone number'),
+    phone: z
+      .string()
+      .min(1, 'Phone number is required')
+      .regex(/^[6-9]\d{9}$/, 'Enter a valid 10-digit mobile number'),
+    address: z.string().min(3, 'Address is required'),
     password: z.string().min(6, 'Password must be at least 6 chars'),
     confirmPassword: z.string().min(1, 'Please confirm your password'),
   }).refine((data) => data.password === data.confirmPassword, {
     message: 'Passwords do not match',
     path: ['confirmPassword'],
   }), [])
-  const form = useForm({ resolver: zodResolver(schema), defaultValues: { name: '', email: '', phone: '', password: '', confirmPassword: '' } })
+  const form = useForm({ resolver: zodResolver(schema), defaultValues: { name: '', email: '', phone: '', address: '', password: '', confirmPassword: '' } })
 
   async function onSubmit(values) {
     dispatch(clearError())
@@ -143,6 +147,7 @@ function RegisterForm() {
       password: values.password,
       fullName: values.name,
       phone: values.phone,
+      address: values.address,
       role: accountType,
     }))
     if (signUpWithEmail.fulfilled.match(result)) {
@@ -177,8 +182,20 @@ function RegisterForm() {
       {form.formState.errors.name && <p className="text-xs text-red-500">{form.formState.errors.name.message}</p>}
       <Input placeholder="Email" {...form.register('email')} />
       {form.formState.errors.email && <p className="text-xs text-red-500">{form.formState.errors.email.message}</p>}
-      <Input placeholder="Phone" {...form.register('phone')} />
+      <Input
+        placeholder="Phone (10-digit mobile)"
+        type="tel"
+        maxLength={10}
+        {...form.register('phone')}
+      />
       {form.formState.errors.phone && <p className="text-xs text-red-500">{form.formState.errors.phone.message}</p>}
+      <textarea
+        placeholder="Address"
+        rows={2}
+        className="flex w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring resize-none"
+        {...form.register('address')}
+      />
+      {form.formState.errors.address && <p className="text-xs text-red-500">{form.formState.errors.address.message}</p>}
       <PasswordInput placeholder="Password" {...form.register('password')} />
       {form.formState.errors.password && <p className="text-xs text-red-500">{form.formState.errors.password.message}</p>}
       <PasswordInput placeholder="Re-enter Password" {...form.register('confirmPassword')} />
@@ -229,12 +246,21 @@ export function ForgotPasswordPage() {
   const toast = useToast()
   const dispatch = useDispatch()
   const [email, setEmail] = useState('')
+  const [emailError, setEmailError] = useState('')
   const [sent, setSent] = useState(false)
+
+  function validateEmail(val) {
+    if (!val.trim()) return 'Email is required'
+    if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(val.trim())) return 'Enter a valid email address'
+    return ''
+  }
 
   async function handleSubmit(e) {
     e.preventDefault()
-    if (!email) return
-    const result = await dispatch(resetPassword({ email }))
+    const err = validateEmail(email)
+    if (err) { setEmailError(err); return }
+    setEmailError('')
+    const result = await dispatch(resetPassword({ email: email.trim() }))
     if (resetPassword.fulfilled.match(result)) {
       toast.success('Reset link sent! Check your email.')
       setSent(true)
@@ -243,16 +269,39 @@ export function ForgotPasswordPage() {
     }
   }
 
+  if (sent) {
+    return (
+      <AuthShell title="Check Your Email" subtitle={`We've sent a reset link to ${email.trim()}`}>
+        <div className="flex flex-col items-center gap-4 py-4">
+          <div className="rounded-full bg-green-100 p-5">
+            <svg xmlns="http://www.w3.org/2000/svg" width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="#16a34a" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M22 13V6a2 2 0 0 0-2-2H4a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h9" />
+              <path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7" />
+              <path d="m16 19 2 2 4-4" />
+            </svg>
+          </div>
+          <p className="text-sm text-muted-foreground text-center">Check your spam folder if you don't see it.</p>
+        </div>
+        <Link to="/login">
+          <Button className="w-full">Back to Login</Button>
+        </Link>
+      </AuthShell>
+    )
+  }
+
   return (
     <AuthShell title="Forgot Password" subtitle="We will send reset instructions to your email.">
       <form onSubmit={handleSubmit} className="space-y-3">
-        <Input
-          placeholder="Email address"
-          type="email"
-          value={email}
-          onChange={(e) => setEmail(e.target.value)}
-        />
-        <Button className="w-full" type="submit" disabled={sent}>
+        <div>
+          <Input
+            placeholder="Email address"
+            type="email"
+            value={email}
+            onChange={(e) => { setEmail(e.target.value); if (emailError) setEmailError('') }}
+          />
+          {emailError && <p className="mt-1 text-xs text-red-500">{emailError}</p>}
+        </div>
+        <Button className="w-full" type="submit">
           {sent ? 'Link Sent' : 'Send Reset Link'}
         </Button>
       </form>

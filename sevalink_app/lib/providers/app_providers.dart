@@ -1,3 +1,4 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -93,7 +94,9 @@ class AuthNotifier extends StateNotifier<AuthState> {
     required String password,
     required String fullName,
     required String phone,
+    String address = '',
     String role = 'customer',
+    File? avatarFile,
   }) async {
     state = state.copyWith(isLoading: true, error: null);
     try {
@@ -102,7 +105,9 @@ class AuthNotifier extends StateNotifier<AuthState> {
         password: password,
         fullName: fullName,
         phone: phone,
+        address: address,
         role: role,
+        avatarFile: avatarFile,
       );
       state = state.copyWith(isLoading: false);
       return null;
