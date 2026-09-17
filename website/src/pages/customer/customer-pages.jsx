@@ -43,6 +43,8 @@ import { SectionHeader } from "@/components/common/section-header";
 import { formatCurrency, formatDate } from "@/utils/format";
 import { selectProfile, selectUser, setAuth, signOut } from "@/store/authSlice";
 import {
+  acceptReschedule,
+  counterReschedule,
   createBookingWithPayment,
   createBookingComplaint,
   createBookingFeedback,
@@ -573,6 +575,34 @@ export function CustomerBookingDetailsPage() {
     onError: (error) => toast.error(error.message || "Could not update booking"),
   });
 
+  // Accept provider's proposed reschedule time
+  const acceptRescheduleMutation = useMutation({
+    mutationFn: () => acceptReschedule(booking.id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["bookings"] });
+      toast.success("Reschedule accepted! Booking time updated.");
+    },
+    onError: (error) => toast.error(error.message || "Could not accept reschedule"),
+  });
+
+  // Counter-propose a different time
+  const [counterOpen, setCounterOpen] = useState(false);
+  const [counterDate, setCounterDate] = useState('');
+  const [counterNote, setCounterNote] = useState('');
+  const counterMutation = useMutation({
+    mutationFn: ({ date, note }) => counterReschedule(booking.id, date, note),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["bookings"] });
+      toast.success("Counter-proposal sent to provider.");
+      setCounterOpen(false);
+      setCounterDate('');
+      setCounterNote('');
+    },
+    onError: (error) => toast.error(error.message || "Could not send counter-proposal"),
+  });
+
+  const anyBusy = statusMutation.isPending || acceptRescheduleMutation.isPending || counterMutation.isPending;
+
   if (!booking) return <EmptyState title="No booking found" />;
 
   function handleFeedbackSubmit(event) {
@@ -616,28 +646,103 @@ export function CustomerBookingDetailsPage() {
         </Card>
         <Card className="space-y-3">
           <h3 className="font-semibold">Actions</h3>
+
+          {/* Reschedule count badge */}
+          {(booking.reschedule_count ?? 0) > 0 && (
+            <p className="text-xs text-muted-foreground">
+              ⚠️ {booking.reschedule_count}/3 reschedules by provider
+            </p>
+          )}
+
+          {/* Provider requested reschedule — customer sees proposed time + 3 options */}
           {booking.status === "reschedule_requested" && (
             <>
+              <div className="rounded-lg border border-amber-500/30 bg-amber-500/10 p-3 space-y-2">
+                <p className="text-sm font-medium">
+                  🔄 Provider wants to reschedule to:
+                </p>
+                <p className="text-sm font-semibold">
+                  {booking.proposed_date ? formatDate(booking.proposed_date) : 'N/A'}
+                </p>
+                {booking.reschedule_note && (
+                  <p className="text-xs text-muted-foreground italic">"{booking.reschedule_note}"</p>
+                )}
+              </div>
               <Button
                 className="w-full"
-                disabled={statusMutation.isPending}
-                onClick={() => statusMutation.mutate("reschedule_accepted")}>
-                Accept Reschedule
+                disabled={anyBusy}
+                onClick={() => acceptRescheduleMutation.mutate()}>
+                {acceptRescheduleMutation.isPending ? 'Accepting...' : '✅ Accept New Time'}
               </Button>
               <Button
                 variant="outline"
                 className="w-full"
-                disabled={statusMutation.isPending}
-                onClick={() => statusMutation.mutate("reschedule_rejected")}>
-                Reject Reschedule
+                disabled={anyBusy}
+                onClick={() => setCounterOpen(true)}>
+                🔄 Propose Different Time
               </Button>
             </>
           )}
+
+          {/* Counter-propose dialog */}
+          {counterOpen && (
+            <div className="rounded-lg border border-border bg-muted/30 p-3 space-y-3">
+              <p className="text-sm font-medium">Suggest a time that works for you:</p>
+              <Input
+                type="datetime-local"
+                value={counterDate}
+                onChange={(e) => setCounterDate(e.target.value)}
+                min={new Date().toISOString().slice(0, 16)}
+              />
+              <Textarea
+                placeholder="Reason (optional)"
+                value={counterNote}
+                onChange={(e) => setCounterNote(e.target.value)}
+                rows={2}
+              />
+              <div className="flex gap-2">
+                <Button
+                  size="sm"
+                  disabled={counterMutation.isPending}
+                  onClick={() => {
+                    if (!counterDate) {
+                      toast.error('Please select a date and time');
+                      return;
+                    }
+                    counterMutation.mutate({ date: counterDate, note: counterNote });
+                  }}>
+                  {counterMutation.isPending ? 'Sending...' : 'Send Proposal'}
+                </Button>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => setCounterOpen(false)}>
+                  Cancel
+                </Button>
+              </div>
+            </div>
+          )}
+
+          {/* Waiting for provider to respond to customer counter */}
+          {booking.status === 'reschedule_counter' && booking.proposed_by === 'customer' && (
+            <div className="rounded-lg border border-blue-500/30 bg-blue-500/10 p-3">
+              <p className="text-sm">
+                ⏳ Waiting for provider to respond to your proposed time:
+                <span className="font-semibold ml-1">
+                  {booking.proposed_date ? formatDate(booking.proposed_date) : 'N/A'}
+                </span>
+              </p>
+              {booking.reschedule_note && (
+                <p className="text-xs text-muted-foreground italic mt-1">"{booking.reschedule_note}"</p>
+              )}
+            </div>
+          )}
+
           {!["completed", "cancelled", "rejected"].includes(booking.status) && (
             <Button
               variant="danger"
               className="w-full"
-              disabled={statusMutation.isPending}
+              disabled={anyBusy}
               onClick={() => statusMutation.mutate("cancelled")}>
               Cancel Booking
             </Button>

@@ -263,6 +263,43 @@ class ProviderApi {
     }
   }
 
+  /// Provider proposes a new date/time. Increments reschedule_count (max 3).
+  static Future<void> proposeReschedule(String bookingId, DateTime proposedDate, {String note = ''}) async {
+    // Fetch current count
+    final current = await client
+        .from('bookings')
+        .select('reschedule_count')
+        .eq('id', bookingId)
+        .single();
+    final count = (current['reschedule_count'] as int?) ?? 0;
+    if (count >= 3) {
+      throw Exception('Maximum reschedule limit (3) reached.');
+    }
+    await client.from('bookings').update({
+      'status': 'reschedule_requested',
+      'proposed_date': proposedDate.toUtc().toIso8601String(),
+      'proposed_by': 'provider',
+      'reschedule_count': count + 1,
+      'reschedule_note': note.isNotEmpty ? note : null,
+    }).eq('id', bookingId);
+  }
+
+  /// Provider accepts the customer's counter-proposed time.
+  static Future<void> acceptCounterReschedule(String bookingId) async {
+    final current = await client
+        .from('bookings')
+        .select('proposed_date')
+        .eq('id', bookingId)
+        .single();
+    await client.from('bookings').update({
+      'status': 'accepted',
+      'scheduled_date': current['proposed_date'],
+      'proposed_date': null,
+      'proposed_by': null,
+      'reschedule_note': null,
+    }).eq('id', bookingId);
+  }
+
   // ── Notifications ─────────────────────────────────────────────
 
   static Future<List<ProviderNotification>> getNotifications(

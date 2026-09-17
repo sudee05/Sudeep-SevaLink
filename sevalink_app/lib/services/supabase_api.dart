@@ -333,6 +333,33 @@ Future<void> updateBookingStatus(String bookingId, String status) async {
   await supabase.from('bookings').update({'status': status}).eq('id', bookingId);
 }
 
+/// Customer accepts the provider's proposed reschedule date.
+/// Copies proposed_date → scheduled_date and clears proposal fields.
+Future<void> acceptReschedule(String bookingId) async {
+  final current = await supabase
+      .from('bookings')
+      .select('proposed_date')
+      .eq('id', bookingId)
+      .single();
+  await supabase.from('bookings').update({
+    'status': 'accepted',
+    'scheduled_date': current['proposed_date'],
+    'proposed_date': null,
+    'proposed_by': null,
+    'reschedule_note': null,
+  }).eq('id', bookingId);
+}
+
+/// Customer counter-proposes their own time back to the provider.
+Future<void> counterReschedule(String bookingId, DateTime proposedDate, {String note = ''}) async {
+  await supabase.from('bookings').update({
+    'status': 'reschedule_counter',
+    'proposed_date': proposedDate.toUtc().toIso8601String(),
+    'proposed_by': 'customer',
+    'reschedule_note': note.isNotEmpty ? note : null,
+  }).eq('id', bookingId);
+}
+
 Future<void> submitFeedback({
   required String bookingId,
   required String providerId,

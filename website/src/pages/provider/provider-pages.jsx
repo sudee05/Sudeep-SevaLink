@@ -28,6 +28,8 @@ import {
   getProviderByUserId,
   markAllNotificationsRead,
   markNotificationRead,
+  proposeReschedule,
+  acceptCounterReschedule,
   setProviderServiceRows,
   updateBookingStatus,
   uploadProviderImage,
@@ -45,11 +47,13 @@ function ProviderBookingActions({ booking, onChanged }) {
   const queryClient = useQueryClient();
   const toast = useToast();
   const [confirmOpen, setConfirmOpen] = useState(false);
+  const [rescheduleOpen, setRescheduleOpen] = useState(false);
+  const [proposedDate, setProposedDate] = useState('');
+  const [rescheduleNote, setRescheduleNote] = useState('');
 
   // Immediately patch every cached bookings query that contains this booking
   function patchBookingInCache(updatedFields) {
     const merged = { ...booking, ...updatedFields };
-    // Optimistically update all cached booking arrays
     queryClient.setQueriesData({ queryKey: ["bookings"] }, (old) => {
       if (!Array.isArray(old)) return old;
       return old.map((b) => (b.id === booking.id ? { ...b, ...updatedFields } : b));
@@ -64,7 +68,6 @@ function ProviderBookingActions({ booking, onChanged }) {
         : updateBookingStatus(booking.id, status),
     onSuccess: (updatedBooking, status) => {
       patchBookingInCache({ ...updatedBooking, status });
-      // Also trigger a background re-fetch to sync server state
       queryClient.invalidateQueries({ queryKey: ["bookings"] });
       if (status === "cancelled") {
         toast.success("Booking cancelled. Refund notification sent to the customer.");
@@ -73,8 +76,35 @@ function ProviderBookingActions({ booking, onChanged }) {
     onError: (error) => toast.error(error.message || "Could not update booking"),
   });
 
-  const busy = statusMutation.isPending;
-  const canCancel = ["pending", "accepted", "confirmed", "in_progress", "reschedule_requested"].includes(booking.status);
+  // Reschedule mutation (provider proposes new time)
+  const rescheduleMutation = useMutation({
+    mutationFn: ({ date, note }) => proposeReschedule(booking.id, date, note),
+    onSuccess: (updatedBooking) => {
+      patchBookingInCache(updatedBooking);
+      queryClient.invalidateQueries({ queryKey: ["bookings"] });
+      toast.success('Reschedule request sent to customer.');
+      setRescheduleOpen(false);
+      setProposedDate('');
+      setRescheduleNote('');
+    },
+    onError: (error) => toast.error(error.message || 'Could not reschedule'),
+  });
+
+  // Accept customer's counter-proposed time
+  const acceptCounterMutation = useMutation({
+    mutationFn: () => acceptCounterReschedule(booking.id),
+    onSuccess: (updatedBooking) => {
+      patchBookingInCache(updatedBooking);
+      queryClient.invalidateQueries({ queryKey: ["bookings"] });
+      toast.success('Counter-reschedule accepted. Booking updated.');
+    },
+    onError: (error) => toast.error(error.message || 'Could not accept'),
+  });
+
+  const busy = statusMutation.isPending || rescheduleMutation.isPending || acceptCounterMutation.isPending;
+  const canCancel = ["pending", "accepted", "confirmed", "in_progress", "reschedule_requested", "reschedule_counter"].includes(booking.status);
+  const rescheduleCount = booking.reschedule_count ?? 0;
+  const canReschedule = ["pending", "accepted", "confirmed"].includes(booking.status) && rescheduleCount < 3;
 
   const updateStatus = (status) => {
     if (status === "cancelled") {
@@ -85,19 +115,11 @@ function ProviderBookingActions({ booking, onChanged }) {
   };
 
   if (booking.status === "completed") {
-    return (
-      <Badge variant="success" className="capitalize">
-        completed
-      </Badge>
-    );
+    return <Badge variant="success" className="capitalize">completed</Badge>;
   }
 
   if (booking.status === "cancelled" || booking.status === "rejected") {
-    return (
-      <Badge variant="outline" className="capitalize">
-        {booking.status}
-      </Badge>
-    );
+    return <Badge variant="outline" className="capitalize">{booking.status}</Badge>;
   }
 
   return (
@@ -115,25 +137,103 @@ function ProviderBookingActions({ booking, onChanged }) {
         }}
         onCancel={() => setConfirmOpen(false)}
       />
+
+      {/* Reschedule Dialog */}
+      <ConfirmDialog
+        open={rescheduleOpen}
+        title="Propose New Time"
+        description={`Select a new date & time for this booking. (${rescheduleCount}/3 reschedules used)`}
+        confirmLabel={rescheduleMutation.isPending ? 'Sending...' : 'Send Reschedule'}
+        cancelLabel="Cancel"
+        onConfirm={() => {
+          if (!proposedDate) {
+            toast.error('Please select a date and time');
+            return;
+          }
+          rescheduleMutation.mutate({ date: proposedDate, note: rescheduleNote });
+        }}
+        onCancel={() => setRescheduleOpen(false)}
+      >
+        <div className="space-y-3 mt-3">
+          <label className="text-sm font-medium">New Date & Time</label>
+          <Input
+            type="datetime-local"
+            value={proposedDate}
+            onChange={(e) => setProposedDate(e.target.value)}
+            min={new Date().toISOString().slice(0, 16)}
+          />
+          <label className="text-sm font-medium">Reason (optional)</label>
+          <Textarea
+            placeholder="Why do you need to reschedule?"
+            value={rescheduleNote}
+            onChange={(e) => setRescheduleNote(e.target.value)}
+            rows={2}
+          />
+        </div>
+      </ConfirmDialog>
+
+      {/* Reschedule count badge */}
+      {rescheduleCount > 0 && (
+        <p className="text-xs text-muted-foreground mb-1">
+          ⚠️ {rescheduleCount}/3 reschedules used
+        </p>
+      )}
+
+      {/* When customer counter-proposed a time */}
+      {booking.status === 'reschedule_counter' && (
+        <div className="rounded-lg border border-amber-500/30 bg-amber-500/10 p-3 mb-2 space-y-2">
+          <p className="text-sm font-medium">
+            🔄 Customer proposed a new time:
+          </p>
+          <p className="text-sm font-semibold">
+            {booking.proposed_date ? formatDate(booking.proposed_date) : 'N/A'}
+          </p>
+          {booking.reschedule_note && (
+            <p className="text-xs text-muted-foreground italic">"{booking.reschedule_note}"</p>
+          )}
+          <div className="flex gap-2">
+            <Button size="sm" disabled={busy} onClick={() => acceptCounterMutation.mutate()}>
+              {acceptCounterMutation.isPending ? 'Accepting...' : 'Accept Time'}
+            </Button>
+            <Button size="sm" variant="danger" disabled={busy} onClick={() => updateStatus('cancelled')}>
+              Cancel Booking
+            </Button>
+          </div>
+        </div>
+      )}
+
+      {/* When provider already requested a reschedule */}
+      {booking.status === 'reschedule_requested' && booking.proposed_by === 'provider' && (
+        <div className="rounded-lg border border-blue-500/30 bg-blue-500/10 p-3 mb-2">
+          <p className="text-sm">
+            ⏳ Waiting for customer to respond to your proposed time:
+            <span className="font-semibold ml-1">
+              {booking.proposed_date ? formatDate(booking.proposed_date) : 'N/A'}
+            </span>
+          </p>
+          {booking.reschedule_note && (
+            <p className="text-xs text-muted-foreground italic mt-1">"{booking.reschedule_note}"</p>
+          )}
+        </div>
+      )}
+
       <div className="flex flex-wrap gap-1">
         {booking.status === "pending" && (
-          <>
-            <Button size="sm" disabled={busy} onClick={() => statusMutation.mutate("accepted")}>
-              Accept
-            </Button>
-          </>
+          <Button size="sm" disabled={busy} onClick={() => statusMutation.mutate("accepted")}>
+            Accept
+          </Button>
         )}
-        {canCancel && (
+        {canCancel && booking.status !== 'reschedule_counter' && (
           <Button size="sm" variant="danger" disabled={busy} onClick={() => updateStatus("cancelled")}>
             Cancel
           </Button>
         )}
-        {["pending", "accepted", "confirmed"].includes(booking.status) && (
+        {canReschedule && (
           <Button
             size="sm"
             variant="outline"
             disabled={busy}
-            onClick={() => updateStatus("reschedule_requested")}>
+            onClick={() => setRescheduleOpen(true)}>
             Reschedule
           </Button>
         )}

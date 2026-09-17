@@ -609,16 +609,116 @@ export async function cancelBookingWithRefund(id) {
   return { id, status: "cancelled", payment_status: "refunded", ...(data || {}) };
 }
 
+// ── Reschedule negotiation ─────────────────────────────────────
+
+/** Provider proposes a new time. Increments reschedule_count (max 3). */
+export async function proposeReschedule(id, proposedDate, note = '') {
+  // Fetch current count first
+  const { data: current, error: fetchErr } = await supabase
+    .from('bookings')
+    .select('reschedule_count')
+    .eq('id', id)
+    .single();
+  if (fetchErr) throw fetchErr;
+
+  const currentCount = current?.reschedule_count ?? 0;
+  if (currentCount >= 3) {
+    throw new Error('Maximum reschedule limit (3) reached for this booking.');
+  }
+
+  const { data, error } = await supabase
+    .from('bookings')
+    .update({
+      status: 'reschedule_requested',
+      proposed_date: proposedDate,
+      proposed_by: 'provider',
+      reschedule_count: currentCount + 1,
+      reschedule_note: note || null,
+    })
+    .eq('id', id)
+    .select()
+    .single();
+  if (error) throw error;
+  return data;
+}
+
+/** Customer accepts the provider's proposed date → updates scheduled_date. */
+export async function acceptReschedule(id) {
+  // Fetch proposed_date
+  const { data: current, error: fetchErr } = await supabase
+    .from('bookings')
+    .select('proposed_date')
+    .eq('id', id)
+    .single();
+  if (fetchErr) throw fetchErr;
+
+  const { data, error } = await supabase
+    .from('bookings')
+    .update({
+      status: 'accepted',
+      scheduled_date: current.proposed_date,
+      proposed_date: null,
+      proposed_by: null,
+      reschedule_note: null,
+    })
+    .eq('id', id)
+    .select()
+    .single();
+  if (error) throw error;
+  return data;
+}
+
+/** Customer counter-proposes their own preferred time. */
+export async function counterReschedule(id, proposedDate, note = '') {
+  const { data, error } = await supabase
+    .from('bookings')
+    .update({
+      status: 'reschedule_counter',
+      proposed_date: proposedDate,
+      proposed_by: 'customer',
+      reschedule_note: note || null,
+    })
+    .eq('id', id)
+    .select()
+    .single();
+  if (error) throw error;
+  return data;
+}
+
+/** Provider accepts the customer's counter-proposed date. */
+export async function acceptCounterReschedule(id) {
+  const { data: current, error: fetchErr } = await supabase
+    .from('bookings')
+    .select('proposed_date')
+    .eq('id', id)
+    .single();
+  if (fetchErr) throw fetchErr;
+
+  const { data, error } = await supabase
+    .from('bookings')
+    .update({
+      status: 'accepted',
+      scheduled_date: current.proposed_date,
+      proposed_date: null,
+      proposed_by: null,
+      reschedule_note: null,
+    })
+    .eq('id', id)
+    .select()
+    .single();
+  if (error) throw error;
+  return data;
+}
+
+/** Legacy: kept for backwards compat */
 export async function requestBookingReschedule(id) {
-  return updateBookingStatus(id, "reschedule_requested");
+  return updateBookingStatus(id, 'reschedule_requested');
 }
-
 export async function acceptBookingReschedule(id) {
-  return updateBookingStatus(id, "reschedule_accepted");
+  return acceptReschedule(id);
 }
-
 export async function rejectBookingReschedule(id) {
-  return updateBookingStatus(id, "reschedule_rejected");
+  return updateBookingStatus(id, 'reschedule_rejected');
 }
 
 export async function createBookingFeedback(feedback) {

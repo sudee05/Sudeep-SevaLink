@@ -204,6 +204,10 @@ class BookingModel {
   final String? customerId;
   final String? providerId;
   final String? serviceId;
+  final DateTime? proposedDate;
+  final String? proposedBy;
+  final int rescheduleCount;
+  final String? rescheduleNote;
 
   const BookingModel({
     required this.id,
@@ -223,12 +227,17 @@ class BookingModel {
     this.customerId,
     this.providerId,
     this.serviceId,
+    this.proposedDate,
+    this.proposedBy,
+    this.rescheduleCount = 0,
+    this.rescheduleNote,
   });
 
   factory BookingModel.fromJson(Map<String, dynamic> json) {
     final provider = json['provider'];
     final service = json['service'];
     final dateStr = json['scheduled_date'] ?? json['booking_date'] ?? json['created_at'];
+    final proposedStr = json['proposed_date'];
     return BookingModel(
       id: json['id'].toString(),
       bookingCode: json['booking_code'] as String?,
@@ -247,6 +256,10 @@ class BookingModel {
       customerId: json['customer_id'] as String?,
       providerId: json['provider_id'] as String?,
       serviceId: json['service_id']?.toString(),
+      proposedDate: proposedStr != null ? DateTime.tryParse(proposedStr.toString()) : null,
+      proposedBy: json['proposed_by'] as String?,
+      rescheduleCount: (json['reschedule_count'] as int?) ?? 0,
+      rescheduleNote: json['reschedule_note'] as String?,
     );
   }
 }

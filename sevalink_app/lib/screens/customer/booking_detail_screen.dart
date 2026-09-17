@@ -125,15 +125,82 @@ class _TabChip extends StatelessWidget {
   }
 }
 
-class _DetailsTab extends ConsumerWidget {
+class _DetailsTab extends ConsumerStatefulWidget {
   final BookingModel booking;
   final VoidCallback onStatusChanged;
 
   const _DetailsTab({required this.booking, required this.onStatusChanged});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<_DetailsTab> createState() => _DetailsTabState();
+}
+
+class _DetailsTabState extends ConsumerState<_DetailsTab> {
+  bool _showCounterForm = false;
+  DateTime? _counterDate;
+  TimeOfDay? _counterTime;
+  final _counterNoteCtrl = TextEditingController();
+  bool _busy = false;
+
+  @override
+  void dispose() {
+    _counterNoteCtrl.dispose();
+    super.dispose();
+  }
+
+  Future<void> _acceptReschedule() async {
+    setState(() => _busy = true);
+    try {
+      await api.acceptReschedule(widget.booking.id);
+      widget.onStatusChanged();
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Reschedule accepted! Time updated.')),
+        );
+      }
+    } catch (e) {
+      if (mounted) showSnack(context, e.toString(), isError: true);
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
+  Future<void> _submitCounterProposal() async {
+    if (_counterDate == null || _counterTime == null) {
+      showSnack(context, 'Please select both date and time', isError: true);
+      return;
+    }
+    setState(() => _busy = true);
+    try {
+      final proposedDt = DateTime(
+        _counterDate!.year, _counterDate!.month, _counterDate!.day,
+        _counterTime!.hour, _counterTime!.minute,
+      );
+      await api.counterReschedule(
+        widget.booking.id,
+        proposedDt,
+        note: _counterNoteCtrl.text.trim(),
+      );
+      widget.onStatusChanged();
+      if (mounted) {
+        setState(() => _showCounterForm = false);
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Counter-proposal sent to provider.')),
+        );
+      }
+    } catch (e) {
+      if (mounted) showSnack(context, e.toString(), isError: true);
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final booking = widget.booking;
     final fmt = DateFormat('dd MMM yyyy, hh:mm a');
+    final rescheduleCount = booking.rescheduleCount;
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -153,6 +220,13 @@ class _DetailsTab extends ConsumerWidget {
                   _DetailRow(Icons.location_on_outlined, 'Address', booking.address!),
                 const SizedBox(height: 10),
                 _StatusBadge(status: booking.status),
+                if (rescheduleCount > 0) ...[
+                  const SizedBox(height: 8),
+                  Text(
+                    '⚠️ $rescheduleCount/3 reschedules by provider',
+                    style: TextStyle(fontSize: 11, color: AppColors.warning),
+                  ),
+                ],
               ],
             ),
           ),
@@ -166,30 +240,167 @@ class _DetailsTab extends ConsumerWidget {
               children: [
                 const Text('Actions', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 16)),
                 const SizedBox(height: 12),
+
+                // Provider requested reschedule — show proposed time + 3 options
                 if (booking.status == 'reschedule_requested') ...[
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: Colors.amber.withValues(alpha: 0.1),
+                      borderRadius: BorderRadius.circular(10),
+                      border: Border.all(color: Colors.amber.withValues(alpha: 0.3)),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Text('🔄 Provider wants to reschedule to:',
+                            style: TextStyle(fontWeight: FontWeight.w600, fontSize: 13)),
+                        const SizedBox(height: 4),
+                        Text(
+                          booking.proposedDate != null ? fmt.format(booking.proposedDate!) : 'N/A',
+                          style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14),
+                        ),
+                        if (booking.rescheduleNote != null && booking.rescheduleNote!.isNotEmpty) ...[
+                          const SizedBox(height: 4),
+                          Text('"${booking.rescheduleNote}"',
+                              style: TextStyle(fontSize: 12, fontStyle: FontStyle.italic, color: AppColors.darkMuted)),
+                        ],
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 10),
                   SizedBox(
                     width: double.infinity,
                     child: ElevatedButton(
-                      onPressed: () async {
-                        await api.updateBookingStatus(booking.id, 'reschedule_accepted');
-                        onStatusChanged();
-                      },
-                      child: const Text('Accept Reschedule'),
+                      onPressed: _busy ? null : _acceptReschedule,
+                      child: _busy
+                          ? const SizedBox(height: 18, width: 18, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                          : const Text('✅ Accept New Time'),
                     ),
                   ),
                   const SizedBox(height: 8),
                   SizedBox(
                     width: double.infinity,
                     child: OutlinedButton(
-                      onPressed: () async {
-                        await api.updateBookingStatus(booking.id, 'reschedule_rejected');
-                        onStatusChanged();
-                      },
-                      child: const Text('Reject Reschedule'),
+                      onPressed: _busy ? null : () => setState(() => _showCounterForm = !_showCounterForm),
+                      child: const Text('🔄 Propose Different Time'),
+                    ),
+                  ),
+                  if (_showCounterForm) ...[
+                    const SizedBox(height: 10),
+                    Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: Theme.of(context).colorScheme.surface,
+                        borderRadius: BorderRadius.circular(10),
+                        border: Border.all(color: AppColors.darkBorder),
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Text('Suggest a time:', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 13)),
+                          const SizedBox(height: 8),
+                          Row(
+                            children: [
+                              Expanded(
+                                child: OutlinedButton.icon(
+                                  icon: const Icon(Icons.calendar_today, size: 14),
+                                  label: Text(_counterDate != null
+                                      ? DateFormat('dd MMM yyyy').format(_counterDate!)
+                                      : 'Pick Date'),
+                                  onPressed: () async {
+                                    final d = await showDatePicker(
+                                      context: context,
+                                      initialDate: DateTime.now().add(const Duration(days: 1)),
+                                      firstDate: DateTime.now(),
+                                      lastDate: DateTime.now().add(const Duration(days: 90)),
+                                    );
+                                    if (d != null) setState(() => _counterDate = d);
+                                  },
+                                ),
+                              ),
+                              const SizedBox(width: 8),
+                              Expanded(
+                                child: OutlinedButton.icon(
+                                  icon: const Icon(Icons.access_time, size: 14),
+                                  label: Text(_counterTime != null
+                                      ? _counterTime!.format(context)
+                                      : 'Pick Time'),
+                                  onPressed: () async {
+                                    final t = await showTimePicker(
+                                      context: context,
+                                      initialTime: TimeOfDay.now(),
+                                    );
+                                    if (t != null) setState(() => _counterTime = t);
+                                  },
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 8),
+                          TextField(
+                            controller: _counterNoteCtrl,
+                            decoration: const InputDecoration(hintText: 'Reason (optional)', isDense: true),
+                            maxLines: 2,
+                          ),
+                          const SizedBox(height: 8),
+                          Row(
+                            children: [
+                              Expanded(
+                                child: ElevatedButton(
+                                  onPressed: _busy ? null : _submitCounterProposal,
+                                  child: _busy
+                                      ? const SizedBox(height: 16, width: 16, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                                      : const Text('Send Proposal'),
+                                ),
+                              ),
+                              const SizedBox(width: 8),
+                              OutlinedButton(
+                                onPressed: () => setState(() => _showCounterForm = false),
+                                child: const Text('Cancel'),
+                              ),
+                            ],
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                  const SizedBox(height: 8),
+                ],
+
+                // Waiting for provider to respond to customer counter
+                if (booking.status == 'reschedule_counter' && booking.proposedBy == 'customer') ...[
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: Colors.blue.withValues(alpha: 0.08),
+                      borderRadius: BorderRadius.circular(10),
+                      border: Border.all(color: Colors.blue.withValues(alpha: 0.3)),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Text('⏳ Waiting for provider to respond',
+                            style: TextStyle(fontWeight: FontWeight.w600, fontSize: 13)),
+                        const SizedBox(height: 4),
+                        Text(
+                          'Your proposed time: ${booking.proposedDate != null ? fmt.format(booking.proposedDate!) : "N/A"}',
+                          style: const TextStyle(fontWeight: FontWeight.w500, fontSize: 13),
+                        ),
+                        if (booking.rescheduleNote != null && booking.rescheduleNote!.isNotEmpty) ...[
+                          const SizedBox(height: 4),
+                          Text('"${booking.rescheduleNote}"',
+                              style: TextStyle(fontSize: 12, fontStyle: FontStyle.italic, color: AppColors.darkMuted)),
+                        ],
+                      ],
                     ),
                   ),
                   const SizedBox(height: 8),
                 ],
+
                 SizedBox(
                   width: double.infinity,
                   child: OutlinedButton.icon(
@@ -206,14 +417,16 @@ class _DetailsTab extends ConsumerWidget {
                     width: double.infinity,
                     child: ElevatedButton(
                       style: ElevatedButton.styleFrom(backgroundColor: AppColors.danger),
-                      onPressed: () async {
+                      onPressed: _busy ? null : () async {
+                        setState(() => _busy = true);
                         await api.updateBookingStatus(booking.id, 'cancelled');
-                        onStatusChanged();
+                        widget.onStatusChanged();
                         if (context.mounted) {
                           ScaffoldMessenger.of(context).showSnackBar(
                             const SnackBar(
                                 content: Text('Booking cancelled'), backgroundColor: Colors.red));
                         }
+                        if (mounted) setState(() => _busy = false);
                       },
                       child: const Text('Cancel Booking'),
                     ),
