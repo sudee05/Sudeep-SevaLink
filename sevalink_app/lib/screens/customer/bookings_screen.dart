@@ -147,7 +147,7 @@ class _BookingCard extends StatelessWidget {
                   children: [
                     const Icon(Icons.calendar_today_outlined, size: 13, color: AppColors.darkMuted),
                     const SizedBox(width: 4),
-                    Text(fmt.format(booking.scheduledDate!),
+                    Text(fmt.format(booking.scheduledDate!.toLocal()),
                         style: Theme.of(context).textTheme.bodySmall),
                   ],
                 ),

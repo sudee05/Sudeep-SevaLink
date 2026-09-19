@@ -145,6 +145,25 @@ class _AuthScreenState extends State<AuthScreen> {
     }
   }
 
+  Future<void> _signInWithGoogle() async {
+    setState(() {
+      _busy = true;
+      _error = null;
+    });
+    try {
+      await ProviderApi.signInWithGoogle();
+    } catch (error) {
+      if (mounted) {
+        setState(
+          () => _error =
+              ProviderApi.authErrorMessage(error, signingUp: false),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     if (_showConfirmation) {
@@ -385,6 +404,46 @@ class _AuthScreenState extends State<AuthScreen> {
                                           fontWeight: FontWeight.w700),
                                     ),
                             ),
+                            if (!_signup) ...[
+                              const SizedBox(height: 12),
+                              // ── OR divider ───────────────────
+                              Row(
+                                children: [
+                                  const Expanded(child: Divider()),
+                                  Padding(
+                                    padding: const EdgeInsets.symmetric(horizontal: 16),
+                                    child: Text('OR',
+                                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                                              color: const Color(0xFF9CA3AF),
+                                              letterSpacing: 1.2,
+                                            )),
+                                  ),
+                                  const Expanded(child: Divider()),
+                                ],
+                              ),
+                              const SizedBox(height: 12),
+                              // ── Google Sign-In button ────────
+                              OutlinedButton.icon(
+                                onPressed: _busy ? null : _signInWithGoogle,
+                                icon: Image.network(
+                                  'https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg',
+                                  height: 20,
+                                  width: 20,
+                                  errorBuilder: (_, __, ___) =>
+                                      const Icon(Icons.g_mobiledata, size: 24),
+                                ),
+                                label: const Text('Sign in with Google'),
+                                style: OutlinedButton.styleFrom(
+                                  padding: const EdgeInsets.symmetric(
+                                      vertical: 14),
+                                  side: BorderSide(
+                                      color: cs.outline.withValues(alpha: 0.3)),
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(12),
+                                  ),
+                                ),
+                              ),
+                            ],
                             const SizedBox(height: 8),
                             TextButton(
                               onPressed: _busy

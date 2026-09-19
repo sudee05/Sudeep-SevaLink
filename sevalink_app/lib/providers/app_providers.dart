@@ -89,6 +89,22 @@ class AuthNotifier extends StateNotifier<AuthState> {
     }
   }
 
+  Future<String?> signInWithGoogle() async {
+    state = state.copyWith(isLoading: true, error: null);
+    try {
+      final res = await api.signInWithGoogle();
+      state = AuthState(
+        user: res['user'] as User,
+        profile: res['profile'] as AppUser,
+        isLoading: false,
+      );
+      return null;
+    } catch (e) {
+      state = state.copyWith(isLoading: false, error: e.toString());
+      return e.toString();
+    }
+  }
+
   Future<String?> signUp({
     required String email,
     required String password,

@@ -978,7 +978,7 @@ class _RecentBookingTile extends StatelessWidget {
                   Text(booking.providerName ?? 'Provider',
                       style: Theme.of(context).textTheme.bodySmall),
                   if (booking.scheduledDate != null)
-                    Text(fmt.format(booking.scheduledDate!),
+                    Text(fmt.format(booking.scheduledDate!.toLocal()),
                         style: Theme.of(context).textTheme.bodySmall?.copyWith(color: AppColors.darkMuted)),
                 ],
               ),

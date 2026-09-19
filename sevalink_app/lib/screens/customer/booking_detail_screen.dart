@@ -215,7 +215,7 @@ class _DetailsTabState extends ConsumerState<_DetailsTab> {
                 _DetailRow(Icons.home_repair_service_outlined, 'Service', booking.serviceTitle ?? '-'),
                 _DetailRow(Icons.person_outline, 'Provider', booking.providerName ?? '-'),
                 if (booking.scheduledDate != null)
-                  _DetailRow(Icons.calendar_today_outlined, 'Scheduled', fmt.format(booking.scheduledDate!)),
+                  _DetailRow(Icons.calendar_today_outlined, 'Scheduled', fmt.format(booking.scheduledDate!.toLocal())),
                 if (booking.address != null)
                   _DetailRow(Icons.location_on_outlined, 'Address', booking.address!),
                 const SizedBox(height: 10),
@@ -258,7 +258,7 @@ class _DetailsTabState extends ConsumerState<_DetailsTab> {
                             style: TextStyle(fontWeight: FontWeight.w600, fontSize: 13)),
                         const SizedBox(height: 4),
                         Text(
-                          booking.proposedDate != null ? fmt.format(booking.proposedDate!) : 'N/A',
+                          booking.proposedDate != null ? fmt.format(booking.proposedDate!.toLocal()) : 'N/A',
                           style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14),
                         ),
                         if (booking.rescheduleNote != null && booking.rescheduleNote!.isNotEmpty) ...[
@@ -371,7 +371,7 @@ class _DetailsTabState extends ConsumerState<_DetailsTab> {
                 ],
 
                 // Waiting for provider to respond to customer counter
-                if (booking.status == 'reschedule_counter' && booking.proposedBy == 'customer') ...[
+                if (booking.status == 'reschedule_counter') ...[
                   Container(
                     width: double.infinity,
                     padding: const EdgeInsets.all(12),
@@ -387,7 +387,7 @@ class _DetailsTabState extends ConsumerState<_DetailsTab> {
                             style: TextStyle(fontWeight: FontWeight.w600, fontSize: 13)),
                         const SizedBox(height: 4),
                         Text(
-                          'Your proposed time: ${booking.proposedDate != null ? fmt.format(booking.proposedDate!) : "N/A"}',
+                          'Your proposed time: ${booking.proposedDate != null ? fmt.format(booking.proposedDate!.toLocal()) : "N/A"}',
                           style: const TextStyle(fontWeight: FontWeight.w500, fontSize: 13),
                         ),
                         if (booking.rescheduleNote != null && booking.rescheduleNote!.isNotEmpty) ...[
@@ -783,6 +783,29 @@ class _ComplaintTabState extends ConsumerState<_ComplaintTab> {
   final _subjectCtrl = TextEditingController();
   final _commentCtrl = TextEditingController();
   bool _loading = false;
+  bool _checkingSubmission = true;
+  bool _submitted = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadSubmissionStatus();
+  }
+
+  Future<void> _loadSubmissionStatus() async {
+    try {
+      final submitted = await api.hasSubmittedComplaint(
+        bookingId: widget.booking.id,
+        customerId: widget.userId,
+      );
+      if (mounted) setState(() => _submitted = submitted);
+    } catch (_) {
+      // Keep the form available if the status lookup fails; the database still
+      // enforces one complaint per booking.
+    } finally {
+      if (mounted) setState(() => _checkingSubmission = false);
+    }
+  }
 
   @override
   void dispose() {
@@ -808,7 +831,10 @@ class _ComplaintTabState extends ConsumerState<_ComplaintTab> {
       );
       _subjectCtrl.clear();
       _commentCtrl.clear();
-      if (mounted) showSnack(context, 'Complaint submitted successfully.');
+      if (mounted) {
+        setState(() => _submitted = true);
+        showSnack(context, 'Complaint submitted successfully.');
+      }
     } catch (e) {
       if (mounted) showSnack(context, e.toString(), isError: true);
     } finally {
@@ -818,6 +844,19 @@ class _ComplaintTabState extends ConsumerState<_ComplaintTab> {
 
   @override
   Widget build(BuildContext context) {
+    if (_checkingSubmission) {
+      return const Center(child: CircularProgressIndicator());
+    }
+
+    if (_submitted) {
+      return const Card(
+        child: Padding(
+          padding: EdgeInsets.all(16),
+          child: Text('Complaint already submitted for this booking. We will get in touch with you within 2-7 working days.'),
+        ),
+      );
+    }
+
     return Card(
       child: Padding(
         padding: const EdgeInsets.all(16),

@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'package:google_sign_in/google_sign_in.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../models/chat_message.dart';
@@ -13,6 +14,10 @@ class ProviderApi {
   static const _invalidProviderRoleMessage =
       'Invalid account. Please log in with a provider account.';
 
+  /// Web client ID from Google Cloud Console (same one configured in Supabase).
+  static const _webClientId =
+      '389406237420-ubj6i6d05oc4idk9tq4jcnm27m0a5t5k.apps.googleusercontent.com';
+
   // ── Auth ──────────────────────────────────────────────────────
 
   static Future<void> signIn(String email, String password) async {
@@ -20,6 +25,43 @@ class ProviderApi {
       final response =
           await client.auth.signInWithPassword(email: email, password: password);
       if (response.user == null) throw Exception('Login failed');
+      await ensureProviderRole(response.user!.id);
+    } catch (error) {
+      throw Exception(authErrorMessage(error, signingUp: false));
+    }
+  }
+
+  static Future<void> signInWithGoogle() async {
+    try {
+      final googleSignIn = GoogleSignIn(serverClientId: _webClientId);
+      final googleUser = await googleSignIn.signIn();
+      if (googleUser == null) throw Exception('Google sign-in cancelled');
+
+      final googleAuth = await googleUser.authentication;
+      final idToken = googleAuth.idToken;
+      final accessToken = googleAuth.accessToken;
+      if (idToken == null) throw Exception('Failed to get Google ID token');
+
+      final response = await client.auth.signInWithIdToken(
+        provider: OAuthProvider.google,
+        idToken: idToken,
+        accessToken: accessToken,
+      );
+      if (response.user == null) throw Exception('Google sign-in failed');
+
+      // Check if the user has a registered profile
+      final existing = await client
+          .from('profiles')
+          .select('id, role, phone')
+          .eq('id', response.user!.id)
+          .maybeSingle();
+
+      if (existing == null || existing['role'] == null || (existing['role'] as String).isEmpty || existing['phone'] == null || (existing['phone'] as String).isEmpty) {
+        // Not registered — sign out and ask them to register first
+        await client.auth.signOut();
+        throw Exception('No account found. Please register first, then use Google to sign in.');
+      }
+
       await ensureProviderRole(response.user!.id);
     } catch (error) {
       throw Exception(authErrorMessage(error, signingUp: false));
@@ -278,7 +320,6 @@ class ProviderApi {
     await client.from('bookings').update({
       'status': 'reschedule_requested',
       'proposed_date': proposedDate.toUtc().toIso8601String(),
-      'proposed_by': 'provider',
       'reschedule_count': count + 1,
       'reschedule_note': note.isNotEmpty ? note : null,
     }).eq('id', bookingId);
@@ -295,7 +336,6 @@ class ProviderApi {
       'status': 'accepted',
       'scheduled_date': current['proposed_date'],
       'proposed_date': null,
-      'proposed_by': null,
       'reschedule_note': null,
     }).eq('id', bookingId);
   }
@@ -332,6 +372,8 @@ class ProviderApi {
   static bool isChatEnabled(String status) => const {
         'accepted',
         'confirmed',
+        'reschedule_requested',
+        'reschedule_counter',
         'in_progress',
         'completed',
       }.contains(status);

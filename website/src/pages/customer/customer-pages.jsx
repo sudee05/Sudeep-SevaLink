@@ -530,12 +530,12 @@ export function CustomerBookingDetailsPage() {
 
   useEffect(() => {
     let active = true;
-    if (!booking?.service_id || !profile?.id) {
+    if (!booking?.id || !profile?.id) {
       return () => { active = false; };
     }
 
     setSubmissionStatus((status) => ({ ...status, loading: true }));
-    getCustomerServiceSubmissionStatus({ serviceId: booking.service_id, customerId: profile.id })
+    getCustomerServiceSubmissionStatus({ serviceId: booking.service_id, customerId: profile.id, bookingId: booking.id })
       .then((status) => {
         if (active) setSubmissionStatus({ ...status, loading: false });
       })
@@ -544,7 +544,7 @@ export function CustomerBookingDetailsPage() {
       });
 
     return () => { active = false; };
-  }, [booking?.service_id, profile?.id]);
+  }, [booking?.id, booking?.service_id, profile?.id]);
 
   const feedbackMutation = useMutation({
     mutationFn: createBookingFeedback,
@@ -724,7 +724,7 @@ export function CustomerBookingDetailsPage() {
           )}
 
           {/* Waiting for provider to respond to customer counter */}
-          {booking.status === 'reschedule_counter' && booking.proposed_by === 'customer' && (
+          {booking.status === 'reschedule_counter' && (
             <div className="rounded-lg border border-blue-500/30 bg-blue-500/10 p-3">
               <p className="text-sm">
                 ⏳ Waiting for provider to respond to your proposed time:
@@ -786,7 +786,7 @@ export function CustomerBookingDetailsPage() {
           <h3 className="mb-3 font-semibold">Complaint</h3>
           {submissionStatus.complaint ? (
             <p className="rounded-xl border border-emerald-500/30 bg-emerald-500/10 p-4 text-sm text-emerald-700 dark:text-emerald-300">
-              Complaint already submitted for this service. We will get in touch with you within 2-7 working days.
+              Complaint already submitted for this booking. We will get in touch with you within 2-7 working days.
             </p>
           ) : (
             <form className="space-y-3" onSubmit={handleComplaintSubmit}>

@@ -205,7 +205,6 @@ class BookingModel {
   final String? providerId;
   final String? serviceId;
   final DateTime? proposedDate;
-  final String? proposedBy;
   final int rescheduleCount;
   final String? rescheduleNote;
 
@@ -228,7 +227,6 @@ class BookingModel {
     this.providerId,
     this.serviceId,
     this.proposedDate,
-    this.proposedBy,
     this.rescheduleCount = 0,
     this.rescheduleNote,
   });
@@ -257,7 +255,6 @@ class BookingModel {
       providerId: json['provider_id'] as String?,
       serviceId: json['service_id']?.toString(),
       proposedDate: proposedStr != null ? DateTime.tryParse(proposedStr.toString()) : null,
-      proposedBy: json['proposed_by'] as String?,
       rescheduleCount: (json['reschedule_count'] as int?) ?? 0,
       rescheduleNote: json['reschedule_note'] as String?,
     );

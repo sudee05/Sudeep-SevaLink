@@ -631,7 +631,6 @@ export async function proposeReschedule(id, proposedDate, note = '') {
     .update({
       status: 'reschedule_requested',
       proposed_date: proposedDate,
-      proposed_by: 'provider',
       reschedule_count: currentCount + 1,
       reschedule_note: note || null,
     })
@@ -658,7 +657,6 @@ export async function acceptReschedule(id) {
       status: 'accepted',
       scheduled_date: current.proposed_date,
       proposed_date: null,
-      proposed_by: null,
       reschedule_note: null,
     })
     .eq('id', id)
@@ -675,7 +673,6 @@ export async function counterReschedule(id, proposedDate, note = '') {
     .update({
       status: 'reschedule_counter',
       proposed_date: proposedDate,
-      proposed_by: 'customer',
       reschedule_note: note || null,
     })
     .eq('id', id)
@@ -700,7 +697,6 @@ export async function acceptCounterReschedule(id) {
       status: 'accepted',
       scheduled_date: current.proposed_date,
       proposed_date: null,
-      proposed_by: null,
       reschedule_note: null,
     })
     .eq('id', id)
@@ -738,28 +734,32 @@ export async function createBookingFeedback(feedback) {
 export async function createBookingComplaint(complaint) {
   const { data, error } = await supabase.from("booking_complaints").insert(complaint).select().single();
   if (error?.code === "23505") {
-    throw new Error("You have already submitted a complaint for this service.");
+    throw new Error("You have already submitted a complaint for this booking.");
   }
   if (error) throw error;
   return data;
 }
 
-export async function getCustomerServiceSubmissionStatus({ serviceId, customerId }) {
-  if (!serviceId || !customerId) return { feedback: false, complaint: false };
+export async function getCustomerServiceSubmissionStatus({ serviceId, customerId, bookingId }) {
+  if (!customerId) return { feedback: false, complaint: false };
 
   const [feedbackResult, complaintResult] = await Promise.all([
-    supabase
-      .from("booking_feedback")
-      .select("id")
-      .eq("service_id", serviceId)
-      .eq("customer_id", customerId)
-      .limit(1),
-    supabase
-      .from("booking_complaints")
-      .select("id")
-      .eq("service_id", serviceId)
-      .eq("customer_id", customerId)
-      .limit(1),
+    serviceId
+      ? supabase
+          .from("booking_feedback")
+          .select("id")
+          .eq("service_id", serviceId)
+          .eq("customer_id", customerId)
+          .limit(1)
+      : Promise.resolve({ data: [], error: null }),
+    bookingId
+      ? supabase
+          .from("booking_complaints")
+          .select("id")
+          .eq("booking_id", bookingId)
+          .eq("customer_id", customerId)
+          .limit(1)
+      : Promise.resolve({ data: [], error: null }),
   ]);
 
   if (feedbackResult.error && !isMissingBookingFeedbackTableError(feedbackResult.error)) {
@@ -879,7 +879,7 @@ export async function markAllNotificationsRead(userId) {
 // ── Realtime Chat ─────────────────────────────────────────────
 
 export function isBookingChatEnabled(status) {
-  return ["accepted", "confirmed", "in_progress", "completed"].includes(status);
+  return ["accepted", "confirmed", "reschedule_requested", "reschedule_counter", "in_progress", "completed"].includes(status);
 }
 
 export async function getConversationByBooking(bookingId) {

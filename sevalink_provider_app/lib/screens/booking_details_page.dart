@@ -293,7 +293,7 @@ class _BookingDetailsPageState extends State<BookingDetailsPage> {
                     const SizedBox(height: 12),
 
                     // Proposed date banners
-                    if (booking.status == 'reschedule_requested' && booking.proposedBy == 'provider') ...[
+                    if (booking.status == 'reschedule_requested') ...[
                       Container(
                         width: double.infinity,
                         padding: const EdgeInsets.all(10),

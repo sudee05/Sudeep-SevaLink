@@ -1,10 +1,53 @@
 import 'dart:io';
+import 'package:google_sign_in/google_sign_in.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../models/models.dart';
 
 final supabase = Supabase.instance.client;
 
+/// Web client ID from Google Cloud Console (same one configured in Supabase).
+const _webClientId =
+    '389406237420-ubj6i6d05oc4idk9tq4jcnm27m0a5t5k.apps.googleusercontent.com';
+
 // ── Auth ──────────────────────────────────────────────────────
+
+Future<Map<String, dynamic>> signInWithGoogle() async {
+  final googleSignIn = GoogleSignIn(serverClientId: _webClientId);
+  final googleUser = await googleSignIn.signIn();
+  if (googleUser == null) throw Exception('Google sign-in cancelled');
+
+  final googleAuth = await googleUser.authentication;
+  final idToken = googleAuth.idToken;
+  final accessToken = googleAuth.accessToken;
+  if (idToken == null) throw Exception('Failed to get Google ID token');
+
+  final res = await supabase.auth.signInWithIdToken(
+    provider: OAuthProvider.google,
+    idToken: idToken,
+    accessToken: accessToken,
+  );
+  if (res.user == null) throw Exception('Google sign-in failed');
+
+  // Check if the user has a registered profile
+  final existing = await supabase
+      .from('profiles')
+      .select('id, role, phone')
+      .eq('id', res.user!.id)
+      .maybeSingle();
+
+  if (existing == null || existing['role'] == null || (existing['role'] as String).isEmpty || existing['phone'] == null || (existing['phone'] as String).isEmpty) {
+    // Not registered — sign out and ask them to register first
+    await supabase.auth.signOut();
+    throw Exception('No account found. Please register first, then use Google to sign in.');
+  }
+
+  final profile = await getProfile(res.user!.id);
+  if (profile.role != 'customer') {
+    await supabase.auth.signOut();
+    throw Exception('Invalid account. Please log in with a customer account.');
+  }
+  return {'user': res.user, 'profile': profile};
+}
 
 Future<Map<String, dynamic>> signInWithEmail({
   required String email,
@@ -219,7 +262,12 @@ Future<BookingModel> createBooking({
   String? notes,
   double amount = 0,
 }) async {
-  final scheduledDate = '${bookingDate}T${bookingTime.length == 5 ? '$bookingTime:00' : bookingTime}';
+  // The picker returns a local time. Store its UTC instant in the timestamptz
+  // column so reading it back and converting to local time does not add 5:30.
+  final localScheduledDate = DateTime.parse(
+    '${bookingDate}T${bookingTime.length == 5 ? '$bookingTime:00' : bookingTime}',
+  );
+  final scheduledDate = localScheduledDate.toUtc().toIso8601String();
   final data = await supabase
       .from('bookings')
       .insert({
@@ -345,7 +393,6 @@ Future<void> acceptReschedule(String bookingId) async {
     'status': 'accepted',
     'scheduled_date': current['proposed_date'],
     'proposed_date': null,
-    'proposed_by': null,
     'reschedule_note': null,
   }).eq('id', bookingId);
 }
@@ -355,7 +402,6 @@ Future<void> counterReschedule(String bookingId, DateTime proposedDate, {String 
   await supabase.from('bookings').update({
     'status': 'reschedule_counter',
     'proposed_date': proposedDate.toUtc().toIso8601String(),
-    'proposed_by': 'customer',
     'reschedule_note': note.isNotEmpty ? note : null,
   }).eq('id', bookingId);
 }
@@ -394,6 +440,20 @@ Future<void> submitComplaint({
   });
 }
 
+/// A complaint is unique to a booking, not to the service across all bookings.
+Future<bool> hasSubmittedComplaint({
+  required String bookingId,
+  required String customerId,
+}) async {
+  final row = await supabase
+      .from('booking_complaints')
+      .select('id')
+      .eq('booking_id', bookingId)
+      .eq('customer_id', customerId)
+      .maybeSingle();
+  return row != null;
+}
+
 // ── Notifications ─────────────────────────────────────────────
 
 Future<List<NotificationModel>> getNotifications(String userId) async {
@@ -418,7 +478,7 @@ Future<void> markAllNotificationsRead(String userId) async {
 
 // ── Chat ──────────────────────────────────────────────────────
 
-bool isBookingChatEnabled(String status) => ['accepted', 'confirmed', 'in_progress', 'completed'].contains(status);
+bool isBookingChatEnabled(String status) => ['accepted', 'confirmed', 'reschedule_requested', 'reschedule_counter', 'in_progress', 'completed'].contains(status);
 
 Future<ConversationModel?> getConversationByBooking(String bookingId) async {
   final data = await supabase

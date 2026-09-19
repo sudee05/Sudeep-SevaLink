@@ -15,7 +15,15 @@ export const initializeAuth = createAsyncThunk(
         .from('profiles')
         .select('*')
         .eq('id', session.user.id)
-        .single()
+        .maybeSingle()
+
+      // If no profile, no role, or no phone → user hasn't completed registration
+      // (The DB trigger may auto-create a profile with a default role on Google OAuth,
+      //  but phone is only set during manual registration.)
+      if (!profile || !profile.role || !profile.phone) {
+        await supabase.auth.signOut()
+        return { user: null, profile: null }
+      }
 
       return { user: session.user, profile }
     } catch (err) {
@@ -38,6 +46,25 @@ export const signInWithEmail = createAsyncThunk(
         .single()
 
       return { user: data.user, profile }
+    } catch (err) {
+      return rejectWithValue(err.message)
+    }
+  }
+)
+
+export const signInWithGoogle = createAsyncThunk(
+  'auth/signInWithGoogle',
+  async (_, { rejectWithValue }) => {
+    try {
+      const { error } = await supabase.auth.signInWithOAuth({
+        provider: 'google',
+        options: {
+          redirectTo: `${window.location.origin}/login`,
+        },
+      })
+      if (error) throw error
+      // The browser will redirect — no return needed.
+      return null
     } catch (err) {
       return rejectWithValue(err.message)
     }

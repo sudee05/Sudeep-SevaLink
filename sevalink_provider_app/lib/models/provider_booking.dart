@@ -14,7 +14,6 @@ class ProviderBooking {
     this.scheduledDate,
     this.createdAt,
     this.proposedDate,
-    this.proposedBy,
     this.rescheduleCount = 0,
     this.rescheduleNote,
   });
@@ -33,7 +32,6 @@ class ProviderBooking {
   final DateTime? scheduledDate;
   final DateTime? createdAt;
   final DateTime? proposedDate;
-  final String? proposedBy;
   final int rescheduleCount;
   final String? rescheduleNote;
 
@@ -64,7 +62,6 @@ class ProviderBooking {
           DateTime.tryParse(json['created_at']?.toString() ?? ''),
       proposedDate:
           proposedStr == null ? null : DateTime.tryParse(proposedStr.toString()),
-      proposedBy: json['proposed_by'] as String?,
       rescheduleCount: (json['reschedule_count'] as int?) ?? 0,
       rescheduleNote: json['reschedule_note'] as String?,
     );

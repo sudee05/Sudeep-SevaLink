@@ -2,7 +2,7 @@ import { motion } from "framer-motion";
 import { useEffect, useMemo, useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { Link, useNavigate, useParams } from "react-router-dom";
-import { Bell, Calendar, CheckCircle2, CircleDollarSign, Clock, Upload, X } from "lucide-react";
+import { Bell, Calendar, CheckCircle2, CircleDollarSign, Clock, RefreshCw, Upload, X } from "lucide-react";
 import { useBookingsQuery, useNotificationsQuery, useProviderBookingsQuery } from "@/hooks/use-queries";
 import { useRealtimeNotifications } from "@/hooks/use-realtime";
 import { BookingBarChart, RevenueAreaChart } from "@/components/charts/revenue-booking-chart";
@@ -43,7 +43,7 @@ const fade = {
   transition: { duration: 0.3 },
 };
 
-function ProviderBookingActions({ booking, onChanged }) {
+function ProviderBookingActions({ booking, onChanged, compact = false }) {
   const queryClient = useQueryClient();
   const toast = useToast();
   const [confirmOpen, setConfirmOpen] = useState(false);
@@ -173,14 +173,14 @@ function ProviderBookingActions({ booking, onChanged }) {
       </ConfirmDialog>
 
       {/* Reschedule count badge */}
-      {rescheduleCount > 0 && (
+      {!compact && rescheduleCount > 0 && (
         <p className="text-xs text-muted-foreground mb-1">
           ⚠️ {rescheduleCount}/3 reschedules used
         </p>
       )}
 
       {/* When customer counter-proposed a time */}
-      {booking.status === 'reschedule_counter' && (
+      {!compact && booking.status === 'reschedule_counter' && (
         <div className="rounded-lg border border-amber-500/30 bg-amber-500/10 p-3 mb-2 space-y-2">
           <p className="text-sm font-medium">
             🔄 Customer proposed a new time:
@@ -203,7 +203,7 @@ function ProviderBookingActions({ booking, onChanged }) {
       )}
 
       {/* When provider already requested a reschedule */}
-      {booking.status === 'reschedule_requested' && booking.proposed_by === 'provider' && (
+      {!compact && booking.status === 'reschedule_requested' && (
         <div className="rounded-lg border border-blue-500/30 bg-blue-500/10 p-3 mb-2">
           <p className="text-sm">
             ⏳ Waiting for customer to respond to your proposed time:
@@ -222,6 +222,16 @@ function ProviderBookingActions({ booking, onChanged }) {
           <Button size="sm" disabled={busy} onClick={() => statusMutation.mutate("accepted")}>
             Accept
           </Button>
+        )}
+        {compact && booking.status === 'reschedule_counter' && (
+          <>
+            <Button size="sm" disabled={busy} onClick={() => acceptCounterMutation.mutate()}>
+              {acceptCounterMutation.isPending ? 'Accepting...' : 'Accept Time'}
+            </Button>
+            <Button size="sm" variant="danger" disabled={busy} onClick={() => updateStatus('cancelled')}>
+              Cancel
+            </Button>
+          </>
         )}
         {canCancel && booking.status !== 'reschedule_counter' && (
           <Button size="sm" variant="danger" disabled={busy} onClick={() => updateStatus("cancelled")}>
@@ -396,11 +406,20 @@ export function ProviderDashboardPage() {
 // ── Bookings ──────────────────────────────────────────────────
 
 export function ProviderBookingsPage() {
-  const { data = [] } = useBookingsQuery();
+  const { data = [], isFetching, refetch } = useBookingsQuery();
 
   return (
     <motion.div className="space-y-4" {...fade}>
-      <SectionHeader title="Bookings" subtitle="View details, timelines, and invoices." />
+      <SectionHeader
+        title="Bookings"
+        subtitle="View details, timelines, and invoices."
+        action={
+          <Button size="sm" variant="outline" onClick={() => refetch()} disabled={isFetching}>
+            <RefreshCw className={`mr-2 h-4 w-4 ${isFetching ? "animate-spin" : ""}`} />
+            {isFetching ? "Refreshing..." : "Refresh"}
+          </Button>
+        }
+      />
       <DataTable
         columns={[
           { key: "customer", label: "Customer" },
@@ -417,7 +436,7 @@ export function ProviderBookingsPage() {
                     View Details
                   </Button>
                 </Link>
-                <ProviderBookingActions booking={row} />
+                <ProviderBookingActions booking={row} compact />
               </div>
             ),
           },
@@ -501,7 +520,7 @@ export function ProviderBookingDetailsPage() {
             }>
             {booking.status}
           </Badge>
-          <div className=" absolute top-4 right-4">
+          <div className="pt-2">
             <ProviderBookingActions booking={booking} onChanged={setBooking} />
             {booking.status === "accepted" && (
               <Button disabled={statusMutation.isPending} onClick={() => statusMutation.mutate("in_progress")}>
@@ -1083,12 +1102,24 @@ export function ProviderNotificationsPage() {
 
   const markReadMutation = useMutation({
     mutationFn: markNotificationRead,
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["notifications", userId] }),
+    onSuccess: (_, notificationId) => {
+      queryClient.setQueryData(["notifications", userId], (current = []) =>
+        current.map((notification) =>
+          notification.id === notificationId ? { ...notification, is_read: true, read: true } : notification,
+        ),
+      );
+      queryClient.invalidateQueries({ queryKey: ["notifications", userId] });
+    },
   });
 
   const markAllReadMutation = useMutation({
     mutationFn: () => markAllNotificationsRead(userId),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["notifications", userId] }),
+    onSuccess: () => {
+      queryClient.setQueryData(["notifications", userId], (current = []) =>
+        current.map((notification) => ({ ...notification, is_read: true, read: true })),
+      );
+      queryClient.invalidateQueries({ queryKey: ["notifications", userId] });
+    },
   });
 
   const unreadCount = (notifications.data || []).filter((notification) => !notification.is_read).length;

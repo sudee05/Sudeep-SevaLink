@@ -34,6 +34,11 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     if (err != null && mounted) showSnack(context, err, isError: true);
   }
 
+  Future<void> _signInWithGoogle() async {
+    final err = await ref.read(authProvider.notifier).signInWithGoogle();
+    if (err != null && mounted) showSnack(context, err, isError: true);
+  }
+
   @override
   Widget build(BuildContext context) {
     final loading = ref.watch(authProvider).isLoading;
@@ -100,6 +105,45 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                             child: CircularProgressIndicator(
                                 color: Colors.white, strokeWidth: 2))
                         : const Text('Continue'),
+                  ),
+                ),
+                const SizedBox(height: 16),
+                // ── OR divider ────────────────────────────────
+                Row(
+                  children: [
+                    const Expanded(child: Divider()),
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 16),
+                      child: Text('OR',
+                          style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                                color: AppColors.darkMuted,
+                                letterSpacing: 1.2,
+                              )),
+                    ),
+                    const Expanded(child: Divider()),
+                  ],
+                ),
+                const SizedBox(height: 16),
+                // ── Google Sign-In button ─────────────────────
+                SizedBox(
+                  width: double.infinity,
+                  child: OutlinedButton.icon(
+                    onPressed: loading ? null : _signInWithGoogle,
+                    icon: Image.network(
+                      'https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg',
+                      height: 20,
+                      width: 20,
+                      errorBuilder: (_, __, ___) =>
+                          const Icon(Icons.g_mobiledata, size: 24),
+                    ),
+                    label: const Text('Sign in with Google'),
+                    style: OutlinedButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(vertical: 14),
+                      side: BorderSide(color: AppColors.darkBorder),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                    ),
                   ),
                 ),
                 const SizedBox(height: 24),

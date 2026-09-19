@@ -23,6 +23,7 @@ export function ConfirmDialog({
   variant = "default",
   onConfirm,
   onCancel,
+  children,
 }) {
   const ref = useRef(null);
 
@@ -54,6 +55,7 @@ export function ConfirmDialog({
             <p className="text-sm text-muted-foreground">{description}</p>
           )}
         </div>
+        {children}
         <div className="flex justify-end gap-2">
           <Button type="button" variant="outline" onClick={onCancel}>
             {cancelLabel}
