@@ -239,7 +239,6 @@ serve(async (req) => {
       // Create Booking Record in Supabase
       const { data: newBooking, error: bookingError } = await adminClient
         .from('bookings')
-        .select('id, booking_code')
         .insert({
           booking_code: bookingCode,
           customer_id: customerId,
@@ -254,7 +253,7 @@ serve(async (req) => {
           address: 'WhatsApp Booking Address (To be confirmed)',
           notes: `Booked via WhatsApp by ${fromNumber}`,
         })
-        .select()
+        .select('id, booking_code')
         .single();
 
       if (bookingError) {
