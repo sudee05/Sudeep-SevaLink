@@ -22,6 +22,7 @@ import {
   Star,
   Target,
   TrendingUp,
+  Users,
 } from "lucide-react";
 import { getLucideIcon } from "@/utils/lucide";
 import {
@@ -1295,31 +1296,31 @@ export function AboutPage() {
       icon: ShieldCheck,
       title: "Verified Providers",
       description: "All service providers are verified for your safety.",
-      iconBg: "bg-blue-50 text-blue-600 border border-blue-100 dark:bg-blue-950/40 dark:text-blue-400 dark:border-blue-900",
+      iconBg: "bg-primary/10 text-primary border border-primary/20",
     },
     {
       icon: Star,
       title: "Transparent Ratings",
       description: "Real reviews from real customers.",
-      iconBg: "bg-amber-50 text-amber-500 border border-amber-100 dark:bg-amber-950/40 dark:text-amber-400 dark:border-amber-900",
+      iconBg: "bg-primary/10 text-primary border border-primary/20",
     },
     {
       icon: MapPin,
       title: "Local Focus",
       description: "Support local talent and businesses.",
-      iconBg: "bg-emerald-50 text-emerald-600 border border-emerald-100 dark:bg-emerald-950/40 dark:text-emerald-400 dark:border-emerald-900",
+      iconBg: "bg-primary/10 text-primary border border-primary/20",
     },
     {
       icon: Calendar,
       title: "Easy Booking",
       description: "Book, track and manage services in one place.",
-      iconBg: "bg-sky-50 text-sky-600 border border-sky-100 dark:bg-sky-950/40 dark:text-sky-400 dark:border-sky-900",
+      iconBg: "bg-primary/10 text-primary border border-primary/20",
     },
     {
       icon: LayoutGrid,
       title: "Wide Range of Services",
       description: "From home services to healthcare and more.",
-      iconBg: "bg-indigo-50 text-indigo-600 border border-indigo-100 dark:bg-indigo-950/40 dark:text-indigo-400 dark:border-indigo-900",
+      iconBg: "bg-primary/10 text-primary border border-primary/20",
     },
   ];
 
@@ -1352,27 +1353,27 @@ export function AboutPage() {
 
   return (
     <motion.div
-      className="public-marketing relative left-1/2 w-screen -translate-x-1/2 space-y-0 overflow-hidden bg-[#f6f8ff] text-slate-900 dark:bg-background dark:text-foreground"
+      className="space-y-8"
       {...fade}
     >
       {/* ── Hero Section ──────────────────────────────────────────────────────── */}
-      <section className="px-4 pb-16 pt-10 lg:px-8">
+      <section className="rounded-2xl border bg-card p-6 shadow-sm">
         <div className="mx-auto grid max-w-7xl gap-10 lg:grid-cols-[1.1fr_1fr] lg:items-center">
           <div className="space-y-6">
-            <div className="inline-flex items-center gap-2 rounded-full bg-blue-100/90 px-3.5 py-1 text-xs font-bold uppercase tracking-wider text-blue-700 dark:bg-blue-900/50 dark:text-blue-300">
-              <MapPin className="h-3.5 w-3.5 text-blue-600 fill-blue-600/30" />
+            <div className="inline-flex items-center gap-2 rounded-full bg-primary/10 px-3.5 py-1 text-xs font-bold uppercase tracking-wider text-primary">
+              <MapPin className="h-3.5 w-3.5 text-primary fill-primary/20" />
               ABOUT SEVALINK
             </div>
-            <h1 className="max-w-xl text-4xl font-black leading-tight tracking-tight text-slate-950 dark:text-white lg:text-5xl">
+            <h1 className="max-w-xl text-4xl font-black leading-tight tracking-tight text-foreground lg:text-5xl">
               Building a Stronger Community Through{" "}
-              <span className="text-blue-700 dark:text-blue-400">Better Services</span>
+              <span className="text-primary">Better Services</span>
             </h1>
-            <p className="max-w-lg text-base leading-7 text-slate-600 dark:text-slate-300">
+            <p className="max-w-lg text-base leading-7 text-muted-foreground">
               SevaLink is a unified service booking platform that connects customers with trusted, verified service providers — making everyday life easier, safer and more convenient.
             </p>
           </div>
 
-          <div className="overflow-hidden rounded-3xl border border-blue-100 bg-white p-2 shadow-[0_28px_80px_rgba(44,77,193,0.14)] dark:border-slate-800 dark:bg-card">
+          <div className="overflow-hidden rounded-2xl border bg-background p-2 shadow-sm">
             <img
               src={aboutHeroImage}
               alt="SevaLink service providers"
@@ -1383,34 +1384,34 @@ export function AboutPage() {
       </section>
 
       {/* ── Our Mission & Vision ─────────────────────────────────────────────── */}
-      <section className="bg-white px-4 py-16 dark:bg-card lg:px-8">
+      <section className="rounded-2xl border bg-card p-6 shadow-sm">
         <div className="mx-auto max-w-7xl space-y-10">
           <div className="text-center">
-            <h2 className="text-3xl font-black text-slate-950 dark:text-white">Our Mission & Vision</h2>
+            <h2 className="text-3xl font-black text-foreground">Our Mission & Vision</h2>
           </div>
 
           <div className="grid gap-6 md:grid-cols-2">
             {/* Mission Card */}
-            <div className="flex gap-5 rounded-2xl border border-slate-100 bg-[#f8faff] p-7 shadow-sm transition hover:shadow-md dark:border-slate-800 dark:bg-muted/40">
-              <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-blue-100 text-blue-700 dark:bg-blue-900/60 dark:text-blue-300">
+            <div className="flex gap-5 rounded-2xl border bg-background p-6 shadow-sm transition hover:shadow-md">
+              <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-primary/10 text-primary">
                 <Target className="h-6 w-6" />
               </div>
               <div className="space-y-2">
-                <h3 className="text-xl font-bold text-slate-950 dark:text-white">Our Mission</h3>
-                <p className="text-sm leading-6 text-slate-600 dark:text-slate-300">
+                <h3 className="text-xl font-bold text-foreground">Our Mission</h3>
+                <p className="text-sm leading-6 text-muted-foreground">
                   To bridge the gap between customers and skilled service providers through a trusted, transparent and easy-to-use platform.
                 </p>
               </div>
             </div>
 
             {/* Vision Card */}
-            <div className="flex gap-5 rounded-2xl border border-slate-100 bg-[#f8faff] p-7 shadow-sm transition hover:shadow-md dark:border-slate-800 dark:bg-muted/40">
-              <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-blue-100 text-blue-700 dark:bg-blue-900/60 dark:text-blue-300">
+            <div className="flex gap-5 rounded-2xl border bg-background p-6 shadow-sm transition hover:shadow-md">
+              <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-primary/10 text-primary">
                 <Eye className="h-6 w-6" />
               </div>
               <div className="space-y-2">
-                <h3 className="text-xl font-bold text-slate-950 dark:text-white">Our Vision</h3>
-                <p className="text-sm leading-6 text-slate-600 dark:text-slate-300">
+                <h3 className="text-xl font-bold text-foreground">Our Vision</h3>
+                <p className="text-sm leading-6 text-muted-foreground">
                   To become the most trusted and preferred service booking platform, empowering local professionals and communities everywhere.
                 </p>
               </div>
@@ -1420,11 +1421,11 @@ export function AboutPage() {
       </section>
 
       {/* ── What Makes SevaLink Different? ─────────────────────────────────── */}
-      <section className="px-4 py-16 lg:px-8">
+      <section className="rounded-2xl border bg-card p-6 shadow-sm">
         <div className="mx-auto max-w-7xl space-y-10">
           <div className="text-center space-y-2">
-            <h2 className="text-3xl font-black text-slate-950 dark:text-white">What Makes SevaLink Different?</h2>
-            <p className="text-sm text-slate-500 dark:text-slate-400">
+            <h2 className="text-3xl font-black text-foreground">What Makes SevaLink Different?</h2>
+            <p className="text-sm text-muted-foreground">
               We focus on trust, convenience and community — because your time and safety matter.
             </p>
           </div>
@@ -1435,13 +1436,13 @@ export function AboutPage() {
               return (
                 <div
                   key={item.title}
-                  className="flex flex-col items-center text-center space-y-3 rounded-2xl border border-slate-200/80 bg-white p-6 shadow-sm transition hover:-translate-y-1 hover:shadow-md dark:border-slate-800 dark:bg-card"
+                  className="flex flex-col items-center text-center space-y-3 rounded-2xl border bg-background p-6 shadow-sm transition hover:-translate-y-1 hover:shadow-md"
                 >
                   <div className={`flex h-12 w-12 items-center justify-center rounded-2xl ${item.iconBg}`}>
                     <Icon className="h-6 w-6" />
                   </div>
-                  <h3 className="text-base font-bold text-slate-950 dark:text-white">{item.title}</h3>
-                  <p className="text-xs leading-5 text-slate-500 dark:text-slate-400">{item.description}</p>
+                  <h3 className="text-base font-bold text-foreground">{item.title}</h3>
+                  <p className="text-xs leading-5 text-muted-foreground">{item.description}</p>
                 </div>
               );
             })}
@@ -1450,11 +1451,11 @@ export function AboutPage() {
       </section>
 
       {/* ── Our Journey ────────────────────────────────────────────────────── */}
-      <section className="bg-white px-4 py-16 dark:bg-card lg:px-8">
+      <section className="rounded-2xl border bg-card p-6 shadow-sm">
         <div className="mx-auto max-w-7xl space-y-12">
           <div className="text-center space-y-2">
-            <h2 className="text-3xl font-black text-slate-950 dark:text-white">Our Journey</h2>
-            <p className="max-w-2xl mx-auto text-sm text-slate-500 dark:text-slate-400">
+            <h2 className="text-3xl font-black text-foreground">Our Journey</h2>
+            <p className="max-w-2xl mx-auto text-sm text-muted-foreground">
               From a simple idea to a platform that connects communities — SevaLink is built with a vision for a better, more connected future.
             </p>
           </div>
@@ -1471,14 +1472,14 @@ export function AboutPage() {
                     <div
                       className={`z-10 flex h-14 w-14 items-center justify-center rounded-full text-white transition ${
                         step.active
-                          ? "bg-blue-700 ring-4 ring-blue-100 shadow-md dark:ring-blue-900/50"
-                          : "bg-blue-600 hover:bg-blue-700"
+                          ? "bg-primary ring-4 ring-primary/20 shadow-md"
+                          : "bg-primary hover:bg-primary/90"
                       }`}
                     >
                       <Icon className="h-6 w-6" />
                     </div>
-                    <h3 className="text-lg font-bold text-slate-950 dark:text-white">{step.phase}</h3>
-                    <p className="text-xs leading-5 text-slate-500 dark:text-slate-400">{step.description}</p>
+                    <h3 className="text-lg font-bold text-foreground">{step.phase}</h3>
+                    <p className="text-xs leading-5 text-muted-foreground">{step.description}</p>
                   </div>
                 );
               })}
@@ -1488,8 +1489,8 @@ export function AboutPage() {
       </section>
 
       {/* ── Join SevaLink Today Banner ──────────────────────────────────────── */}
-      <section className="px-4 py-16 lg:px-8">
-        <div className="mx-auto max-w-7xl relative overflow-hidden rounded-3xl bg-blue-700 p-8 text-white shadow-[0_24px_60px_rgba(33,84,210,0.3)] sm:p-12">
+      <section className="rounded-2xl border bg-card p-6 shadow-sm">
+        <div className="relative overflow-hidden rounded-2xl bg-primary p-8 text-center text-white shadow-sm sm:p-10">
           <div className="relative z-10 flex flex-col gap-6 lg:flex-row lg:items-center lg:justify-between">
             <div className="space-y-4 max-w-xl">
               <h2 className="text-3xl font-black tracking-tight sm:text-4xl">Join SevaLink Today</h2>
