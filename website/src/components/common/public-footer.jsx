@@ -125,7 +125,7 @@ export function PublicFooter() {
 
             {/* About SevaLink */}
             <Link
-              to="/"
+              to="/about"
               onClick={scrollToTop}
               className="block transition hover:text-blue-700"
             >
@@ -147,9 +147,14 @@ export function PublicFooter() {
               onClick={scrollToTop}
               className="block transition hover:text-blue-700"
             >
-              Create Account
+            {/* Privacy Policy */}
+            <Link
+              to="/privacy"
+              onClick={scrollToTop}
+              className="block transition hover:text-blue-700"
+            >
+              Privacy Policy
             </Link>
-
           </div>
         </div>
 

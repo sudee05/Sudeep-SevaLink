@@ -8,8 +8,10 @@ import { AdminLayout } from '@/layouts/admin-layout'
 import { ProtectedRoute } from '@/components/common/protected-route'
 import { selectAuthLoading, selectIsAuthenticated, selectUserRole } from '@/store/authSlice'
 import {
+  AboutPage,
   CategoriesPage,
   LandingPage,
+  PrivacyPolicyPage,
   ProviderDetailsPage,
   ProvidersPage,
   SearchPage,
@@ -90,6 +92,8 @@ export function AppRouter() {
     <Routes>
       <Route element={<PublicLayout />}>
         <Route path="/" element={<LandingRoute />} />
+        <Route path="/about" element={<AboutPage />} />
+        <Route path="/privacy" element={<PrivacyPolicyPage />} />
         <Route path="/services" element={<ServicesPage />} />
         <Route path="/categories" element={<CategoriesPage />} />
         <Route path="/providers" element={<ProvidersPage />} />
