@@ -1,11 +1,10 @@
-import { motion, AnimatePresence } from "framer-motion";
+﻿import { motion, AnimatePresence } from "framer-motion";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import {
   ArrowRight,
   BadgeCheck,
   BriefcaseBusiness,
-  ChartNoAxesCombined,
   Handshake,
   MoveRight,
   Search,
@@ -47,10 +46,7 @@ import { ErrorState } from "@/components/ui/error-state";
 import { Badge } from "@/components/ui/badge";
 import heroConsultation from "@/assets/landing-hero-consultation.png";
 import aboutHeroImage from "@/assets/about-hero.png";
-import missionPortrait from "@/assets/uncle.jpg";
 import cleaningImage from "@/assets/cleaning.jpg";
-import logisticsImage from "@/assets/logistics.jpg";
-import counselingImage from "@/assets/talling aunties.jpg";
 import providerGrowthImage from "@/assets/cyber_security.jpg";
 import nurseImage from "@/assets/nursing.jpg";
 import relocationImage from "@/assets/relocation.jpg";
@@ -63,50 +59,6 @@ const fade = {
   animate: { opacity: 1, y: 0 },
   transition: { duration: 0.35 },
 };
-
-const popularCategories = [
-  {
-    title: "Home Maintenance",
-    subtitle: "1.2k providers available",
-    image: cleaningImage,
-    className: "md:col-span-2 md:row-span-2",
-  },
-  {
-    title: "Health & Wellness",
-    subtitle: "Yoga, nursing, therapy",
-    image: counselingImage,
-    className: "md:col-span-2",
-  },
-  {
-    title: "Logistics",
-    subtitle: "Moving and storage",
-    image: logisticsImage,
-    className: "",
-  },
-];
-
-const providerBenefits = [
-  {
-    icon: BriefcaseBusiness,
-    title: "Flexible schedule",
-    text: "Work when you want, where you want, and choose the jobs that match your strengths.",
-  },
-  {
-    icon: ShieldCheck,
-    title: "Secure payments",
-    text: "Get paid instantly upon job completion through our protected workflow.",
-  },
-  {
-    icon: ChartNoAxesCombined,
-    title: "Business tools",
-    text: "Track bookings, customer repeat rate, and performance from one clean dashboard.",
-  },
-  {
-    icon: BadgeCheck,
-    title: "Verified trust",
-    text: "Build credibility with verified reviews, badges, and quality milestones.",
-  },
-];
 
 const featuredPros = [
   {
@@ -138,26 +90,6 @@ const featuredPros = [
     text: "Home network audits, device protection, and professional troubleshooting.",
   },
 ];
-
-const qualitySteps = [
-  {
-    icon: ShieldCheck,
-    title: "1. Verification",
-    text: "Pros undergo deep vetting, skill checks, and identity review before they go live.",
-  },
-  {
-    icon: MoveRight,
-    title: "2. Matching",
-    text: "Our matching flow pairs local needs with the right skill set, rating, and availability.",
-  },
-  {
-    icon: Handshake,
-    title: "3. Collaboration",
-    text: "Customers and providers manage milestones, updates, and payments in one place.",
-  },
-];
-
-// ── Hero Carousel ──────────────────────────────────────────────────────────────
 
 function HeroCarousel({ fallbackSrc }) {
   const [slides, setSlides] = useState([]);
@@ -277,7 +209,6 @@ function HeroCarousel({ fallbackSrc }) {
 }
 
 export function LandingPage() {
-  const [location, setLocation] = useState("");
 
   return (
     <motion.div
@@ -301,7 +232,7 @@ export function LandingPage() {
                 is the bridge to excellence and professional freedom.
               </p>
             </div>
-         
+
             <div className="flex flex-wrap items-center gap-6">
               <div className="flex items-center gap-3">
                 <div className="flex -space-x-3">
@@ -330,262 +261,16 @@ export function LandingPage() {
         </div>
       </section>
 
-      <section
-  id="about-sevalink"
-  className="bg-white px-4 py-18 lg:px-8"
->
-        <div className="mx-auto grid max-w-7xl gap-10 lg:grid-cols-[1fr_1.1fr] lg:items-center">
-          <div className="grid grid-cols-2 gap-4">
-            <div className="flex h-full items-center justify-center rounded-[1.75rem] bg-blue-50 text-blue-700">
-              <Users className="h-9 w-9" />
-            </div>
-            <div className="overflow-hidden rounded-[1.75rem]">
-              <img src={missionPortrait} alt="Trusted senior professional" className="h-52 w-full object-cover" />
-            </div>
-            <div className="overflow-hidden rounded-[1.75rem]">
-              <img src={heroConsultation} alt="Consultation at SevaLink" className="h-44 w-full object-cover" />
-            </div>
-            <div className="flex h-full items-center justify-center rounded-[1.75rem] bg-emerald-50 text-emerald-700">
-              <Handshake className="h-9 w-9" />
-            </div>
-          </div>
-          <div className="space-y-5">
-            <div>
-              <p className="mb-2 text-sm font-semibold uppercase tracking-[0.22em] text-slate-400">Our Mission</p>
-              <h2 className="text-3xl font-black leading-tight text-slate-950 lg:text-5xl">Bridging the Gap</h2>
-            </div>
-            <p className="max-w-2xl text-base leading-7 text-slate-600">
-              SevaLink was born from a simple observation: skilled professionals often struggle to find reliable
-              clients, while people in need of help can&apos;t find quality they can trust.
-            </p>
-            <p className="max-w-2xl text-base leading-7 text-slate-600">
-              We didn&apos;t just build a marketplace. We built an ecosystem that values integrity, skill, and mutual
-              growth, turning every booking into an opportunity to strengthen communities.
-            </p>
-            <div className="grid gap-3 sm:grid-cols-3">
-              <Card className="rounded-2xl border-0 bg-blue-50 p-4 shadow-none">
-                <p className="text-2xl font-black text-blue-700">500+</p>
-                <p className="text-sm text-slate-600">Local Cities</p>
-              </Card>
-              <Card className="rounded-2xl border-0 bg-emerald-50 p-4 shadow-none">
-                <p className="text-2xl font-black text-emerald-700">98%</p>
-                <p className="text-sm text-slate-600">Job Satisfaction</p>
-              </Card>
-              <Card className="rounded-2xl border-0 bg-slate-100 p-4 shadow-none">
-                <p className="text-2xl font-black text-slate-900">24/7</p>
-                <p className="text-sm text-slate-600">Human Support</p>
-              </Card>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      <section className="px-4 py-18 lg:px-8">
+      <section className="bg-card px-4 py-14 lg:px-8">
         <div className="mx-auto max-w-7xl space-y-8">
-          <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
-            <div>
-              <h2 className="text-3xl font-black text-slate-950">Popular Categories</h2>
-              <p className="mt-2 text-slate-500">Explore services or find your next business opportunity.</p>
-            </div>
-            <Link
-              to="/categories"
-              className="inline-flex items-center gap-1 text-sm font-semibold text-blue-700 hover:text-blue-800">
-              View All
-              <ArrowRight className="h-4 w-4" />
-            </Link>
-          </div>
-          <div className="grid auto-rows-55 gap-4 md:grid-cols-4">
-            {popularCategories.map((category) => (
-              <article
-                key={category.title}
-                className={`group relative overflow-hidden rounded-[1.8rem] ${category.className}`}>
-                <img
-                  src={category.image}
-                  alt={category.title}
-                  className="h-full w-full object-cover transition duration-500 group-hover:scale-105"
-                />
-                <div className="absolute inset-0 bg-linear-to-t from-black/75 via-black/20 to-transparent" />
-                <div className="absolute inset-x-0 bottom-0 p-5 text-white">
-                  <h3 className="text-xl font-bold">{category.title}</h3>
-                  <p className="mt-1 text-sm text-white/80">{category.subtitle}</p>
-                </div>
-              </article>
-            ))}
-            <article className="flex flex-col justify-between rounded-[1.8rem] bg-blue-700 p-6 text-white shadow-[0_24px_50px_rgba(33,84,210,0.25)]">
-              <div className="rounded-2xl bg-white/10 p-3 text-white">
-                <Sparkles className="h-5 w-5" />
-              </div>
-              <div className="space-y-3">
-                <h3 className="text-2xl font-black leading-tight">List your service</h3>
-                <p className="text-sm text-blue-100">Open your own category today and start getting verified demand.</p>
-              </div>
-              <Link to="/register?type=provider">
-                <Button className="rounded-2xl bg-white text-blue-700 hover:bg-blue-50">Join Now</Button>
-              </Link>
-            </article>
-          </div>
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between"><div><p className="text-sm font-semibold uppercase tracking-[0.18em] text-primary">Explore SevaLink</p><h2 className="mt-2 text-3xl font-black text-foreground">Services for Every Need</h2><p className="mt-2 text-sm text-muted-foreground">Find skilled professionals for the services you need, all in one place.</p></div><Link to="/services" className="inline-flex items-center gap-1 text-sm font-semibold text-primary">Explore all services <ArrowRight className="h-4 w-4" /></Link></div>
+          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">{[{title:"Home Services",icon:Sparkles,tone:"bg-amber-500/10 text-amber-600"},{title:"Healthcare",icon:ShieldCheck,tone:"bg-rose-500/10 text-rose-600"},{title:"Repairs & Maintenance",icon:BriefcaseBusiness,tone:"bg-blue-500/10 text-blue-600"},{title:"Cleaning",icon:Handshake,tone:"bg-emerald-500/10 text-emerald-600"},{title:"Moving & Logistics",icon:MoveRight,tone:"bg-violet-500/10 text-violet-600"},{title:"Professional Services",icon:BadgeCheck,tone:"bg-cyan-500/10 text-cyan-600"},{title:"Easy Booking",icon:Calendar,tone:"bg-orange-500/10 text-orange-600"},{title:"Local Experts",icon:MapPin,tone:"bg-primary/10 text-primary"}].map(({title,icon:Icon,tone})=><Link key={title} to="/services" className="flex items-center gap-4 rounded-2xl border bg-background p-4 shadow-sm transition hover:-translate-y-1 hover:border-primary/40"><div className={"flex h-12 w-12 shrink-0 items-center justify-center rounded-xl "+tone}><Icon className="h-6 w-6" /></div><div><h3 className="font-semibold text-foreground">{title}</h3><p className="mt-1 text-xs text-muted-foreground">Verified professionals</p></div></Link>)}</div>
         </div>
       </section>
-
-      <section className="bg-[#272b36] px-4 py-18 text-white lg:px-8">
-        <div className="mx-auto grid max-w-7xl gap-10 lg:grid-cols-[0.95fr_1fr] lg:items-center">
-          <div className="space-y-6">
-            <div className="inline-flex items-center gap-2 rounded-full bg-emerald-500/10 px-3 py-1 text-xs font-semibold uppercase tracking-[0.16em] text-emerald-300">
-              <Sparkles className="h-3.5 w-3.5" />
-              Grow with SevaLink
-            </div>
-            <h2 className="text-3xl font-black leading-tight lg:text-5xl">
-              Turn Your Skills Into
-              <br />
-              <span className="text-emerald-300">Sustainable Growth</span>
-            </h2>
-            <p className="max-w-xl text-base leading-7 text-slate-300">
-              Join our network of providers and take full control of your business. We provide the tools, trust, and
-              visibility. You provide the talent.
-            </p>
-            <div className="grid gap-5 sm:grid-cols-2">
-              {providerBenefits.map((item) => {
-                const Icon = item.icon;
-                return (
-                  <div key={item.title} className="flex gap-3">
-                    <div className="rounded-2xl bg-white/8 p-3 text-emerald-300">
-                      <Icon className="h-5 w-5" />
-                    </div>
-                    <div>
-                      <h3 className="font-semibold text-white">{item.title}</h3>
-                      <p className="mt-1 text-sm leading-6 text-slate-400">{item.text}</p>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-            <Link to="/register?type=provider">
-              <Button className="rounded-2xl bg-emerald-400 px-8 text-slate-950 hover:bg-emerald-300">
-                Join as a Pro
-              </Button>
-            </Link>
-          </div>
-          <div className="relative rounded-4xl border border-white/10 bg-white/6 p-4 shadow-2xl backdrop-blur-sm">
-            <img
-              src={providerGrowthImage}
-              alt="Provider dashboard"
-              className="h-105 w-full rounded-[1.6rem] object-cover"
-            />
-            <div className="absolute bottom-8 left-8 rounded-2xl bg-white px-4 py-3 text-slate-900 shadow-xl">
-              <div className="flex items-center gap-3">
-                <img src={markImage} alt="Mark Sterling" className="h-11 w-11 rounded-full object-cover" />
-                <div>
-                  <p className="text-sm font-semibold">Mark Sterling</p>
-                  <p className="text-xs text-slate-500">SevaLink helped me double my bookings in 3 months.</p>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      <section className="bg-white px-4 py-18 lg:px-8">
-        <div className="mx-auto max-w-7xl space-y-8">
-          <div className="text-center">
-            <h2 className="text-3xl font-black text-slate-950">Top-Rated Professionals</h2>
-            <p className="mt-2 text-slate-500">
-              Discover elite providers ready to assist you today and see the quality standard we uphold.
-            </p>
-          </div>
-          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-            {featuredPros.map((item) => (
-              <article
-                key={item.title}
-                className="overflow-hidden rounded-[1.7rem] border border-slate-200 bg-white shadow-[0_16px_40px_rgba(15,23,42,0.07)]">
-                <img src={item.image} alt={item.title} className="h-48 w-full object-cover" />
-                <div className="space-y-4 p-5">
-                  <div className="flex items-start justify-between gap-3">
-                    <h3 className="text-lg font-bold text-slate-950">{item.title}</h3>
-                    <div className="rounded-full bg-amber-50 px-2.5 py-1 text-xs font-semibold text-amber-700">
-                      {item.rating}
-                    </div>
-                  </div>
-                  <p className="text-sm leading-6 text-slate-500">{item.text}</p>
-                  <div className="flex items-end justify-between gap-3">
-                    <div>
-                      <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-400">
-                        Starts from
-                      </p>
-                      <p className="text-xl font-black text-slate-950">{item.price}</p>
-                    </div>
-                    <Link to="/login">
-                      <Button variant="outline" className="rounded-2xl border-blue-200 text-blue-700 hover:bg-blue-50">
-                        Book Now
-                      </Button>
-                    </Link>
-                  </div>
-                </div>
-              </article>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      <section className="px-4 py-18 lg:px-8">
-        <div className="mx-auto grid max-w-7xl gap-8 lg:grid-cols-[0.95fr_1.2fr] lg:items-start">
-          <div className="space-y-5">
-            <h2 className="text-3xl font-black leading-tight text-slate-950">
-              How SevaLink
-              <br />
-              <span className="text-blue-700">Ensures Quality</span>
-            </h2>
-            <p className="max-w-md text-base leading-7 text-slate-500">
-              A streamlined path for both customers seeking help and trusted providers offering skills.
-            </p>
-            <Card className="rounded-[1.7rem] border border-slate-200 bg-white p-5 shadow-none">
-              <div className="mb-3 inline-flex rounded-2xl bg-emerald-50 p-3 text-emerald-700">
-                <ShieldCheck className="h-5 w-5" />
-              </div>
-              <h3 className="text-lg font-bold text-slate-950">Trust Guarantee</h3>
-              <p className="mt-2 text-sm leading-6 text-slate-500">
-                Every booking is protected by our service quality checks and support-backed resolution flow.
-              </p>
-            </Card>
-          </div>
-          <div className="grid gap-4 md:grid-cols-3">
-            {qualitySteps.map((step) => {
-              const Icon = step.icon;
-              return (
-                <div
-                  key={step.title}
-                  className="space-y-4 rounded-[1.6rem] bg-white p-5 shadow-[0_16px_40px_rgba(15,23,42,0.07)]">
-                  <div className="inline-flex rounded-2xl bg-blue-700 p-3 text-white">
-                    <Icon className="h-5 w-5" />
-                  </div>
-                  <h3 className="text-lg font-bold text-slate-950">{step.title}</h3>
-                  <p className="text-sm leading-6 text-slate-500">{step.text}</p>
-                </div>
-              );
-            })}
-          </div>
-        </div>
-      </section>
-
-      <section className="px-4 pb-18 lg:px-8">
-        <div className="mx-auto max-w-7xl rounded-[2.25rem] bg-blue-700 px-6 py-14 text-center text-white shadow-[0_30px_80px_rgba(32,77,201,0.28)] lg:px-16">
-          <h2 className="text-3xl font-black leading-tight lg:text-5xl">The Future of Service Excellence is Here</h2>
-          <p className="mx-auto mt-4 max-w-2xl text-base leading-7 text-blue-100">
-            Whether you&apos;re looking to hire or looking to be hired, SevaLink is the ecosystem built for you.
-          </p>
-          <div className="mt-8 flex flex-col justify-center gap-3 sm:flex-row">
-            <Link to="/services">
-              <Button className="rounded-2xl bg-white px-8 text-blue-700 hover:bg-blue-50">Start Booking</Button>
-            </Link>
-            <Link to="/register?type=provider">
-              <Button
-                variant="outline"
-                className="rounded-2xl border-white/30 bg-transparent px-8 text-white hover:bg-white/10">
-                Join as Provider
-              </Button>
-            </Link>
-          </div>
-        </div>
-      </section>
+      <section className="bg-muted/40 px-4 py-14 lg:px-8"><div className="mx-auto max-w-7xl space-y-8"><div className="text-center"><h2 className="text-3xl font-black text-foreground">How SevaLink Works</h2><p className="mt-2 text-sm text-muted-foreground">Getting your service is simple and easy.</p></div><div className="grid gap-8 md:grid-cols-3">{[{number:"01",title:"Find",text:"Search for the service you need.",icon:Search},{number:"02",title:"Choose",text:"Compare providers, ratings and service details.",icon:Users},{number:"03",title:"Book",text:"Select a provider and book the service.",icon:Calendar}].map(({number,title,text,icon:Icon})=><div key={number} className="flex flex-col items-center text-center"><div className="mb-4 flex items-center gap-3"><span className="grid h-10 w-10 place-items-center rounded-full bg-primary/10 text-sm font-bold text-primary">{number}</span><div className="grid h-14 w-14 place-items-center rounded-full bg-primary text-white"><Icon className="h-6 w-6" /></div></div><h3 className="text-lg font-bold text-foreground">{title}</h3><p className="mt-1 text-sm text-muted-foreground">{text}</p></div>)}</div></div></section>
+      <section className="bg-card px-4 py-14 lg:px-8"><div className="mx-auto max-w-7xl space-y-8"><div className="text-center"><h2 className="text-3xl font-black text-foreground">Why Choose SevaLink?</h2><p className="mt-2 text-sm text-muted-foreground">A safer, smarter and simpler way to find local services.</p></div><div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">{[{title:"Trusted Providers",text:"Connect with verified service professionals.",icon:ShieldCheck},{title:"Ratings & Reviews",text:"Make better decisions with real feedback.",icon:BadgeCheck},{title:"Local Services",text:"Find providers in your area.",icon:MapPin},{title:"Easy Booking",text:"Request and manage services in one place.",icon:Calendar}].map(({title,text,icon:Icon})=><div key={title} className="rounded-2xl border bg-background p-5 text-center shadow-sm"><div className="mx-auto mb-4 grid h-12 w-12 place-items-center rounded-xl bg-primary/10 text-primary"><Icon className="h-6 w-6" /></div><h3 className="font-semibold text-foreground">{title}</h3><p className="mt-2 text-sm leading-6 text-muted-foreground">{text}</p></div>)}</div></div></section>
+      <section className="bg-muted/40 px-4 py-14 lg:px-8"><div className="mx-auto max-w-7xl space-y-8"><div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between"><div><h2 className="text-3xl font-black text-foreground">Meet Our Service Providers</h2><p className="mt-2 text-sm text-muted-foreground">Discover skilled professionals ready to help.</p></div><Link to="/providers" className="inline-flex items-center gap-1 text-sm font-semibold text-primary">View all providers <ArrowRight className="h-4 w-4" /></Link></div><div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">{featuredPros.map(item=><article key={item.title} className="overflow-hidden rounded-2xl border bg-card shadow-sm"><img src={item.image} alt={item.title} className="h-40 w-full object-cover" /><div className="space-y-3 p-4"><div className="flex items-start justify-between gap-2"><h3 className="font-bold text-foreground">{item.title}</h3><span className="rounded-full bg-amber-500/10 px-2 py-1 text-xs font-semibold text-amber-600">? {item.rating}</span></div><p className="text-sm leading-6 text-muted-foreground">{item.text}</p><Link to="/login"><Button variant="outline" className="w-full rounded-xl border-primary/30 text-primary">View Profile <ArrowRight className="ml-1 h-4 w-4" /></Button></Link></div></article>)}</div></div></section>
+      <section className="px-4 pb-14 lg:px-8"><div className="mx-auto max-w-7xl rounded-2xl bg-primary p-8 text-center text-white shadow-sm sm:p-12"><h2 className="text-3xl font-black">Ready to Find the Right Service?</h2><p className="mx-auto mt-2 max-w-xl text-sm text-white/80">Discover skilled professionals for your everyday needs with SevaLink.</p><div className="mt-6 flex flex-col justify-center gap-3 sm:flex-row"><Link to="/services"><Button className="rounded-xl bg-white text-primary">Find a Service <ArrowRight className="ml-1 h-4 w-4" /></Button></Link><Link to="/register?type=provider"><Button variant="outline" className="rounded-xl border-white/40 bg-transparent text-white">Become a Provider</Button></Link></div></div></section>
     </motion.div>
   );
 }
@@ -1525,23 +1210,23 @@ export function AboutPage() {
 
 export function PrivacyPolicyPage() {
   return (
-    <motion.div className="mx-auto max-w-4xl px-4 py-12 space-y-8" {...fade}>
+    <motion.div className="mx-auto max-w-4xl space-y-8 pt-8" {...fade}>
       <div className="space-y-3">
-        <Badge variant="outline">Legal</Badge>
-        <h1 className="text-4xl font-black text-slate-950 dark:text-white">Privacy Policy</h1>
-        <p className="text-sm text-slate-500">Last updated: September 20, 2026</p>
+
+        <h1 className="text-4xl font-black text-foreground">Privacy Policy</h1>
+        <p className="text-sm text-muted-foreground">Last updated: September 20, 2026</p>
       </div>
 
-      <div className="space-y-6 text-sm leading-7 text-slate-600 dark:text-slate-300">
+      <div className="space-y-6 rounded-2xl border bg-card p-6 text-sm leading-7 text-muted-foreground shadow-sm sm:p-8">
         <section className="space-y-2">
-          <h2 className="text-xl font-bold text-slate-900 dark:text-white">1. Introduction</h2>
+          <h2 className="text-xl font-bold text-foreground">1. Introduction</h2>
           <p>
             Welcome to SevaLink (&quot;we&quot;, &quot;our&quot;, or &quot;us&quot;). We respect your privacy and are committed to protecting the personal data you share with us through our web platform, mobile application, and WhatsApp messaging services.
           </p>
         </section>
 
         <section className="space-y-2">
-          <h2 className="text-xl font-bold text-slate-900 dark:text-white">2. Information We Collect</h2>
+          <h2 className="text-xl font-bold text-foreground">2. Information We Collect</h2>
           <p>We collect information to provide better service booking experiences:</p>
           <ul className="list-disc pl-5 space-y-1">
             <li><strong>Account & Contact Info:</strong> Name, phone number, email address, and service delivery addresses.</li>
@@ -1551,7 +1236,7 @@ export function PrivacyPolicyPage() {
         </section>
 
         <section className="space-y-2">
-          <h2 className="text-xl font-bold text-slate-900 dark:text-white">3. How We Use Your Information</h2>
+          <h2 className="text-xl font-bold text-foreground">3. How We Use Your Information</h2>
           <p>Your data is used strictly to:</p>
           <ul className="list-disc pl-5 space-y-1">
             <li>Connect customers with verified local service providers.</li>
@@ -1561,16 +1246,16 @@ export function PrivacyPolicyPage() {
         </section>
 
         <section className="space-y-2">
-          <h2 className="text-xl font-bold text-slate-900 dark:text-white">4. Data Sharing & Security</h2>
+          <h2 className="text-xl font-bold text-foreground">4. Data Sharing & Security</h2>
           <p>
             We do not sell your personal data. We only share necessary service details (such as service name and address) with assigned, verified service providers to fulfill your booking.
           </p>
         </section>
 
         <section className="space-y-2">
-          <h2 className="text-xl font-bold text-slate-900 dark:text-white">5. Contact & Data Deletion</h2>
+          <h2 className="text-xl font-bold text-foreground">5. Contact & Data Deletion</h2>
           <p>
-            If you wish to request data deletion or have questions regarding this Privacy Policy, please contact our privacy team at <a href="mailto:privacy@sevalink.app" className="text-blue-600 font-semibold underline">privacy@sevalink.app</a>.
+            If you wish to request data deletion or have questions regarding this Privacy Policy, please contact our privacy team at <a href="mailto:privacy@sevalink.app" className="font-semibold text-primary underline">privacy@sevalink.app</a>.
           </p>
         </section>
       </div>
