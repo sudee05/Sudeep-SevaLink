@@ -147,6 +147,8 @@ export function PublicFooter() {
               onClick={scrollToTop}
               className="block transition hover:text-blue-700"
             >
+              Register
+            </Link>
             {/* Privacy Policy */}
             <Link
               to="/privacy"
