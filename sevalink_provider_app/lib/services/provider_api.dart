@@ -16,7 +16,7 @@ class ProviderApi {
 
   /// Web client ID from Google Cloud Console (same one configured in Supabase).
   static const _webClientId =
-      '389406237420-ubj6i6d05oc4idk9tq4jcnm27m0a5t5k.apps.googleusercontent.com';
+      '389406237420-ubj6l6d05oc4ldk9tq4jcnm27m0a5t5k.apps.googleusercontent.com';
 
   // ── Auth ──────────────────────────────────────────────────────
 
@@ -49,17 +49,30 @@ class ProviderApi {
       );
       if (response.user == null) throw Exception('Google sign-in failed');
 
-      // Check if the user has a registered profile
+      // Keep new Google users signed in with a minimal provider profile.
+      // AuthGate will show the details form until the provider profile is saved.
       final existing = await client
           .from('profiles')
-          .select('id, role, phone')
+          .select('id, role, phone, full_name')
           .eq('id', response.user!.id)
           .maybeSingle();
-
-      if (existing == null || existing['role'] == null || (existing['role'] as String).isEmpty || existing['phone'] == null || (existing['phone'] as String).isEmpty) {
-        // Not registered — sign out and ask them to register first
-        await client.auth.signOut();
-        throw Exception('No account found. Please register first, then use Google to sign in.');
+      if (existing == null) {
+        await client.from('profiles').insert({
+          'id': response.user!.id,
+          'full_name': response.user!.userMetadata?['full_name'] ??
+              response.user!.userMetadata?['name'] ?? '',
+          'phone': '',
+          'role': 'provider',
+          'approval_status': 'pending',
+        });
+      } else if (existing['role'] != 'provider') {
+        // Convert an auto-created blank profile into provider onboarding.
+        if ((existing['phone'] as String? ?? '').trim().isEmpty) {
+          await client.from('profiles').update({'role': 'provider'}).eq('id', response.user!.id);
+        } else {
+          await client.auth.signOut();
+          throw Exception(_invalidProviderRoleMessage);
+        }
       }
 
       await ensureProviderRole(response.user!.id);
@@ -113,7 +126,14 @@ class ProviderApi {
     }
   }
 
-  static Future<void> signOut() => client.auth.signOut();
+  static Future<void> signOut() async {
+    // Clear the native Google session so the next login can choose another account.
+    try {
+      await GoogleSignIn(serverClientId: _webClientId).signOut();
+    } finally {
+      await client.auth.signOut();
+    }
+  }
 
   static Future<void> ensureProviderRole(String userId) async {
     final profile = await client

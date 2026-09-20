@@ -15,7 +15,8 @@ class AuthState {
 
   const AuthState({this.profile, this.user, this.isLoading = false, this.error});
 
-  bool get isAuthenticated => user != null && profile != null;
+  bool get profileComplete => profile != null && profile!.fullName.trim().isNotEmpty && profile!.phone.trim().isNotEmpty;
+  bool get isAuthenticated => user != null && profileComplete;
   bool get hasSession => user != null;
 
   AuthState copyWith({AppUser? profile, User? user, bool? isLoading, String? error}) => AuthState(

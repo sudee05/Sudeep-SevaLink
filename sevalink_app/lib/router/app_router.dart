@@ -6,6 +6,7 @@ import '../screens/auth/login_screen.dart';
 import '../screens/auth/register_screen.dart';
 import '../screens/auth/forgot_password_screen.dart';
 import '../screens/auth/email_verification_screen.dart';
+import '../screens/auth/complete_profile_screen.dart';
 import '../screens/customer/customer_shell.dart';
 import '../screens/customer/dashboard_screen.dart';
 import '../screens/customer/bookings_screen.dart';
@@ -26,18 +27,22 @@ final _shellNavigatorKey = GlobalKey<NavigatorState>();
 class _AuthNotifier extends ChangeNotifier {
   bool _isAuthenticated;
   bool _isLoading;
+  bool _hasSession;
 
-  _AuthNotifier({required bool isAuthenticated, required bool isLoading})
+  _AuthNotifier({required bool isAuthenticated, required bool isLoading, required bool hasSession})
       : _isAuthenticated = isAuthenticated,
-        _isLoading = isLoading;
+        _isLoading = isLoading,
+        _hasSession = hasSession;
 
   bool get isAuthenticated => _isAuthenticated;
   bool get isLoading => _isLoading;
+  bool get hasSession => _hasSession;
 
-  void update({required bool isAuthenticated, required bool isLoading}) {
-    if (_isAuthenticated != isAuthenticated || _isLoading != isLoading) {
+  void update({required bool isAuthenticated, required bool isLoading, required bool hasSession}) {
+    if (_isAuthenticated != isAuthenticated || _isLoading != isLoading || _hasSession != hasSession) {
       _isAuthenticated = isAuthenticated;
       _isLoading = isLoading;
+      _hasSession = hasSession;
       notifyListeners();
     }
   }
@@ -51,12 +56,14 @@ final routerProvider = Provider<GoRouter>((ref) {
   final notifier = _AuthNotifier(
     isAuthenticated: authState.isAuthenticated,
     isLoading: authState.isLoading,
+    hasSession: authState.hasSession,
   );
 
   ref.listen(authProvider, (_, next) {
     notifier.update(
       isAuthenticated: next.isAuthenticated,
       isLoading: next.isLoading,
+      hasSession: next.hasSession,
     );
   });
 
@@ -72,9 +79,11 @@ final routerProvider = Provider<GoRouter>((ref) {
           path.startsWith('/register') ||
           path.startsWith('/forgot-password') ||
           path.startsWith('/verify-email');
+      final isCompleteProfileRoute = path.startsWith('/complete-profile');
 
-      if (!notifier.isAuthenticated && !isAuthRoute) return '/login';
-      if (notifier.isAuthenticated && isAuthRoute) return '/customer';
+      if (!notifier.hasSession && !isAuthRoute) return '/login';
+      if (notifier.hasSession && !notifier.isAuthenticated && !isCompleteProfileRoute) return '/complete-profile';
+      if (notifier.isAuthenticated && (isAuthRoute || isCompleteProfileRoute)) return '/customer';
       return null;
     },
     routes: [
@@ -83,6 +92,7 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(path: '/register', builder: (ctx, _) => const RegisterScreen()),
       GoRoute(path: '/forgot-password', builder: (ctx, _) => const ForgotPasswordScreen()),
       GoRoute(path: '/verify-email', builder: (ctx, _) => const EmailVerificationScreen()),
+      GoRoute(path: '/complete-profile', builder: (ctx, _) => const CompleteProfileScreen()),
 
       // ── Customer Portal (shell with bottom nav) ──────────────
       ShellRoute(

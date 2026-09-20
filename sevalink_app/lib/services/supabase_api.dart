@@ -7,7 +7,7 @@ final supabase = Supabase.instance.client;
 
 /// Web client ID from Google Cloud Console (same one configured in Supabase).
 const _webClientId =
-    '389406237420-ubj6i6d05oc4idk9tq4jcnm27m0a5t5k.apps.googleusercontent.com';
+    '389406237420-ubj6l6d05oc4ldk9tq4jcnm27m0a5t5k.apps.googleusercontent.com';
 
 // ── Auth ──────────────────────────────────────────────────────
 
@@ -28,24 +28,29 @@ Future<Map<String, dynamic>> signInWithGoogle() async {
   );
   if (res.user == null) throw Exception('Google sign-in failed');
 
-  // Check if the user has a registered profile
+  // Google creates the auth user first. Keep the session and create a minimal
+  // profile so the app can collect the remaining required details.
   final existing = await supabase
       .from('profiles')
-      .select('id, role, phone')
+      .select('id, role, phone, full_name')
       .eq('id', res.user!.id)
       .maybeSingle();
 
-  if (existing == null || existing['role'] == null || (existing['role'] as String).isEmpty || existing['phone'] == null || (existing['phone'] as String).isEmpty) {
-    // Not registered — sign out and ask them to register first
-    await supabase.auth.signOut();
-    throw Exception('No account found. Please register first, then use Google to sign in.');
-  }
-
-  final profile = await getProfile(res.user!.id);
-  if (profile.role != 'customer') {
+  if (existing == null) {
+    await supabase.from('profiles').insert({
+      'id': res.user!.id,
+      'full_name': res.user!.userMetadata?['full_name'] ??
+          res.user!.userMetadata?['name'] ?? '',
+      'phone': '',
+      'role': 'customer',
+      'approval_status': 'approved',
+    });
+  } else if (existing['role'] != 'customer') {
     await supabase.auth.signOut();
     throw Exception('Invalid account. Please log in with a customer account.');
   }
+
+  final profile = await getProfile(res.user!.id);
   return {'user': res.user, 'profile': profile};
 }
 
@@ -107,7 +112,13 @@ Future<Map<String, dynamic>> signUpWithEmail({
 }
 
 Future<void> signOut() async {
-  await supabase.auth.signOut();
+  // Clear the native Google session as well as the Supabase session. Without
+  // this, GoogleSignIn reuses the previously selected account on next login.
+  try {
+    await GoogleSignIn(serverClientId: _webClientId).signOut();
+  } finally {
+    await supabase.auth.signOut();
+  }
 }
 
 Future<void> resetPassword(String email) async {
