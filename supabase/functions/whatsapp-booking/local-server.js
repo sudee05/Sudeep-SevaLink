@@ -282,19 +282,62 @@ async function createProfile(opts) {
   const phone = opts.phone, name = opts.name, email = opts.email;
   const digits = String(phone).replace(/\D/g, '');
   const formatted = '+' + digits;
-  const { data: authUser, error: authError } = await adminClient.auth.admin.createUser({
-    email, phone: formatted, email_confirm: true, phone_confirm: true,
+
+  const { data: created, error: authError } = await adminClient.auth.admin.createUser({
+    email,
+    phone: formatted,
+    email_confirm: true,
+    phone_confirm: true,
     user_metadata: { full_name: name, source: 'whatsapp' },
   });
-  if (authError) console.warn('[createUser]', authError.message);
-  const userId = (authUser && authUser.user && authUser.user.id) || cryptoLib.randomUUID();
-  const { data: profile, error: upsertError } = await adminClient.from('profiles')
-    .upsert({ id: userId, full_name: name, phone: formatted, role: 'customer', approval_status: 'approved' })
-    .select('id, full_name, phone, role').single();
-  if (upsertError) console.warn('[profiles upsert]', upsertError.message);
-  return profile || { id: userId, full_name: name, phone: formatted };
-}
 
+  let authUser = created && created.user;
+
+  // A WhatsApp user may already exist in Supabase Auth even when the
+  // createUser call returns "already registered". Resolve that real UUID
+  // instead of inventing one, because profiles.id references auth.users.id.
+  if (authError) {
+    console.warn('[createUser]', authError.message);
+    const { data: usersData, error: listError } = await adminClient.auth.admin.listUsers({
+      page: 1,
+      perPage: 1000,
+    });
+
+    if (listError) {
+      throw new Error('Could not resolve the existing WhatsApp account: ' + listError.message);
+    }
+
+    const normalizedEmail = String(email || '').trim().toLowerCase();
+    authUser = (usersData.users || []).find((user) => {
+      const userPhone = String(user.phone || '').replace(/\D/g, '');
+      return (normalizedEmail && String(user.email || '').toLowerCase() === normalizedEmail)
+        || (userPhone && (userPhone === digits || userPhone.endsWith(digits) || digits.endsWith(userPhone)));
+    });
+  }
+
+  if (!authUser?.id) {
+    throw new Error('Could not create or find the WhatsApp customer account.');
+  }
+
+  const { data: profile, error: upsertError } = await adminClient
+    .from('profiles')
+    .upsert({
+      id: authUser.id,
+      full_name: name,
+      phone: formatted,
+      role: 'customer',
+      approval_status: 'approved',
+    })
+    .select('id, full_name, phone, role')
+    .single();
+
+  if (upsertError) {
+    console.warn('[profiles upsert]', upsertError.message);
+    throw upsertError;
+  }
+
+  return profile;
+}
 async function fetchCategories() {
   const { data, error } = await adminClient.from('categories').select('id, name, description').order('name').limit(9);
   if (error) console.warn('[fetchCategories]', error.message);
@@ -361,14 +404,33 @@ async function notifyProvider(providerId, bookingCode) {
 }
 
 async function createBooking(opts) {
-  const customerId = opts.customerId, customerName = opts.customerName, provider = opts.provider, service = opts.service, address = opts.address, bookingDate = opts.bookingDate, bookingTime = opts.bookingTime;
+  const customerId = opts.customerId, customerName = opts.customerName, customerPhone = opts.customerPhone, provider = opts.provider, service = opts.service, address = opts.address, bookingDate = opts.bookingDate, bookingTime = opts.bookingTime;
   let scheduledDate;
   try {
     scheduledDate = new Date(bookingDate + 'T' + bookingTime + ':00');
     if (isNaN(scheduledDate.getTime())) throw new Error('Invalid');
   } catch (e) { scheduledDate = new Date(Date.now() + 86400000); scheduledDate.setHours(10, 0, 0, 0); }
+  let validCustomerId = customerId;
+  const { data: customerProfile } = await adminClient
+    .from('profiles')
+    .select('id')
+    .eq('id', customerId)
+    .maybeSingle();
+
+  if (!customerProfile) {
+    validCustomerId = null;
+  }
+
+  if (!customerProfile && customerPhone) {
+    const recoveredProfile = await findProfileByPhone(customerPhone);
+    if (recoveredProfile) validCustomerId = recoveredProfile.id;
+  }
+
+  if (!validCustomerId) {
+    throw new Error('WhatsApp customer profile was not found.');
+  }
   const { data, error } = await adminClient.from('bookings').insert({
-    service_id: service.id, customer_id: customerId, provider_id: provider.providerId,
+    service_id: service.id, customer_id: validCustomerId, provider_id: provider.providerId,
     service_title: service.name, provider_name: provider.businessName, customer_name: customerName,
     scheduled_date: scheduledDate.toISOString(), booking_date: bookingDate, booking_time: bookingTime,
     status: 'pending', amount: provider.price, address,
@@ -661,7 +723,7 @@ async function handleMessage(opts) {
       }
       if (id!=='confirm_yes'&&id!=='1') return sendButtons(phone,t(session,'invalid'),[{ id:'confirm_yes', title:t(session,'btnConfirm') },{ id:'confirm_no', title:t(session,'btnCancel') }]);
       try {
-        const booking = await createBooking({ customerId:session.profile.id, customerName:session.profile.full_name, provider:session.draft.provider, service:session.draft.service, address:session.draft.address, bookingDate:session.draft.bookingDate, bookingTime:session.draft.bookingTime });
+        const booking = await createBooking({ customerId:session.profile.id, customerPhone:phone, customerName:session.profile.full_name, provider:session.draft.provider, service:session.draft.service, address:session.draft.address, bookingDate:session.draft.bookingDate, bookingTime:session.draft.bookingTime });
         await sendText(phone, t(session,'bookingCreated', booking.booking_code, { service:session.draft.service.title, provider:session.draft.provider.businessName, date:prettyDate(session.draft.bookingDate), time:prettyTime(session.draft.bookingTime) }));
         await notifyProvider(session.draft.provider.providerId, booking.booking_code);
       } catch(err) { console.error('[createBooking]', err.message); await sendText(phone,t(session,'bookingFailed')); }
