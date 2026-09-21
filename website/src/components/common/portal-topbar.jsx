@@ -10,20 +10,26 @@ import { Logo } from './logo'
 import { useAdminPendingItemsQuery, useNotificationsQuery } from '@/hooks/use-queries'
 import { useRealtimeNotifications } from '@/hooks/use-realtime'
 import { selectProfile, signOut } from '@/store/authSlice'
+import { fetchAdminSection, resetSection } from '@/store/adminSlice'
 import { formatDate } from '@/utils/format'
 
 // ── Admin notification drawer ──────────────────────────────────
 
 function AdminNotificationDrawer({ open, onClose }) {
   const navigate = useNavigate()
+  const dispatch = useDispatch()
   const { data, isLoading } = useAdminPendingItemsQuery()
 
   const pendingProviders = data?.pendingProviders || []
   const pendingServiceRequests = data?.pendingServiceRequests || []
   const totalCount = pendingProviders.length + pendingServiceRequests.length
 
-  function go(path) {
+  function go(path, section) {
     onClose()
+    if (section) {
+      dispatch(resetSection(section))
+      dispatch(fetchAdminSection(section))
+    }
     navigate(path)
   }
 
@@ -98,7 +104,7 @@ function AdminNotificationDrawer({ open, onClose }) {
                       {pendingProviders.map((provider) => (
                         <button
                           key={provider.id}
-                          onClick={() => go('/sevalink-admin/providers')}
+                          onClick={() => go('/sevalink-admin/providers', 'providers')}
                           className="flex w-full items-start gap-3 rounded-xl border border-border bg-background p-3 text-left transition hover:border-primary/40 hover:bg-primary/5 active:scale-[0.98]"
                         >
                           <div className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-primary/10">
@@ -137,7 +143,7 @@ function AdminNotificationDrawer({ open, onClose }) {
                       {pendingServiceRequests.map((req) => (
                         <button
                           key={req.id}
-                          onClick={() => go('/sevalink-admin/services')}
+                          onClick={() => go('/sevalink-admin/services', 'services')}
                           className="flex w-full items-start gap-3 rounded-xl border border-border bg-background p-3 text-left transition hover:border-amber-400/40 hover:bg-amber-50/50 dark:hover:bg-amber-900/10 active:scale-[0.98]"
                         >
                           <div className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-amber-100 dark:bg-amber-900/30">
