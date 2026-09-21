@@ -42,6 +42,9 @@ const WHATSAPP_PHONE_ID = process.env.WHATSAPP_PHONE_NUMBER_ID || '';
 const VERIFY_TOKEN = process.env.WHATSAPP_VERIFY_TOKEN || 'sevalink_whatsapp_secret_sudeep';
 const PORT = Number(process.env.PORT || 3001);
 const PROVIDER_WEBSITE = 'https://sudeep-seva-link.vercel.app/provider';
+const CUSTOMER_REGISTER_WEBSITE = 'https://sudeep-seva-link.vercel.app/register';
+const CUSTOMER_LOGIN_WEBSITE = 'https://sudeep-seva-link.vercel.app/login';
+const SEVALINK_LOGO_URL = 'https://giygtxqatkrgjeuojgma.supabase.co/storage/v1/object/public/avatars/sevalink_logo.png';
 
 if (!SERVICE_ROLE_KEY) {
   throw new Error('Missing Supabase key. Add SUPABASE_SERVICE_ROLE_KEY or SUPABASE_SECRET_KEY to supabase/functions/.env.');
@@ -86,6 +89,8 @@ function sendText(to, body) {
 function sendImage(to, imageUrl, caption) {
   return callMeta({ messaging_product: 'whatsapp', recipient_type: 'individual', to, type: 'image', image: { link: imageUrl, caption: caption || '' } });
 }
+
+function wait(ms) { return new Promise(function(resolve) { setTimeout(resolve, ms); }); }
 
 function sendList(to, bodyText, buttonLabel, items, sectionTitle) {
   const rows = items.slice(0, 10).map(function(item) {
@@ -134,6 +139,8 @@ setInterval(function() {
 /* i18n — English + Kannada (Romanized to avoid Windows parse errors) */
 /* ------------------------------------------------------------------ */
 
+const KN_STRINGS = JSON.parse(fs.readFileSync(path.join(__dirname, 'kn-strings.json'), 'utf8').replace(/^\uFEFF/, ''));
+
 const MSG = {
   en: {
     chooseLang: 'Welcome to SevaLink!\n\nPlease choose your language.',
@@ -157,7 +164,7 @@ const MSG = {
     askTime: 'Please enter the preferred time.\nFormat: HH:MM AM/PM  e.g. 10:30 AM  or 24h e.g. 14:30',
     invalidTime: 'Invalid time. Please use HH:MM AM/PM or 24h format.',
     confirmBooking: function(s) { return 'Please confirm your booking.\n\nService: ' + s.service + '\nProvider: ' + s.provider + '\nDate: ' + s.date + '\nTime: ' + s.time + '\nPrice: Rs. ' + s.price + '\nAddress: ' + s.address; },
-    bookingCreated: function(code, s) { return 'Booking confirmed.\n\nCode: ' + code + '\nService: ' + s.service + '\nProvider: ' + s.provider + '\nDate: ' + s.date + '\nTime: ' + s.time + '\nStatus: Pending provider confirmation.'; },
+    bookingCreated: function(code, s) { return 'Thank you for your booking!\n\nBooking confirmed.\n\nCode: ' + code + '\nService: ' + s.service + '\nProvider: ' + s.provider + '\nDate: ' + s.date + '\nTime: ' + s.time + '\nStatus: Pending provider confirmation.\n\nTo monitor your booking status and view details, register on our website using the same email address (' + s.email + '):\n' + CUSTOMER_REGISTER_WEBSITE + '?email=' + encodeURIComponent(s.email || '') + '\n\nAlready have an account? Log in here:\n' + CUSTOMER_LOGIN_WEBSITE; },
     bookingFailed: 'Something went wrong while creating your booking. Please try again.',
     cancelled: 'Booking cancelled.',
     invalid: 'Sorry, I did not understand that. Please choose one of the options shown.',
@@ -197,63 +204,22 @@ const MSG = {
   // Kannada strings use Romanized transliteration (avoids Node.js v24 Windows
   // Unicode parsing bug with Kannada characters inside template literals).
   kn: {
-    chooseLang: 'SevaLink ge swagata!\n\nDayavittu nimma bhashe ayke maDi.',
-    welcome: 'SevaLink ge swagata.',
-    sessionExpired: '5 nimisha pratikriye illadda karana session mugidide. Hosadagi arambisona.',
-    askName: 'Neevu hosobaru. Dayavittu nimma purna hesarannu kaLuhisi.',
-    askEmail: 'DhanyavAda. Dayavittu nimma email viLAsa kaLuhisi.',
-    invalidEmail: 'Adu sariyadda email alla. Dayavittu matte kaLuhisi.',
-    profileCreated: function(name) { return 'DhanyavAda ' + name + ', nimma khate siddhavagide.'; },
-    chooseCategory: 'Dayavittu vargavannu ayke maDi.',
-    noCategories: 'Iga yAvude vargagaLu labhyaville. SvaLpa samayadda nantar matte prayatnisi.',
-    chooseService: 'Dayavittu seveyanne ayke maDi.',
-    noServices: 'I vargadalli yAvude sevegaLu kandubandilla. MENU endo uttarisi.',
-    chooseProvider: 'Dayavittu seva puraike dararannu ayke maDi.',
-    noProviders: 'I sevege Iga yAvude anumodita puraike dararilla. MENU endo uttarisi.',
-    providerSummary: function(p) { return p.businessName + '\nReting: ' + (p.rating || 'Ret agilla') + '\nAnubhava: ' + (p.experience || 'Namudisalagilla') + '\nBele: rU. ' + p.price + '\n\nNeevu Enu maDalu bayasuttiri?'; },
-    providerDetails: function(p) { return p.businessName + '\n\nParicaya: ' + (p.about || 'Vivarane illa.') + '\nAnubhava: ' + (p.experience || 'Namudisalagilla') + '\nReting: ' + (p.rating || 'Ret agilla') + '\nParishilisalagide: ' + (p.verified ? 'Houdu' : 'Illa') + '\nBele: rU. ' + p.price; },
-    askAddress: 'Seve bekagiruvA viLAsa kaLuhisi.',
-    askDate: 'Adyateya dinanka namudisi.\nMadari: DD/MM/YYYY  udA: 25/09/2026',
-    invalidDate: 'Adu sariyadda dinanka alla. DD/MM/YYYY madari baLasi.',
-    askTime: 'Adyateya samaya namudisi.\nMadari: HH:MM AM/PM  udA: 10:30 AM',
-    invalidTime: 'Adu sariyadda samaya alla. HH:MM AM/PM madari baLasi.',
-    confirmBooking: function(s) { return 'Dayavittu nimma booking dhruDikarisi.\n\nSeve: ' + s.service + '\nPuraike dara: ' + s.provider + '\nDinanka: ' + s.date + '\nSamaya: ' + s.time + '\nBele: rU. ' + s.price + '\nViLAsa: ' + s.address; },
-    bookingCreated: function(code, s) { return 'Booking dhruDikarisalagide.\n\nCode: ' + code + '\nSeve: ' + s.service + '\nPuraike dara: ' + s.provider + '\nDinanka: ' + s.date + '\nSamaya: ' + s.time + '\nSthiti: Puraike darada dhruDikaraNakkagi kayalaguttide.'; },
-    bookingFailed: 'Booking maDuvaga tondareydita. Matte prayatnisi.',
-    cancelled: 'Booking raddugomDisalagide.',
-    invalid: 'KSamisi, nanage arthaAgalilla. Dayavittu torisidag aykegaLalli onnannu arisi.',
-    genericError: 'Tondareydita. SvaLpa samayadda nantar matte prayatnisi.',
-    noBookings: 'Nimma yAvude ittIcina bookingggaLilla. Hosa booking maDalu MENU endo uttarisi.',
-    chooseBooking: 'Nimma ittIcina bookingggaLu illive. VivaraGAgAgi onnannu ayke maDi.',
-    bookingDetail: function(b) { return 'Booking: ' + b.booking_code + '\nSeve: ' + b.service_title + '\nPuraike dara: ' + b.provider_name + '\nDinanka: ' + (b.booking_date || 'Namudisalagilla') + '\nSamaya: ' + (b.booking_time || 'Namudisalagilla') + '\nSthiti: ' + b.status + '\nMotta: rU. ' + b.amount + '\nViLAsa: ' + b.address; },
-    cannotCancel: function(status) { return 'I booking raddugomDisalu sadyavilla (sthiti: "' + status + '"). KEvala baki athava svIkarisalAda bookings raddugomDisabahudu.'; },
-    confirmCancel: 'Neevu khaNDitavAgi I booking raddugomDisalu bayasuttirA?',
-    cancelSuccess: function(code) { return 'Booking ' + code + ' yasasviyAgi raddugomDisalagide.'; },
-    cancelFailed: 'Booking raddugomDisalu sadyavagalilla. Matte prayatnisi.',
-    btnBook: 'Book maDi',
-    btnViewDetails: 'Vivara noDi',
-    btnBack: 'Hinde',
-    btnConfirm: 'DhruDikarisi',
-    btnCancel: 'RaddumaDi',
-    btnYes: 'Houdu, raddumaDi',
-    btnNo: 'Illa, irali',
-    btnOk: 'Sari',
-    lblCategories: 'Vargagalu',
-    lblServices: 'Sevegalu',
-    lblProviders: 'Puraike dararu',
-    lblBookings: 'Nanna booking',
-    mainMenuBody: function(name) { return 'Namaskara ' + name + '! Nimage Enu sahAya beku?'; },
-    mainMenuBodyNew: 'SwAgata! Neevu Enu maDalu bayasuttiri?',
-    menuBookService: 'Seve book maDi',
-    menuMyBookings: 'Nanna booking',
-    menuHelp: 'SahAya',
-    menuBookDesc: 'Seva puraike darannu huduki book maDi',
-    menuBookingsDesc: 'Nimma bookings noDi athava raddu maDi',
-    menuHelpDesc: 'SevaLink baLasuvA vidha tiLiyiri',
-    menuChooseBtn: 'Ayke maDi',
-    menuLabel: 'Menu',
-    helpText: 'SahAya:\n- "1" endo athava "Seve book maDi" endo kaLuhisi.\n- "2" endo athava "Nanna booking" endo kaLuhisi.\n- MENU endo kaLuhisi - menu maraLi tereyalu.',
-  },
+    chooseLang: KN_STRINGS.chooseLang, welcome: KN_STRINGS.welcome, sessionExpired: KN_STRINGS.sessionExpired, askName: KN_STRINGS.askName, askEmail: KN_STRINGS.askEmail, invalidEmail: KN_STRINGS.invalidEmail,
+    profileCreated: function(name) { return KN_STRINGS.profileCreated_prefix + name + KN_STRINGS.profileCreated_suffix; },
+    chooseCategory: KN_STRINGS.chooseCategory, noCategories: KN_STRINGS.noCategories, chooseService: KN_STRINGS.chooseService, noServices: KN_STRINGS.noServices, chooseProvider: KN_STRINGS.chooseProvider, noProviders: KN_STRINGS.noProviders,
+    providerSummary: function(p) { return p.businessName + KN_STRINGS.providerSummary_rating + (p.rating || KN_STRINGS.providerSummary_norating) + KN_STRINGS.providerSummary_exp + (p.experience || KN_STRINGS.providerSummary_noexp) + KN_STRINGS.providerSummary_price + p.price + KN_STRINGS.providerSummary_action; },
+    providerDetails: function(p) { return p.businessName + KN_STRINGS.providerDetails_about + (p.about || KN_STRINGS.providerDetails_noabout) + KN_STRINGS.providerDetails_exp + (p.experience || KN_STRINGS.providerDetails_noexp) + KN_STRINGS.providerDetails_rating + (p.rating || KN_STRINGS.providerDetails_norating) + (p.verified ? KN_STRINGS.providerDetails_verified_yes : KN_STRINGS.providerDetails_verified_no) + KN_STRINGS.providerDetails_price + p.price; },
+    askAddress: KN_STRINGS.askAddress, askDate: KN_STRINGS.askDate, invalidDate: KN_STRINGS.invalidDate, askTime: KN_STRINGS.askTime, invalidTime: KN_STRINGS.invalidTime,
+    confirmBooking: function(x) { return KN_STRINGS.confirmBooking_header + KN_STRINGS.confirmBooking_service + x.service + KN_STRINGS.confirmBooking_provider + x.provider + KN_STRINGS.confirmBooking_date + x.date + KN_STRINGS.confirmBooking_time + x.time + KN_STRINGS.confirmBooking_price + x.price + KN_STRINGS.confirmBooking_address + x.address; },
+    bookingCreated: function(code,x) { return KN_STRINGS.bookingCreated_header + KN_STRINGS.bookingCreated_code + code + KN_STRINGS.bookingCreated_service + x.service + KN_STRINGS.bookingCreated_provider + x.provider + KN_STRINGS.bookingCreated_date + x.date + KN_STRINGS.bookingCreated_time + x.time + KN_STRINGS.bookingCreated_status + '\n\n' + KN_STRINGS.bookingWebsiteNotice_prefix + x.email + KN_STRINGS.bookingWebsiteNotice_suffix + '\n' + CUSTOMER_REGISTER_WEBSITE + '?email=' + encodeURIComponent(x.email || '') + '\n\n' + KN_STRINGS.bookingLoginNotice + '\n' + CUSTOMER_LOGIN_WEBSITE; },
+    bookingFailed: KN_STRINGS.bookingFailed, cancelled: KN_STRINGS.cancelled, invalid: KN_STRINGS.invalid, genericError: KN_STRINGS.genericError, noBookings: KN_STRINGS.noBookings, chooseBooking: KN_STRINGS.chooseBooking,
+    bookingDetail: function(b) { return KN_STRINGS.bookingDetail_code + b.booking_code + KN_STRINGS.bookingDetail_service + b.service_title + KN_STRINGS.bookingDetail_provider + b.provider_name + KN_STRINGS.bookingDetail_date + (b.booking_date || KN_STRINGS.bookingDetail_nodate) + KN_STRINGS.bookingDetail_time + (b.booking_time || KN_STRINGS.bookingDetail_notime) + KN_STRINGS.bookingDetail_status + b.status + KN_STRINGS.bookingDetail_amount + b.amount + KN_STRINGS.bookingDetail_address + b.address; },
+    cannotCancel: function(status) { return KN_STRINGS.cannotCancel_prefix + status + KN_STRINGS.cannotCancel_suffix; }, confirmCancel: KN_STRINGS.confirmCancel, cancelSuccess: function(code) { return KN_STRINGS.cancelSuccess_prefix + code + KN_STRINGS.cancelSuccess_suffix; }, cancelFailed: KN_STRINGS.cancelFailed,
+    btnBook: KN_STRINGS.btnBook, btnViewDetails: KN_STRINGS.btnViewDetails, btnBack: KN_STRINGS.btnBack, btnConfirm: KN_STRINGS.btnConfirm, btnCancel: KN_STRINGS.btnCancel, btnYes: KN_STRINGS.btnYes, btnNo: KN_STRINGS.btnNo, btnOk: KN_STRINGS.btnOk,
+    lblCategories: KN_STRINGS.lblCategories, lblServices: KN_STRINGS.lblServices, lblProviders: KN_STRINGS.lblProviders, lblBookings: KN_STRINGS.lblBookings,
+    mainMenuBody: function(name) { return KN_STRINGS.mainMenuBody_prefix + name + KN_STRINGS.mainMenuBody_suffix; }, mainMenuBodyNew: KN_STRINGS.mainMenuBodyNew, menuBookService: KN_STRINGS.menuBookService, menuMyBookings: KN_STRINGS.menuMyBookings, menuHelp: KN_STRINGS.menuHelp, menuBookDesc: "", menuBookingsDesc: "", menuHelpDesc: "", menuChooseBtn: KN_STRINGS.chooseBtn, menuLabel: KN_STRINGS.mainMenuLabel,
+    helpText: KN_STRINGS.menuHelp_header + "\n" + KN_STRINGS.menuHelp_book + "\n" + KN_STRINGS.menuHelp_view + "\n" + KN_STRINGS.menuHelp_menu
+  }
 };
 
 function t(session, key) {
@@ -515,6 +481,7 @@ async function showMainMenu(phone, session, wasInvalid) {
     { id: 'menu_bookings', title: t(session, 'menuMyBookings'),  description: t(session, 'menuBookingsDesc') },
     { id: 'menu_help',     title: t(session, 'menuHelp'),        description: t(session, 'menuHelpDesc') },
   ];
+  await sendImage(phone, SEVALINK_LOGO_URL, 'SevaLink');
   return sendList(phone, numberedBody(bodyText, items), t(session, 'menuChooseBtn'), items, t(session, 'menuLabel'));
 }
 
@@ -627,7 +594,7 @@ async function handleMessage(opts) {
     case 'onboard_email': {
       if (inbound.kind !== 'text' || !EMAIL_RE.test(inbound.text)) return sendText(phone, t(session,'invalidEmail'));
       const profile = await createProfile({ phone, name: session.draft.name, email: inbound.text });
-      session.profile = profile; session.step = 'main_menu'; session.draft = {}; saveSession(phone, session);
+      session.profile = { ...profile, email: inbound.text.trim() }; session.step = 'main_menu'; session.draft = {}; saveSession(phone, session);
       await sendText(phone, t(session,'profileCreated', profile.full_name));
       return showMainMenu(phone, session);
     }
@@ -724,8 +691,9 @@ async function handleMessage(opts) {
       if (id!=='confirm_yes'&&id!=='1') return sendButtons(phone,t(session,'invalid'),[{ id:'confirm_yes', title:t(session,'btnConfirm') },{ id:'confirm_no', title:t(session,'btnCancel') }]);
       try {
         const booking = await createBooking({ customerId:session.profile.id, customerPhone:phone, customerName:session.profile.full_name, provider:session.draft.provider, service:session.draft.service, address:session.draft.address, bookingDate:session.draft.bookingDate, bookingTime:session.draft.bookingTime });
-        await sendText(phone, t(session,'bookingCreated', booking.booking_code, { service:session.draft.service.title, provider:session.draft.provider.businessName, date:prettyDate(session.draft.bookingDate), time:prettyTime(session.draft.bookingTime) }));
+        await sendText(phone, t(session,'bookingCreated', booking.booking_code, { service:session.draft.service.title, provider:session.draft.provider.businessName, date:prettyDate(session.draft.bookingDate), time:prettyTime(session.draft.bookingTime), email:(session.profile && session.profile.email) || session.draft.email || '' }));
         await notifyProvider(session.draft.provider.providerId, booking.booking_code);
+        await wait(5000);
       } catch(err) { console.error('[createBooking]', err.message); await sendText(phone,t(session,'bookingFailed')); }
       session.step='main_menu'; session.draft={}; saveSession(phone,session);
       return showMainMenu(phone,session);
@@ -820,7 +788,7 @@ server.listen(PORT, function() {
   console.log('\nSevaLink WhatsApp server -> http://localhost:' + PORT);
   console.log('Verify token: ' + VERIFY_TOKEN);
   console.log(WHATSAPP_ACCESS_TOKEN ? 'Token loaded (' + WHATSAPP_ACCESS_TOKEN.length + ' chars)' : 'No token — mock mode (replies print to console)');
-  console.log('Languages: English + Kannada (Romanized)');
+  console.log('Languages: English + Kannada');
   console.log('Session timeout: 5 minutes');
   console.log('Press Ctrl+C to stop.\n');
 });
