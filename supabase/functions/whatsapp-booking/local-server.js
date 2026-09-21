@@ -42,6 +42,7 @@ const WHATSAPP_ACCESS_TOKEN = (process.env.WHATSAPP_ACCESS_TOKEN || '').trim();
 const WHATSAPP_PHONE_ID = process.env.WHATSAPP_PHONE_NUMBER_ID || '';
 const VERIFY_TOKEN = process.env.WHATSAPP_VERIFY_TOKEN || 'sevalink_whatsapp_secret_sudeep';
 const PORT = Number(process.env.PORT || 3001);
+const PROVIDER_WEBSITE = 'https://sudeep-seva-link.vercel.app/provider';
 
 if (!SERVICE_ROLE_KEY) {
   throw new Error(
@@ -56,7 +57,7 @@ const adminClient = createClient(SUPABASE_URL, SERVICE_ROLE_KEY);
 const cryptoLib = require('crypto');
 
 /* ------------------------------------------------------------------ */
-/* outbound: text / list / buttons                                     */
+/* outbound: text / image / list / buttons                             */
 /* ------------------------------------------------------------------ */
 
 async function callMeta(payload) {
@@ -97,7 +98,18 @@ function sendText(to, body) {
   });
 }
 
-// items: [{ id, title, description }]  — max 10 rows total, title max 24 chars, description max 72 chars
+/** Send provider image before detail text. imageUrl must be a public HTTPS URL. */
+function sendImage(to, imageUrl, caption) {
+  return callMeta({
+    messaging_product: 'whatsapp',
+    recipient_type: 'individual',
+    to,
+    type: 'image',
+    image: { link: imageUrl, caption: caption || '' },
+  });
+}
+
+// items: [{ id, title, description }]  — max 10 rows, title max 24 chars, description max 72 chars
 function sendList(to, bodyText, buttonLabel, items, sectionTitle) {
   const rows = items.slice(0, 10).map((item) => ({
     id: item.id,
@@ -140,37 +152,182 @@ function sendButtons(to, bodyText, buttons) {
   });
 }
 
-// Sends a list, and also numbers the items in the body text so a plain
-// numeric reply ("2") works as a fallback if the client can't render lists.
 function numberedBody(bodyText, items) {
   const lines = items.map((item, i) => `${i + 1}. ${item.title}`);
   return `${bodyText}\n\n${lines.join('\n')}`;
 }
 
 /* ------------------------------------------------------------------ */
-/* session store                                                       */
+/* session store — 5-minute inactivity timeout                        */
 /* ------------------------------------------------------------------ */
 
-const SESSION_TTL_MS = 60 * 60 * 1000;
+const SESSION_TTL_MS = 5 * 60 * 1000;
 const sessions = new Map();
 const seenMessageIds = new Set();
 
 function getSession(phone) {
   const existing = sessions.get(phone);
   if (existing && Date.now() - existing.updatedAt < SESSION_TTL_MS) return existing;
-  const fresh = { step: 'init', profile: null, draft: {}, updatedAt: Date.now() };
+  const fresh = {
+    step: 'init',
+    profile: null,
+    lang: existing?.lang || null, // preserve language choice across sessions
+    draft: {},
+    updatedAt: Date.now(),
+    expired: !!existing,
+  };
   sessions.set(phone, fresh);
   return fresh;
 }
+
 function saveSession(phone, session) {
   session.updatedAt = Date.now();
+  session.expired = false;
   sessions.set(phone, session);
 }
+
 setInterval(() => {
   const now = Date.now();
   for (const [phone, s] of sessions) if (now - s.updatedAt > SESSION_TTL_MS) sessions.delete(phone);
   if (seenMessageIds.size > 2000) seenMessageIds.clear();
-}, 10 * 60 * 1000).unref();
+}, 5 * 60 * 1000).unref();
+
+/* ------------------------------------------------------------------ */
+/* i18n — English + Kannada                                           */
+/* ------------------------------------------------------------------ */
+
+const MSG = {
+  en: {
+    chooseLang: 'Welcome to SevaLink!\n\nPlease choose your language.',
+    welcome: 'Welcome to SevaLink.',
+    sessionExpired: 'Your session timed out after 5 minutes of inactivity. Starting fresh.',
+    askName: 'You are new here. Please send your full name.',
+    askEmail: 'Thanks. Please send your email address.',
+    invalidEmail: 'That does not look like a valid email. Please send a valid email address.',
+    profileCreated: (name) => `Thanks ${name}, your account is set up.`,
+    chooseCategory: 'Please choose a category.',
+    noCategories: 'No categories are available right now. Please try again later.',
+    chooseService: 'Please choose a service.',
+    noServices: 'No services found in this category. Reply MENU to choose a different category.',
+    chooseProvider: 'Please choose a provider.',
+    noProviders: 'No approved providers are available for this service. Reply MENU to start over.',
+    providerSummary: (p) =>
+      `${p.businessName}\nRating: ${p.rating || 'Not rated yet'}\nExperience: ${p.experience || 'Not specified'}\nPrice: Rs. ${p.price}\n\nWhat would you like to do?`,
+    providerDetails: (p) =>
+      `${p.businessName}\n\nAbout: ${p.about || 'No description provided.'}\nExperience: ${p.experience || 'Not specified'}\nRating: ${p.rating || 'Not rated yet'}\nVerified: ${p.verified ? 'Yes' : 'No'}\nPrice: Rs. ${p.price}`,
+    askAddress: 'Please send the address where the service is needed.',
+    askDate: 'Please enter the preferred date.\nFormat: DD/MM/YYYY  e.g. 25/09/2026',
+    invalidDate: 'That does not look like a valid date. Please use DD/MM/YYYY format, e.g. 25/09/2026',
+    askTime: 'Please enter the preferred time.\nFormat: HH:MM AM/PM  e.g. 10:30 AM  or 24h e.g. 14:30',
+    invalidTime: 'That does not look like a valid time. Please use HH:MM AM/PM or 24h format.',
+    confirmBooking: (s) =>
+      `Please confirm your booking.\n\nService: ${s.service}\nProvider: ${s.provider}\nDate: ${s.date}\nTime: ${s.time}\nPrice: Rs. ${s.price}\nAddress: ${s.address}`,
+    bookingCreated: (code, s) =>
+      `Booking confirmed.\n\nBooking code: ${code}\nService: ${s.service}\nProvider: ${s.provider}\nDate: ${s.date}\nTime: ${s.time}\nStatus: Pending confirmation from the provider.`,
+    bookingFailed: 'Something went wrong while creating your booking. Please try again.',
+    cancelled: 'Booking cancelled.',
+    invalid: 'Sorry, I did not understand that. Please choose one of the options shown.',
+    genericError: 'Something went wrong. Please try again in a moment.',
+    // My Bookings
+    noBookings: 'You have no recent bookings. Reply MENU to make a new booking.',
+    chooseBooking: 'Here are your recent bookings. Select one to view details.',
+    bookingDetail: (b) =>
+      `Booking: ${b.booking_code}\nService: ${b.service_title}\nProvider: ${b.provider_name}\nDate: ${b.booking_date || 'Not set'}\nTime: ${b.booking_time || 'Not set'}\nStatus: ${b.status}\nAmount: Rs. ${b.amount}\nAddress: ${b.address}`,
+    cannotCancel: (status) => `This booking cannot be cancelled because its status is "${status}". Only pending or accepted bookings can be cancelled.`,
+    confirmCancel: 'Are you sure you want to cancel this booking?',
+    cancelSuccess: (code) => `Booking ${code} has been cancelled successfully.`,
+    cancelFailed: 'Could not cancel the booking. Please try again.',
+    // Buttons / labels
+    btnBook: 'Book',
+    btnViewDetails: 'View Details',
+    btnBack: 'Back',
+    btnConfirm: 'Confirm',
+    btnCancel: 'Cancel',
+    btnYes: 'Yes, Cancel',
+    btnNo: 'No, Keep It',
+    btnOk: 'OK',
+    lblCategories: 'Categories',
+    lblServices: 'Services',
+    lblProviders: 'Providers',
+    lblBookings: 'My Bookings',
+    // Main menu
+    mainMenuBody: (name) => `Hello ${name}! How can we help you today?`,
+    mainMenuBodyNew: 'Welcome! What would you like to do?',
+    menuBookService: 'Book a Service',
+    menuMyBookings: 'My Bookings',
+    menuHelp: 'Help',
+  },
+
+  kn: {
+    chooseLang: 'ಸೇವಾಲಿಂಕ್‌ಗೆ ಸ್ವಾಗತ!\n\nದಯವಿಟ್ಟು ನಿಮ್ಮ ಭಾಷೆ ಆಯ್ಕೆ ಮಾಡಿ.',
+    welcome: 'ಸೇವಾಲಿಂಕ್‌ಗೆ ಸ್ವಾಗತ.',
+    sessionExpired: '5 ನಿಮಿಷ ಪ್ರತಿಕ್ರಿಯೆ ಇಲ್ಲದ ಕಾರಣ ಸೆಶನ್ ಮುಗಿದಿದೆ. ಹೊಸದಾಗಿ ಆರಂಭಿಸೋಣ.',
+    askName: 'ನೀವು ಹೊಸಬರು. ದಯವಿಟ್ಟು ನಿಮ್ಮ ಪೂರ್ಣ ಹೆಸರನ್ನು ಕಳುಹಿಸಿ.',
+    askEmail: 'ಧನ್ಯವಾದ. ದಯವಿಟ್ಟು ನಿಮ್ಮ ಇಮೇಲ್ ವಿಳಾಸ ಕಳುಹಿಸಿ.',
+    invalidEmail: 'ಅದು ಸರಿಯಾದ ಇಮೇಲ್ ಅಲ್ಲ. ದಯವಿಟ್ಟು ಮತ್ತೆ ಕಳುಹಿಸಿ.',
+    profileCreated: (name) => `ಧನ್ಯವಾದ ${name}, ನಿಮ್ಮ ಖಾತೆ ಸಿದ್ಧವಾಗಿದೆ.`,
+    chooseCategory: 'ದಯವಿಟ್ಟು ವರ್ಗವನ್ನು ಆಯ್ಕೆ ಮಾಡಿ.',
+    noCategories: 'ಈಗ ಯಾವುದೇ ವರ್ಗಗಳು ಲಭ್ಯವಿಲ್ಲ. ಸ್ವಲ್ಪ ಸಮಯದ ನಂತರ ಮತ್ತೆ ಪ್ರಯತ್ನಿಸಿ.',
+    chooseService: 'ದಯವಿಟ್ಟು ಸೇವೆಯನ್ನು ಆಯ್ಕೆ ಮಾಡಿ.',
+    noServices: 'ಈ ವರ್ಗದಲ್ಲಿ ಯಾವುದೇ ಸೇವೆಗಳು ಕಂಡುಬಂದಿಲ್ಲ. MENU ಎಂದು ಉತ್ತರಿಸಿ.',
+    chooseProvider: 'ದಯವಿಟ್ಟು ಸೇವಾ ಪೂರೈಕೆದಾರರನ್ನು ಆಯ್ಕೆ ಮಾಡಿ.',
+    noProviders: 'ಈ ಸೇವೆಗೆ ಈಗ ಯಾವುದೇ ಅನುಮೋದಿತ ಪೂರೈಕೆದಾರರಿಲ್ಲ. MENU ಎಂದು ಉತ್ತರಿಸಿ.',
+    providerSummary: (p) =>
+      `${p.businessName}\nರೇಟಿಂಗ್: ${p.rating || 'ರೇಟ್ ಆಗಿಲ್ಲ'}\nಅನುಭವ: ${p.experience || 'ನಮೂದಿಸಲಾಗಿಲ್ಲ'}\nಬೆಲೆ: ರೂ. ${p.price}\n\nನೀವು ಏನು ಮಾಡಲು ಬಯಸುತ್ತೀರಿ?`,
+    providerDetails: (p) =>
+      `${p.businessName}\n\nಪರಿಚಯ: ${p.about || 'ವಿವರಣೆ ಇಲ್ಲ.'}\nಅನುಭವ: ${p.experience || 'ನಮೂದಿಸಲಾಗಿಲ್ಲ'}\nರೇಟಿಂಗ್: ${p.rating || 'ರೇಟ್ ಆಗಿಲ್ಲ'}\nಪರಿಶೀಲಿಸಲಾಗಿದೆ: ${p.verified ? 'ಹೌದು' : 'ಇಲ್ಲ'}\nಬೆಲೆ: ರೂ. ${p.price}`,
+    askAddress: 'ಸೇವೆ ಬೇಕಾಗಿರುವ ವಿಳಾಸ ಕಳುಹಿಸಿ.',
+    askDate: 'ಆದ್ಯತೆಯ ದಿನಾಂಕ ನಮೂದಿಸಿ.\nಮಾದರಿ: DD/MM/YYYY  ಉದಾ: 25/09/2026',
+    invalidDate: 'ಅದು ಸರಿಯಾದ ದಿನಾಂಕ ಅಲ್ಲ. DD/MM/YYYY ಮಾದರಿ ಬಳಸಿ.',
+    askTime: 'ಆದ್ಯತೆಯ ಸಮಯ ನಮೂದಿಸಿ.\nಮಾದರಿ: HH:MM AM/PM  ಉದಾ: 10:30 AM',
+    invalidTime: 'ಅದು ಸರಿಯಾದ ಸಮಯ ಅಲ್ಲ. HH:MM AM/PM ಮಾದರಿ ಬಳಸಿ.',
+    confirmBooking: (s) =>
+      `ದಯವಿಟ್ಟು ನಿಮ್ಮ ಬುಕಿಂಗ್ ದೃಢೀಕರಿಸಿ.\n\nಸೇವೆ: ${s.service}\nಪೂರೈಕೆದಾರ: ${s.provider}\nದಿನಾಂಕ: ${s.date}\nಸಮಯ: ${s.time}\nಬೆಲೆ: ರೂ. ${s.price}\nವಿಳಾಸ: ${s.address}`,
+    bookingCreated: (code, s) =>
+      `ಬುಕಿಂಗ್ ದೃಢೀಕರಿಸಲಾಗಿದೆ.\n\nಬುಕಿಂಗ್ ಕೋಡ್: ${code}\nಸೇವೆ: ${s.service}\nಪೂರೈಕೆದಾರ: ${s.provider}\nದಿನಾಂಕ: ${s.date}\nಸಮಯ: ${s.time}\nಸ್ಥಿತಿ: ಪೂರೈಕೆದಾರರ ದೃಢೀಕರಣಕ್ಕಾಗಿ ಕಾಯಲಾಗುತ್ತಿದೆ.',
+    bookingFailed: 'ಬುಕಿಂಗ್ ಮಾಡುವಾಗ ತೊಂದರೆಯಾಯಿತು. ಮತ್ತೆ ಪ್ರಯತ್ನಿಸಿ.',
+    cancelled: 'ಬುಕಿಂಗ್ ರದ್ದುಗೊಳಿಸಲಾಗಿದೆ.',
+    invalid: 'ಕ್ಷಮಿಸಿ, ನನಗೆ ಅರ್ಥವಾಗಲಿಲ್ಲ. ದಯವಿಟ್ಟು ತೋರಿಸಿದ ಆಯ್ಕೆಗಳಲ್ಲಿ ಒಂದನ್ನು ಆರಿಸಿ.',
+    genericError: 'ತೊಂದರೆಯಾಯಿತು. ಸ್ವಲ್ಪ ಸಮಯದ ನಂತರ ಮತ್ತೆ ಪ್ರಯತ್ನಿಸಿ.',
+    // My Bookings
+    noBookings: 'ನಿಮ್ಮ ಯಾವುದೇ ಇತ್ತೀಚಿನ ಬುಕಿಂಗ್‌ಗಳಿಲ್ಲ. ಹೊಸ ಬುಕಿಂಗ್ ಮಾಡಲು MENU ಎಂದು ಉತ್ತರಿಸಿ.',
+    chooseBooking: 'ನಿಮ್ಮ ಇತ್ತೀಚಿನ ಬುಕಿಂಗ್‌ಗಳು ಇಲ್ಲಿವೆ. ವಿವರಗಳಿಗಾಗಿ ಒಂದನ್ನು ಆಯ್ಕೆ ಮಾಡಿ.',
+    bookingDetail: (b) =>
+      `ಬುಕಿಂಗ್: ${b.booking_code}\nಸೇವೆ: ${b.service_title}\nಪೂರೈಕೆದಾರ: ${b.provider_name}\nದಿನಾಂಕ: ${b.booking_date || 'ನಮೂದಿಸಲಾಗಿಲ್ಲ'}\nಸಮಯ: ${b.booking_time || 'ನಮೂದಿಸಲಾಗಿಲ್ಲ'}\nಸ್ಥಿತಿ: ${b.status}\nಮೊತ್ತ: ರೂ. ${b.amount}\nವಿಳಾಸ: ${b.address}`,
+    cannotCancel: (status) => `ಈ ಬುಕಿಂಗ್ ರದ್ದುಗೊಳಿಸಲು ಸಾಧ್ಯವಿಲ್ಲ ಏಕೆಂದರೆ ಅದರ ಸ್ಥಿತಿ "${status}" ಆಗಿದೆ. ಕೇವಲ ಬಾಕಿ ಅಥವಾ ಸ್ವೀಕರಿಸಲಾದ ಬುಕಿಂಗ್‌ಗಳನ್ನು ರದ್ದುಗೊಳಿಸಬಹುದು.`,
+    confirmCancel: 'ನೀವು ಖಂಡಿತವಾಗಿ ಈ ಬುಕಿಂಗ್ ರದ್ದುಗೊಳಿಸಲು ಬಯಸುತ್ತೀರಾ?',
+    cancelSuccess: (code) => `ಬುಕಿಂಗ್ ${code} ಯಶಸ್ವಿಯಾಗಿ ರದ್ದುಗೊಳಿಸಲಾಗಿದೆ.`,
+    cancelFailed: 'ಬುಕಿಂಗ್ ರದ್ದುಗೊಳಿಸಲು ಸಾಧ್ಯವಾಗಲಿಲ್ಲ. ಮತ್ತೆ ಪ್ರಯತ್ನಿಸಿ.',
+    // Buttons / labels
+    btnBook: 'ಬುಕ್ ಮಾಡಿ',
+    btnViewDetails: 'ವಿವರ ನೋಡಿ',
+    btnBack: 'ಹಿಂದೆ',
+    btnConfirm: 'ದೃಢೀಕರಿಸಿ',
+    btnCancel: 'ರದ್ದುಮಾಡಿ',
+    btnYes: 'ಹೌದು, ರದ್ದುಮಾಡಿ',
+    btnNo: 'ಇಲ್ಲ, ಇರಲಿ',
+    btnOk: 'ಸರಿ',
+    lblCategories: 'ವರ್ಗಗಳು',
+    lblServices: 'ಸೇವೆಗಳು',
+    lblProviders: 'ಪೂರೈಕೆದಾರರು',
+    lblBookings: 'ನನ್ನ ಬುಕಿಂಗ್',
+    // Main menu
+    mainMenuBody: (name) => `ನಮಸ್ಕಾರ ${name}! ನಿಮಗೆ ಏನು ಸಹಾಯ ಬೇಕು?`,
+    mainMenuBodyNew: 'ಸ್ವಾಗತ! ನೀವು ಏನು ಮಾಡಲು ಬಯಸುತ್ತೀರಿ?',
+    menuBookService: 'ಸೇವೆ ಬುಕ್ ಮಾಡಿ',
+    menuMyBookings: 'ನನ್ನ ಬುಕಿಂಗ್',
+    menuHelp: 'ಸಹಾಯ',
+  },
+};
+
+/** Translate a message key for the user's chosen language. */
+function t(session, key, ...args) {
+  const lang = session.lang || 'en';
+  const strings = MSG[lang] || MSG.en;
+  const val = strings[key] ?? MSG.en[key];
+  if (typeof val === 'function') return val(...args);
+  return val ?? key;
+}
 
 /* ------------------------------------------------------------------ */
 /* data access                                                         */
@@ -179,9 +336,10 @@ setInterval(() => {
 async function findProfileByPhone(rawPhone) {
   const digits = String(rawPhone).replace(/\D/g, '');
   const formatted = `+${digits}`;
+  // Provider approval is checked via providers.status, not profiles.approval_status.
   const { data, error } = await adminClient
     .from('profiles')
-    .select('id, full_name, phone, role, approval_status')
+    .select('id, full_name, phone, role')
     .or(`phone.eq.${formatted},phone.eq.${digits}`)
     .limit(1)
     .maybeSingle();
@@ -213,7 +371,7 @@ async function createProfile({ phone, name, email }) {
       role: 'customer',
       approval_status: 'approved',
     })
-    .select('id, full_name, phone, role, approval_status')
+    .select('id, full_name, phone, role')
     .single();
   if (upsertError) console.warn('[profiles upsert]', upsertError.message);
 
@@ -241,10 +399,13 @@ async function fetchServices(categoryId) {
   return data || [];
 }
 
+// Approval checked via providers.status = 'approved' (not profiles.approval_status).
 async function fetchProviders(serviceId) {
   const { data, error } = await adminClient
     .from('provider_services')
-    .select('price, provider_id, providers!inner(id, business_name, rating, experience, about, verified, status, certificates)')
+    .select(
+      'price, provider_id, providers!inner(id, business_name, rating, experience, about, verified, status, certificates, image_url)'
+    )
     .eq('service_id', serviceId)
     .eq('providers.status', 'approved')
     .limit(9);
@@ -255,27 +416,19 @@ async function fetchProviders(serviceId) {
   }
 
   if (data.length === 0) {
-    // Nothing matched with the approved-only filter. Re-run without the
-    // status filter to tell us whether the data exists but is unapproved,
-    // or whether there's no provider_services link at all for this service.
     const { data: unfiltered, error: rawError } = await adminClient
       .from('provider_services')
       .select('provider_id, providers(business_name, status)')
       .eq('service_id', serviceId);
-
     if (rawError) {
       console.warn('[fetchProviders] diagnostic query error:', rawError.message);
     } else if (!unfiltered || unfiltered.length === 0) {
-      console.warn(
-        `[fetchProviders] No rows in provider_services for service_id=${serviceId}. ` +
-          `No provider has been linked to this service yet.`
-      );
+      console.warn(`[fetchProviders] No rows in provider_services for service_id=${serviceId}.`);
     } else {
-      const statuses = unfiltered.map((r) => `${r.providers?.business_name || r.provider_id}: ${r.providers?.status}`);
-      console.warn(
-        `[fetchProviders] service_id=${serviceId} has ${unfiltered.length} provider(s) linked, ` +
-          `but none have status='approved'. Statuses found: ${statuses.join(', ')}`
+      const statuses = unfiltered.map(
+        (r) => `${r.providers?.business_name || r.provider_id}: ${r.providers?.status}`
       );
+      console.warn(`[fetchProviders] ${unfiltered.length} provider(s) linked but none approved. Statuses: ${statuses.join(', ')}`);
     }
     return [];
   }
@@ -289,12 +442,97 @@ async function fetchProviders(serviceId) {
     about: row.providers.about,
     verified: row.providers.verified,
     certificates: row.providers.certificates || [],
+    imageUrl: row.providers.image_url || '',
   }));
 }
 
-async function createBooking({ customerId, customerName, provider, service, address }) {
-  const scheduledDate = new Date(Date.now() + 86400000);
-  scheduledDate.setHours(10, 0, 0, 0);
+/** Fetch last 5 bookings for a customer (any active/closed status). */
+async function fetchCustomerBookings(customerId) {
+  const { data, error } = await adminClient
+    .from('bookings')
+    .select('id, booking_code, service_title, provider_name, status, booking_date, booking_time, amount, address')
+    .eq('customer_id', customerId)
+    .order('created_at', { ascending: false })
+    .limit(5);
+  if (error) {
+    console.warn('[fetchCustomerBookings]', error.message);
+    return [];
+  }
+  return data || [];
+}
+
+/**
+ * Cancel a booking — only allowed if status is 'pending' or 'accepted'
+ * and the booking belongs to this customer.
+ * Returns { success, status } where status is the current status if blocked.
+ */
+async function cancelBooking(bookingId, customerId) {
+  // First fetch the booking to check ownership + status.
+  const { data: existing, error: fetchErr } = await adminClient
+    .from('bookings')
+    .select('id, status, booking_code, customer_id')
+    .eq('id', bookingId)
+    .eq('customer_id', customerId)
+    .maybeSingle();
+
+  if (fetchErr || !existing) {
+    console.warn('[cancelBooking] fetch error or not found:', fetchErr?.message);
+    return { success: false, status: null };
+  }
+
+  const cancellable = ['pending', 'accepted'];
+  if (!cancellable.includes(existing.status)) {
+    return { success: false, status: existing.status };
+  }
+
+  const { error: updateErr } = await adminClient
+    .from('bookings')
+    .update({ status: 'cancelled', updated_at: new Date().toISOString() })
+    .eq('id', bookingId)
+    .eq('customer_id', customerId);
+
+  if (updateErr) {
+    console.warn('[cancelBooking] update error:', updateErr.message);
+    return { success: false, status: existing.status };
+  }
+
+  return { success: true, bookingCode: existing.booking_code };
+}
+
+/** Notify provider via WhatsApp after a booking is created. */
+async function getProviderPhone(providerId) {
+  const { data, error } = await adminClient
+    .from('providers')
+    .select('user_id, profiles!inner(phone)')
+    .eq('id', providerId)
+    .maybeSingle();
+  if (error) { console.warn('[getProviderPhone]', error.message); return null; }
+  return data?.profiles?.phone || null;
+}
+
+async function notifyProvider(providerId, bookingCode) {
+  try {
+    const providerPhone = await getProviderPhone(providerId);
+    if (!providerPhone) { console.warn(`[notifyProvider] No phone for provider ${providerId}`); return; }
+    const digits = String(providerPhone).replace(/\D/g, '');
+    const to = digits.startsWith('0') ? `91${digits.slice(1)}` : digits;
+    await sendText(to, `You have a new booking! (Code: ${bookingCode})\n\nVisit your dashboard:\n${PROVIDER_WEBSITE}`);
+    console.log(`[notifyProvider] Alert sent to ${to}`);
+  } catch (err) {
+    console.error('[notifyProvider]', err.message);
+  }
+}
+
+/** Store booking with user-provided date and time. */
+async function createBooking({ customerId, customerName, provider, service, address, bookingDate, bookingTime }) {
+  let scheduledDate;
+  try {
+    scheduledDate = new Date(`${bookingDate}T${bookingTime}:00`);
+    if (isNaN(scheduledDate.getTime())) throw new Error('Invalid');
+  } catch {
+    scheduledDate = new Date(Date.now() + 86400000);
+    scheduledDate.setHours(10, 0, 0, 0);
+  }
 
   const { data, error } = await adminClient
     .from('bookings')
@@ -306,6 +544,8 @@ async function createBooking({ customerId, customerName, provider, service, addr
       provider_name: provider.businessName,
       customer_name: customerName,
       scheduled_date: scheduledDate.toISOString(),
+      booking_date: bookingDate,
+      booking_time: bookingTime,
       status: 'pending',
       amount: provider.price,
       address,
@@ -318,35 +558,77 @@ async function createBooking({ customerId, customerName, provider, service, addr
 }
 
 /* ------------------------------------------------------------------ */
-/* copy (no emojis)                                                    */
+/* date / time helpers                                                 */
 /* ------------------------------------------------------------------ */
 
-const MSG = {
-  welcome: 'Welcome to SevaLink.',
-  askName: 'You are new here. Please send your full name.',
-  askEmail: 'Thanks. Please send your email address.',
-  invalidEmail: 'That does not look like a valid email. Please send a valid email address.',
-  profileCreated: (name) => `Thanks ${name}, your account is set up.`,
-  chooseCategory: 'Please choose a category.',
-  noCategories: 'No categories are available right now. Please try again later.',
-  chooseService: 'Please choose a service.',
-  noServices: 'No services found in this category. Reply MENU to choose a different category.',
-  chooseProvider: 'Please choose a provider.',
-  noProviders: 'No providers are available for this service right now. Reply MENU to start over.',
-  providerSummary: (p) =>
-    `${p.businessName}\nRating: ${p.rating || 'Not rated yet'}\nExperience: ${p.experience || 'Not specified'}\nPrice: Rs. ${p.price}\n\nWhat would you like to do?`,
-  providerDetails: (p) =>
-    `${p.businessName}\n\nAbout: ${p.about || 'No description provided.'}\nExperience: ${p.experience || 'Not specified'}\nRating: ${p.rating || 'Not rated yet'}\nVerified: ${p.verified ? 'Yes' : 'No'}\nPrice: Rs. ${p.price}`,
-  askAddress: 'Please send the address where the service is needed.',
-  confirmBooking: (s) =>
-    `Please confirm your booking.\n\nService: ${s.service}\nProvider: ${s.provider}\nPrice: Rs. ${s.price}\nAddress: ${s.address}`,
-  bookingCreated: (code, s) =>
-    `Booking confirmed.\n\nBooking code: ${code}\nService: ${s.service}\nProvider: ${s.provider}\nStatus: Pending confirmation from the provider.`,
-  bookingFailed: 'Something went wrong while creating your booking. Please try again.',
-  cancelled: 'Booking cancelled.',
-  invalid: 'Sorry, I did not understand that. Please choose one of the options shown.',
-  genericError: 'Something went wrong. Please try again in a moment.',
-};
+function parseDate(text) {
+  let match;
+  match = text.trim().match(/^(\d{1,2})[/\-](\d{1,2})[/\-](\d{4})$/);
+  if (match) {
+    const iso = `${match[3]}-${match[2].padStart(2, '0')}-${match[1].padStart(2, '0')}`;
+    if (!isNaN(new Date(iso).getTime())) return iso;
+  }
+  match = text.trim().match(/^(\d{4})[/\-](\d{1,2})[/\-](\d{1,2})$/);
+  if (match) {
+    const iso = `${match[1]}-${match[2].padStart(2, '0')}-${match[3].padStart(2, '0')}`;
+    if (!isNaN(new Date(iso).getTime())) return iso;
+  }
+  return null;
+}
+
+function parseTime(text) {
+  let match;
+  match = text.trim().match(/^(\d{1,2}):(\d{2})\s*(AM|PM|am|pm)$/i);
+  if (match) {
+    let h = parseInt(match[1], 10);
+    const m = match[2];
+    if (match[3].toLowerCase() === 'pm' && h !== 12) h += 12;
+    if (match[3].toLowerCase() === 'am' && h === 12) h = 0;
+    if (h >= 0 && h < 24 && parseInt(m) < 60) return `${String(h).padStart(2, '0')}:${m}`;
+  }
+  match = text.trim().match(/^(\d{1,2}):(\d{2})(:\d{2})?$/);
+  if (match) {
+    const h = parseInt(match[1], 10);
+    const m = parseInt(match[2], 10);
+    if (h >= 0 && h < 24 && m >= 0 && m < 60) return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
+  }
+  return null;
+}
+
+function prettyDate(iso) {
+  if (!iso) return 'Not set';
+  const [y, m, d] = iso.split('-');
+  return `${d}/${m}/${y}`;
+}
+
+function prettyTime(time24) {
+  if (!time24) return 'Not set';
+  const [hh, mm] = time24.split(':');
+  const h = parseInt(hh, 10);
+  return `${h % 12 || 12}:${mm} ${h < 12 ? 'AM' : 'PM'}`;
+}
+
+/* ------------------------------------------------------------------ */
+/* keyword detection                                                   */
+/* ------------------------------------------------------------------ */
+
+const GREETINGS_EN = ['hi', 'hey', 'hello', 'start', 'menu'];
+const GREETINGS_KN = ['ನಮಸ್ಕಾರ', 'ಹೇ', 'ಹೇಯ್', 'ಶುರು', 'ಮೆನು'];
+
+const MYBOOKINGS_EN = ['my bookings', 'bookings', 'my booking', 'view bookings', 'view booking'];
+const MYBOOKINGS_KN = ['ನನ್ನ ಬುಕಿಂಗ್', 'ಬುಕಿಂಗ್‌ಗಳು', 'ಬುಕಿಂಗ್'];
+
+function isGreeting(inbound) {
+  if (inbound.kind !== 'text') return false;
+  const lower = inbound.text.toLowerCase().trim();
+  return GREETINGS_EN.includes(lower) || GREETINGS_KN.includes(inbound.text.trim());
+}
+
+function isMyBookings(inbound) {
+  if (inbound.kind !== 'text') return false;
+  const lower = inbound.text.toLowerCase().trim();
+  return MYBOOKINGS_EN.includes(lower) || MYBOOKINGS_KN.includes(inbound.text.trim());
+}
 
 /* ------------------------------------------------------------------ */
 /* interactive reply parsing                                           */
@@ -364,8 +646,6 @@ function parseInbound(message) {
   return { kind: 'unknown' };
 }
 
-// Resolve a reply against a stored list of choices, accepting either the
-// interactive id or a typed number ("2") matching the item's position.
 function resolveChoice(inbound, choices) {
   if (inbound.kind === 'list_reply' || inbound.kind === 'button_reply') {
     return choices.find((c) => c.id === inbound.id) || null;
@@ -378,7 +658,6 @@ function resolveChoice(inbound, choices) {
 }
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-const GREETINGS = ['hi', 'hey', 'hello', 'start', 'menu'];
 
 /* ------------------------------------------------------------------ */
 /* the flow                                                             */
@@ -386,53 +665,147 @@ const GREETINGS = ['hi', 'hey', 'hello', 'start', 'menu'];
 
 async function handleMessage({ phone, waName, inbound }) {
   const session = getSession(phone);
+  const wasExpired = session.expired;
 
-  const isGreeting = inbound.kind === 'text' && GREETINGS.includes(inbound.text.toLowerCase());
-  if (isGreeting) {
+  // ── Global: MENU / greeting ──────────────────────────────────────
+  if (isGreeting(inbound)) {
     session.step = 'init';
     session.draft = {};
     saveSession(phone, session);
   }
 
-  // Entry point: resolve the profile, then branch to onboarding or categories.
+  // ── Global: MY BOOKINGS (from any step except booking-sub-steps) ─
+  const bookingSubSteps = ['view_bookings', 'booking_selected', 'cancel_confirm'];
+  if (
+    isMyBookings(inbound) &&
+    !bookingSubSteps.includes(session.step) &&
+    session.profile
+  ) {
+    session.step = 'view_bookings';
+    session.draft.bookingList = null;
+    saveSession(phone, session);
+    return showMyBookings(phone, session);
+  }
+
+  // ── Entry point ──────────────────────────────────────────────────
   if (session.step === 'init') {
-    await sendText(phone, MSG.welcome);
+    if (wasExpired && !isGreeting(inbound)) {
+      await sendText(phone, t(session, 'sessionExpired'));
+    }
+
+    // Language choice: ask once if not set yet.
+    if (!session.lang) {
+      session.step = 'choose_lang';
+      saveSession(phone, session);
+      return sendButtons(phone, MSG.en.chooseLang, [
+        { id: 'lang_en', title: 'English' },
+        { id: 'lang_kn', title: 'ಕನ್ನಡ' },
+      ]);
+    }
+
+    await sendText(phone, t(session, 'welcome'));
 
     let profile = session.profile;
     if (!profile) profile = await findProfileByPhone(phone);
 
     if (profile) {
       session.profile = profile;
-      return showCategories(phone, session);
+      return showMainMenu(phone, session);
     }
 
     session.step = 'onboard_name';
     session.draft = { name: null, email: null };
     saveSession(phone, session);
-    return sendText(phone, MSG.askName);
+    return sendText(phone, t(session, 'askName'));
   }
 
   switch (session.step) {
+
+    // ── Language selection ─────────────────────────────────────────
+    case 'choose_lang': {
+      const id = inbound.kind === 'button_reply' ? inbound.id
+               : inbound.kind === 'text'         ? inbound.text.toLowerCase().trim()
+               : '';
+      if (id === 'lang_kn' || id === 'kn' || id === 'kannada' || id === 'ಕನ್ನಡ') {
+        session.lang = 'kn';
+      } else {
+        session.lang = 'en'; // default to English for anything else
+      }
+      session.step = 'init';
+      saveSession(phone, session);
+
+      await sendText(phone, t(session, 'welcome'));
+
+      let profile = session.profile;
+      if (!profile) profile = await findProfileByPhone(phone);
+
+      if (profile) {
+        session.profile = profile;
+        return showMainMenu(phone, session);
+      }
+
+      session.step = 'onboard_name';
+      session.draft = { name: null, email: null };
+      saveSession(phone, session);
+      return sendText(phone, t(session, 'askName'));
+    }
+
+    // ── Onboarding ─────────────────────────────────────────────────
     case 'onboard_name': {
-      if (inbound.kind !== 'text' || inbound.text.length < 2) return sendText(phone, MSG.askName);
+      if (inbound.kind !== 'text' || inbound.text.length < 2) return sendText(phone, t(session, 'askName'));
       session.draft.name = inbound.text;
       session.step = 'onboard_email';
       saveSession(phone, session);
-      return sendText(phone, MSG.askEmail);
+      return sendText(phone, t(session, 'askEmail'));
     }
 
     case 'onboard_email': {
-      if (inbound.kind !== 'text' || !EMAIL_RE.test(inbound.text)) return sendText(phone, MSG.invalidEmail);
+      if (inbound.kind !== 'text' || !EMAIL_RE.test(inbound.text)) return sendText(phone, t(session, 'invalidEmail'));
       session.draft.email = inbound.text;
       const profile = await createProfile({ phone, name: session.draft.name, email: session.draft.email });
       session.profile = profile;
-      session.step = 'categories';
+      session.step = 'main_menu';
       session.draft = {};
       saveSession(phone, session);
-      await sendText(phone, MSG.profileCreated(profile.full_name));
-      return showCategories(phone, session);
+      await sendText(phone, t(session, 'profileCreated', profile.full_name));
+      return showMainMenu(phone, session);
     }
 
+    // ── Main menu ──────────────────────────────────────────────────
+    case 'main_menu': {
+      const id = inbound.kind === 'button_reply' ? inbound.id
+               : inbound.kind === 'list_reply'   ? inbound.id
+               : inbound.kind === 'text'         ? inbound.text.toLowerCase().trim()
+               : '';
+      if (id === 'menu_book' || id === '1') {
+        session.step = 'categories';
+        saveSession(phone, session);
+        return showCategories(phone, session);
+      }
+      if (id === 'menu_bookings' || id === '2') {
+        if (!session.profile) return showMainMenu(phone, session, true);
+        session.step = 'view_bookings';
+        session.draft.bookingList = null;
+        saveSession(phone, session);
+        return showMyBookings(phone, session);
+      }
+      if (id === 'menu_help' || id === '3') {
+        const helpText = session.lang === 'kn'
+          ? `ಸಹಾಯ:
+- ಸೇವೆ ಬುಕ್ ಮಾಡಲು "1" ಅಥವಾ "ಸೇವೆ ಬುಕ್ ಮಾಡಿ" ಎಂದು ಕಳುಹಿಸಿ.
+- ನಿಮ್ಮ ಬುಕಿಂಗ್ ನೋಡಲು "2" ಅಥವಾ "ನನ್ನ ಬುಕಿಂಗ್" ಎಂದು ಕಳುಹಿಸಿ.
+- ಮೆನು ಮರಳಿ ತೆರೆಯಲು MENU ಎಂದು ಕಳುಹಿಸಿ.`
+          : `Help:
+- Send "1" or "Book a Service" to find and book a provider.
+- Send "2" or "My Bookings" to view or cancel your bookings.
+- Send MENU at any time to return to this menu.`;
+        await sendText(phone, helpText);
+        return showMainMenu(phone, session);
+      }
+      return showMainMenu(phone, session, true);
+    }
+
+    // ── Service discovery ──────────────────────────────────────────
     case 'categories': {
       const choice = resolveChoice(inbound, session.draft.categories || []);
       if (!choice) return showCategories(phone, session, true);
@@ -457,84 +830,115 @@ async function handleMessage({ phone, waName, inbound }) {
       session.draft.provider = choice;
       session.step = 'provider_action';
       saveSession(phone, session);
-      return sendButtons(phone, MSG.providerSummary(choice), [
-        { id: 'book_now', title: 'Book' },
-        { id: 'view_details', title: 'View Details' },
+      return sendButtons(phone, t(session, 'providerSummary', choice), [
+        { id: 'book_now', title: t(session, 'btnBook') },
+        { id: 'view_details', title: t(session, 'btnViewDetails') },
       ]);
     }
 
     case 'provider_action': {
-      const id = inbound.kind === 'button_reply' ? inbound.id : inbound.kind === 'text' ? inbound.text.toLowerCase() : '';
+      const id = inbound.kind === 'button_reply' ? inbound.id
+               : inbound.kind === 'text'         ? inbound.text.toLowerCase()
+               : '';
       if (id === 'view_details' || id === '2') {
         session.step = 'provider_details';
         saveSession(phone, session);
-        return sendButtons(phone, MSG.providerDetails(session.draft.provider), [
-          { id: 'book_now', title: 'Book' },
-          { id: 'back_to_providers', title: 'Back' },
+        const provider = session.draft.provider;
+        if (provider.imageUrl) await sendImage(phone, provider.imageUrl, provider.businessName);
+        return sendButtons(phone, t(session, 'providerDetails', provider), [
+          { id: 'book_now', title: t(session, 'btnBook') },
+          { id: 'back_to_providers', title: t(session, 'btnBack') },
         ]);
       }
       if (id === 'book_now' || id === '1') {
         session.step = 'await_address';
         saveSession(phone, session);
-        return sendText(phone, MSG.askAddress);
+        return sendText(phone, t(session, 'askAddress'));
       }
-      return sendButtons(phone, MSG.invalid, [
-        { id: 'book_now', title: 'Book' },
-        { id: 'view_details', title: 'View Details' },
+      return sendButtons(phone, t(session, 'invalid'), [
+        { id: 'book_now', title: t(session, 'btnBook') },
+        { id: 'view_details', title: t(session, 'btnViewDetails') },
       ]);
     }
 
     case 'provider_details': {
-      const id = inbound.kind === 'button_reply' ? inbound.id : inbound.kind === 'text' ? inbound.text.toLowerCase() : '';
+      const id = inbound.kind === 'button_reply' ? inbound.id
+               : inbound.kind === 'text'         ? inbound.text.toLowerCase()
+               : '';
       if (id === 'book_now' || id === '1') {
         session.step = 'await_address';
         saveSession(phone, session);
-        return sendText(phone, MSG.askAddress);
+        return sendText(phone, t(session, 'askAddress'));
       }
       if (id === 'back_to_providers') {
         session.step = 'providers';
         saveSession(phone, session);
         return showProviders(phone, session);
       }
-      return sendButtons(phone, MSG.invalid, [
-        { id: 'book_now', title: 'Book' },
-        { id: 'back_to_providers', title: 'Back' },
+      return sendButtons(phone, t(session, 'invalid'), [
+        { id: 'book_now', title: t(session, 'btnBook') },
+        { id: 'back_to_providers', title: t(session, 'btnBack') },
       ]);
     }
 
+    // ── Booking steps ──────────────────────────────────────────────
     case 'await_address': {
-      if (inbound.kind !== 'text' || inbound.text.length < 5) return sendText(phone, MSG.askAddress);
+      if (inbound.kind !== 'text' || inbound.text.length < 5) return sendText(phone, t(session, 'askAddress'));
       session.draft.address = inbound.text;
+      session.step = 'await_date';
+      saveSession(phone, session);
+      return sendText(phone, t(session, 'askDate'));
+    }
+
+    case 'await_date': {
+      if (inbound.kind !== 'text') return sendText(phone, t(session, 'invalidDate'));
+      const dateIso = parseDate(inbound.text);
+      if (!dateIso) return sendText(phone, t(session, 'invalidDate'));
+      session.draft.bookingDate = dateIso;
+      session.step = 'await_time';
+      saveSession(phone, session);
+      return sendText(phone, t(session, 'askTime'));
+    }
+
+    case 'await_time': {
+      if (inbound.kind !== 'text') return sendText(phone, t(session, 'invalidTime'));
+      const time24 = parseTime(inbound.text);
+      if (!time24) return sendText(phone, t(session, 'invalidTime'));
+      session.draft.bookingTime = time24;
       session.step = 'confirm_booking';
       saveSession(phone, session);
       return sendButtons(
         phone,
-        MSG.confirmBooking({
+        t(session, 'confirmBooking', {
           service: session.draft.service.title,
           provider: session.draft.provider.businessName,
+          date: prettyDate(session.draft.bookingDate),
+          time: prettyTime(session.draft.bookingTime),
           price: session.draft.provider.price,
           address: session.draft.address,
         }),
         [
-          { id: 'confirm_yes', title: 'Confirm' },
-          { id: 'confirm_no', title: 'Cancel' },
+          { id: 'confirm_yes', title: t(session, 'btnConfirm') },
+          { id: 'confirm_no', title: t(session, 'btnCancel') },
         ]
       );
     }
 
     case 'confirm_booking': {
-      const id = inbound.kind === 'button_reply' ? inbound.id : inbound.kind === 'text' ? inbound.text.toLowerCase() : '';
+      const id = inbound.kind === 'button_reply' ? inbound.id
+               : inbound.kind === 'text'         ? inbound.text.toLowerCase()
+               : '';
       if (id === 'confirm_no' || id === '2') {
         session.step = 'categories';
         session.draft = {};
         saveSession(phone, session);
-        await sendText(phone, MSG.cancelled);
+        await sendText(phone, t(session, 'cancelled'));
         return showCategories(phone, session);
       }
       if (id !== 'confirm_yes' && id !== '1') {
-        return sendButtons(phone, MSG.invalid, [
-          { id: 'confirm_yes', title: 'Confirm' },
-          { id: 'confirm_no', title: 'Cancel' },
+        return sendButtons(phone, t(session, 'invalid'), [
+          { id: 'confirm_yes', title: t(session, 'btnConfirm') },
+          { id: 'confirm_no', title: t(session, 'btnCancel') },
         ]);
       }
 
@@ -545,17 +949,22 @@ async function handleMessage({ phone, waName, inbound }) {
           provider: session.draft.provider,
           service: session.draft.service,
           address: session.draft.address,
+          bookingDate: session.draft.bookingDate,
+          bookingTime: session.draft.bookingTime,
         });
         await sendText(
           phone,
-          MSG.bookingCreated(booking.booking_code, {
+          t(session, 'bookingCreated', booking.booking_code, {
             service: session.draft.service.title,
             provider: session.draft.provider.businessName,
+            date: prettyDate(session.draft.bookingDate),
+            time: prettyTime(session.draft.bookingTime),
           })
         );
+        await notifyProvider(session.draft.provider.providerId, booking.booking_code);
       } catch (err) {
         console.error('[createBooking]', err.message);
-        await sendText(phone, MSG.bookingFailed);
+        await sendText(phone, t(session, 'bookingFailed'));
       }
 
       session.step = 'categories';
@@ -564,44 +973,148 @@ async function handleMessage({ phone, waName, inbound }) {
       return showCategories(phone, session);
     }
 
+    // ── My Bookings ────────────────────────────────────────────────
+    case 'view_bookings': {
+      const choice = resolveChoice(inbound, session.draft.bookingList || []);
+      if (!choice) return showMyBookings(phone, session, true);
+      session.draft.selectedBooking = choice;
+      session.step = 'booking_selected';
+      saveSession(phone, session);
+      return showBookingDetail(phone, session);
+    }
+
+    case 'booking_selected': {
+      const id = inbound.kind === 'button_reply' ? inbound.id
+               : inbound.kind === 'text'         ? inbound.text.toLowerCase()
+               : '';
+      if (id === 'cancel_booking') {
+        const bk = session.draft.selectedBooking;
+        const cancellable = ['pending', 'accepted'];
+        if (!cancellable.includes(bk.status)) {
+          await sendText(phone, t(session, 'cannotCancel', bk.status));
+          session.step = 'view_bookings';
+          saveSession(phone, session);
+          return showMyBookings(phone, session);
+        }
+        session.step = 'cancel_confirm';
+        saveSession(phone, session);
+        return sendButtons(phone, t(session, 'confirmCancel'), [
+          { id: 'yes_cancel', title: t(session, 'btnYes') },
+          { id: 'no_keep', title: t(session, 'btnNo') },
+        ]);
+      }
+      if (id === 'back_to_bookings') {
+        session.step = 'view_bookings';
+        saveSession(phone, session);
+        return showMyBookings(phone, session);
+      }
+      // OK button — go back to main menu
+      if (id === 'ok_done') {
+        session.step = 'main_menu';
+        session.draft = {};
+        saveSession(phone, session);
+        return showMainMenu(phone, session);
+      }
+      return showBookingDetail(phone, session);
+    }
+
+    case 'cancel_confirm': {
+      const id = inbound.kind === 'button_reply' ? inbound.id
+               : inbound.kind === 'text'         ? inbound.text.toLowerCase()
+               : '';
+      if (id === 'yes_cancel' || id === '1') {
+        const bk = session.draft.selectedBooking;
+        const result = await cancelBooking(bk.id, session.profile.id);
+        if (result.success) {
+          await sendText(phone, t(session, 'cancelSuccess', result.bookingCode));
+        } else {
+          await sendText(phone, result.status
+            ? t(session, 'cannotCancel', result.status)
+            : t(session, 'cancelFailed'));
+        }
+        session.step = 'main_menu';
+        session.draft = {};
+        saveSession(phone, session);
+        return showMainMenu(phone, session);
+      }
+      if (id === 'no_keep' || id === '2') {
+        session.step = 'booking_selected';
+        saveSession(phone, session);
+        return showBookingDetail(phone, session);
+      }
+      return sendButtons(phone, t(session, 'confirmCancel'), [
+        { id: 'yes_cancel', title: t(session, 'btnYes') },
+        { id: 'no_keep', title: t(session, 'btnNo') },
+      ]);
+    }
+
     default: {
       session.step = 'init';
       saveSession(phone, session);
-      return sendText(phone, MSG.welcome);
+      if (session.profile && session.lang) return showMainMenu(phone, session);
+      return sendText(phone, t(session, 'welcome'));
     }
   }
 }
 
+/* ------------------------------------------------------------------ */
+/* show helpers                                                        */
+/* ------------------------------------------------------------------ */
+
+/** Main menu — shown after language selection, greeting, and post-booking. */
+async function showMainMenu(phone, session, wasInvalid) {
+  const name = session.profile?.full_name;
+  const bodyText = wasInvalid
+    ? t(session, 'invalid')
+    : name
+      ? t(session, 'mainMenuBody', name)
+      : t(session, 'mainMenuBodyNew');
+
+  session.step = 'main_menu';
+  saveSession(phone, session);
+
+  // Use a WhatsApp list so all 3 options are visible and numbered.
+  const items = [
+    { id: 'menu_book',     title: t(session, 'menuBookService'), description: session.lang === 'kn' ? 'ಸೇವಾ ಪೂರೈಕೆದಾರರನ್ನು ಹುಡುಕಿ ಬುಕ್ ಮಾಡಿ' : 'Find and book a service provider' },
+    { id: 'menu_bookings', title: t(session, 'menuMyBookings'),  description: session.lang === 'kn' ? 'ನಿಮ್ಮ ಬುಕಿಂಗ್‌ಗಳನ್ನು ನೋಡಿ ಅಥವಾ ರದ್ದುಗೊಳಿಸಿ' : 'View or cancel your bookings' },
+    { id: 'menu_help',    title: t(session, 'menuHelp'),         description: session.lang === 'kn' ? 'ಬಳಸುವ ವಿಧಾನ ತಿಳಿಯಿರಿ' : 'Learn how to use SevaLink' },
+  ];
+
+  const numbered = numberedBody(bodyText, items);
+  return sendList(
+    phone,
+    numbered,
+    session.lang === 'kn' ? 'ಆಯ್ಕೆ ಮಾಡಿ' : 'Choose',
+    items,
+    session.lang === 'kn' ? 'ಮೆನು' : 'Main Menu'
+  );
+}
+
 async function showCategories(phone, session, wasInvalid) {
   const categories = await fetchCategories();
-  if (categories.length === 0) return sendText(phone, MSG.noCategories);
-
+  if (categories.length === 0) return sendText(phone, t(session, 'noCategories'));
   const items = categories.map((c) => ({ id: c.id, title: c.name, description: c.description || '' }));
   session.draft.categories = items;
   session.step = 'categories';
   saveSession(phone, session);
-
-  const body = numberedBody(wasInvalid ? MSG.invalid + ' ' + MSG.chooseCategory : MSG.chooseCategory, items);
-  return sendList(phone, body, 'Choose', items, 'Categories');
+  const body = numberedBody(wasInvalid ? `${t(session, 'invalid')} ${t(session, 'chooseCategory')}` : t(session, 'chooseCategory'), items);
+  return sendList(phone, body, session.lang === 'kn' ? 'ಆಯ್ಕೆ ಮಾಡಿ' : 'Choose', items, t(session, 'lblCategories'));
 }
 
 async function showServices(phone, session, wasInvalid) {
   const services = await fetchServices(session.draft.category.id);
-  if (services.length === 0) return sendText(phone, MSG.noServices);
-
+  if (services.length === 0) return sendText(phone, t(session, 'noServices'));
   const items = services.map((s) => ({ id: s.id, title: s.name, description: s.description || '' }));
   session.draft.services = items;
   session.step = 'services';
   saveSession(phone, session);
-
-  const body = numberedBody(wasInvalid ? MSG.invalid + ' ' + MSG.chooseService : MSG.chooseService, items);
-  return sendList(phone, body, 'Choose', items, 'Services');
+  const body = numberedBody(wasInvalid ? `${t(session, 'invalid')} ${t(session, 'chooseService')}` : t(session, 'chooseService'), items);
+  return sendList(phone, body, session.lang === 'kn' ? 'ಆಯ್ಕೆ ಮಾಡಿ' : 'Choose', items, t(session, 'lblServices'));
 }
 
 async function showProviders(phone, session, wasInvalid) {
   const providers = await fetchProviders(session.draft.service.id);
-  if (providers.length === 0) return sendText(phone, MSG.noProviders);
-
+  if (providers.length === 0) return sendText(phone, t(session, 'noProviders'));
   const items = providers.map((p) => ({
     id: p.providerId,
     title: p.businessName,
@@ -611,9 +1124,50 @@ async function showProviders(phone, session, wasInvalid) {
   session.draft.providers = items.map((i) => ({ ...i, ...i._full }));
   session.step = 'providers';
   saveSession(phone, session);
+  const body = numberedBody(wasInvalid ? `${t(session, 'invalid')} ${t(session, 'chooseProvider')}` : t(session, 'chooseProvider'), items);
+  return sendList(phone, body, session.lang === 'kn' ? 'ಆಯ್ಕೆ ಮಾಡಿ' : 'Choose', items, t(session, 'lblProviders'));
+}
 
-  const body = numberedBody(wasInvalid ? MSG.invalid + ' ' + MSG.chooseProvider : MSG.chooseProvider, items);
-  return sendList(phone, body, 'Choose', items, 'Providers');
+async function showMyBookings(phone, session, wasInvalid) {
+  const bookings = await fetchCustomerBookings(session.profile.id);
+  if (bookings.length === 0) return sendText(phone, t(session, 'noBookings'));
+
+  const items = bookings.map((b) => ({
+    id: b.id,
+    title: b.booking_code,
+    description: `${b.service_title} · ${b.status}`.slice(0, 72),
+    // store full booking object for later use
+    ...b,
+  }));
+
+  session.draft.bookingList = items;
+  session.step = 'view_bookings';
+  saveSession(phone, session);
+
+  const body = numberedBody(
+    wasInvalid ? `${t(session, 'invalid')} ${t(session, 'chooseBooking')}` : t(session, 'chooseBooking'),
+    items
+  );
+  return sendList(phone, body, session.lang === 'kn' ? 'ಆಯ್ಕೆ ಮಾಡಿ' : 'Choose', items, t(session, 'lblBookings'));
+}
+
+async function showBookingDetail(phone, session) {
+  const bk = session.draft.selectedBooking;
+  const detailText = t(session, 'bookingDetail', bk);
+  const cancellable = ['pending', 'accepted'];
+
+  if (cancellable.includes(bk.status)) {
+    return sendButtons(phone, detailText, [
+      { id: 'cancel_booking', title: t(session, 'btnCancel') },
+      { id: 'back_to_bookings', title: t(session, 'btnBack') },
+    ]);
+  }
+
+  // Non-cancellable booking — show detail with OK / Back only
+  return sendButtons(phone, detailText, [
+    { id: 'ok_done', title: t(session, 'btnOk') },
+    { id: 'back_to_bookings', title: t(session, 'btnBack') },
+  ]);
 }
 
 /* ------------------------------------------------------------------ */
@@ -642,7 +1196,7 @@ async function processInbound(body) {
     await handleMessage({ phone, waName, inbound });
   } catch (err) {
     console.error('Handler error:', err);
-    await sendText(phone, MSG.genericError);
+    await sendText(phone, 'Something went wrong. Please try again in a moment.');
   }
 }
 
@@ -668,7 +1222,6 @@ const server = http.createServer((req, res) => {
     req.on('end', () => {
       res.writeHead(200, { 'Content-Type': 'application/json' });
       res.end(JSON.stringify({ received: true }));
-
       let body;
       try {
         body = JSON.parse(bodyText || '{}');
@@ -691,7 +1244,9 @@ server.listen(PORT, () => {
   console.log(
     WHATSAPP_ACCESS_TOKEN
       ? `Access token loaded (${WHATSAPP_ACCESS_TOKEN.length} chars)`
-      : 'No WHATSAPP_ACCESS_TOKEN - replies will print to console only (mock mode)'
+      : 'No WHATSAPP_ACCESS_TOKEN - mock mode (replies printed to console)'
   );
+  console.log('Languages: English + Kannada');
+  console.log('Session timeout: 5 minutes');
   console.log('Press Ctrl+C to stop.\n');
 });
