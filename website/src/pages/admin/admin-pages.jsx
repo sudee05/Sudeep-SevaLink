@@ -26,7 +26,7 @@ import {
 import { formatCurrency, formatDate } from "@/utils/format";
 import { supabase } from "@/lib/supabase";
 import { getAdminComplaints } from "@/services/supabaseApi";
-import { Bell, CheckCircle2, Clock, Image, Pencil, Plus, ShieldCheck, Trash2, Upload, Wrench, X
+import { Bell, CheckCircle2, Clock, Image, Pencil, Plus, RefreshCw, ShieldCheck, Trash2, Upload, Wrench, X
 } from "lucide-react";
 import { getLucideIcon } from "@/utils/lucide";
 
@@ -253,7 +253,71 @@ export function AdminDashboardPage() {
 // ── Admin Users ───────────────────────────────────────────────
 
 export function AdminUsersPage() {
-  return <AdminSectionPage sectionOverride="users" />;
+  const dispatch = useDispatch();
+  const { rows, status, error } = useSelector(selectAdminSection("users"));
+  const [refreshing, setRefreshing] = useState(false);
+
+  useEffect(() => {
+    if (status === "idle") dispatch(fetchAdminSection("users"));
+  }, [dispatch, status]);
+
+  async function handleRefresh() {
+    setRefreshing(true);
+    dispatch(resetSection("users"));
+    await dispatch(fetchAdminSection("users"));
+    setRefreshing(false);
+  }
+
+  return (
+    <motion.div className="space-y-4" {...fade}>
+      <SectionHeader
+        title="Users"
+        subtitle="Customer, provider, and admin account administration."
+        action={
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={handleRefresh}
+            disabled={refreshing || status === "loading"}
+          >
+            <RefreshCw className={`h-4 w-4 mr-1.5 ${refreshing || status === "loading" ? "animate-spin" : ""}`} />
+            Refresh
+          </Button>
+        }
+      />
+      <Card className="grid gap-3 md:grid-cols-4">
+        <Input className="md:col-span-2" placeholder="Search Users" />
+        <Select placeholder="Filter" options={[{ label: "All", value: "all" }]} />
+        <Button variant="outline">Apply</Button>
+      </Card>
+      {status === "loading" ? (
+        <LoadingGrid count={3} />
+      ) : status === "failed" ? (
+        <ErrorState description={error} onRetry={handleRefresh} />
+      ) : rows.length ? (
+        <DataTable
+          columns={[
+            { key: "full_name", label: "Name", render: (row) => row.full_name || "Unnamed user" },
+            { key: "phone", label: "Phone", render: (row) => row.phone || "-" },
+            { key: "role", label: "Role", render: (row) => <Badge>{row.role}</Badge> },
+            { key: "created_at", label: "Joined", render: (row) => formatDate(row.created_at) },
+            {
+              key: "action",
+              label: "Action",
+              render: () => (
+                <Button size="sm" variant="outline">
+                  Edit
+                </Button>
+              ),
+            },
+          ]}
+          rows={rows}
+        />
+      ) : (
+        <EmptyState title="No users found" />
+      )}
+    </motion.div>
+  );
 }
 
 // ── Admin Providers ───────────────────────────────────────────
@@ -312,10 +376,32 @@ export function AdminProvidersPage() {
   }
 
   const approvalVariant = (s) => (s === "approved" ? "success" : s === "denied" ? "danger" : "warning");
+  const [refreshing, setRefreshing] = useState(false);
+
+  async function handleRefresh() {
+    setRefreshing(true);
+    dispatch(resetSection("providers"));
+    await dispatch(fetchAdminSection("providers"));
+    setRefreshing(false);
+  }
 
   return (
     <motion.div className="space-y-4" {...fade}>
-      <SectionHeader title="Provider Management" subtitle="Review provider registrations and approve or deny access." />
+      <SectionHeader
+        title="Provider Management"
+        subtitle="Review provider registrations and approve or deny access."
+        action={
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={handleRefresh}
+            disabled={refreshing || status === "loading"}
+          >
+            <RefreshCw className={`h-4 w-4 mr-1.5 ${refreshing || status === "loading" ? "animate-spin" : ""}`} />
+            Refresh
+          </Button>
+        }
+      />
 
       {/* Filters */}
       <Card className="grid gap-3 md:grid-cols-4">
@@ -790,11 +876,31 @@ export function AdminBookingsPage() {
     return unique.map((s) => ({ label: s.charAt(0).toUpperCase() + s.slice(1), value: s }));
   }, [rows]);
 
+  const [refreshing, setRefreshing] = useState(false);
+
+  async function handleRefresh() {
+    setRefreshing(true);
+    dispatch(resetSection("bookings"));
+    await dispatch(fetchAdminSection("bookings"));
+    setRefreshing(false);
+  }
+
   return (
     <motion.div className="space-y-4" {...fade}>
       <SectionHeader
         title="Booking Management"
         subtitle="All bookings with customer, provider, service, and payment details."
+        action={
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={handleRefresh}
+            disabled={refreshing || status === "loading"}
+          >
+            <RefreshCw className={`h-4 w-4 mr-1.5 ${refreshing || status === "loading" ? "animate-spin" : ""}`} />
+            Refresh
+          </Button>
+        }
       />
 
       {/* Filters */}
