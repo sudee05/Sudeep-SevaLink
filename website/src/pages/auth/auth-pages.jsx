@@ -12,6 +12,7 @@ import { useToast } from '@/hooks/use-toast'
 import {
   signInWithEmail,
   signInWithGoogle,
+  completeGoogleProfile,
   signUpWithEmail,
   resetPassword,
   updatePassword,
@@ -19,6 +20,8 @@ import {
   selectIsAuthenticated,
   selectUserRole,
   clearError,
+  selectNeedsGoogleProfile,
+  selectUser,
 } from '@/store/authSlice'
 import { useSearchParams } from "react-router-dom";
 
@@ -161,6 +164,41 @@ function LoginForm() {
   )
 }
 
+const googleProfileSchema = z.object({
+  name: z.string().min(2, 'Full name is required'),
+  phone: z.string().regex(/^[6-9]\d{9}$/, 'Enter a valid 10-digit mobile number'),
+  address: z.string().min(3, 'Address is required'),
+})
+
+function GoogleProfileForm() {
+  const toast = useToast()
+  const dispatch = useDispatch()
+  const navigate = useNavigate()
+  const user = useSelector(selectUser)
+  const profile = useSelector((state) => state.auth.profile)
+  const loading = useSelector(selectAuthLoading)
+  const form = useForm({ resolver: zodResolver(googleProfileSchema), defaultValues: {
+    name: profile?.full_name || user?.user_metadata?.full_name || '', phone: profile?.phone || '', address: profile?.address || '',
+  }})
+  async function onSubmit(values) {
+    const result = await dispatch(completeGoogleProfile({ fullName: values.name, phone: values.phone, address: values.address }))
+    if (completeGoogleProfile.fulfilled.match(result)) {
+      toast.success('Profile completed successfully!')
+      navigate(getRedirectPath(result.payload.profile?.role), { replace: true })
+    } else toast.error(result.payload || 'Could not save your profile')
+  }
+  return <AuthShell title="Complete your profile" subtitle="A few details are required before you can continue.">
+    <form className="space-y-3" onSubmit={form.handleSubmit(onSubmit)}>
+      <Input placeholder="Full Name" {...form.register('name')} />
+      {form.formState.errors.name && <p className="text-xs text-red-500">{form.formState.errors.name.message}</p>}
+      <Input placeholder="Phone (10-digit mobile)" type="tel" maxLength={10} {...form.register('phone')} />
+      {form.formState.errors.phone && <p className="text-xs text-red-500">{form.formState.errors.phone.message}</p>}
+      <textarea placeholder="Address" rows={2} className="flex w-full rounded-md border border-input bg-background px-3 py-2 text-sm resize-none" {...form.register('address')} />
+      {form.formState.errors.address && <p className="text-xs text-red-500">{form.formState.errors.address.message}</p>}
+      <Button className="w-full" type="submit" disabled={loading}>{loading ? 'Saving...' : 'Continue'}</Button>
+    </form>
+  </AuthShell>
+}
 function RegisterForm() {
   const [searchParams] = useSearchParams();
   const type = searchParams.get("type") || "customer";
@@ -255,7 +293,9 @@ function RegisterForm() {
 export function CustomerLoginPage() {
   const isAuthenticated = useSelector(selectIsAuthenticated)
   const role = useSelector(selectUserRole)
+  const needsGoogleProfile = useSelector(selectNeedsGoogleProfile)
 
+  if (needsGoogleProfile) return <GoogleProfileForm />
   if (isAuthenticated) return <Navigate to={getRedirectPath(role)} replace />
 
   return (
