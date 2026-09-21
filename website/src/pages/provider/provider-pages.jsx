@@ -334,7 +334,9 @@ export function ProviderDashboardPage() {
       pendingBookings,
       completedBookings,
       revenue,
-      trend: Object.values(monthlyMap).sort((a, b) => a.sortDate - b.sortDate).map(({ month, revenue, bookings }) => ({ month, revenue, bookings })),
+      trend: Object.values(monthlyMap)
+        .sort((a, b) => a.sortDate - b.sortDate)
+        .map(({ month, revenue, bookings }) => ({ month, revenue, bookings })),
     };
   }, [providerBookings]);
 
