@@ -15,6 +15,7 @@ import {
   Send,
   Search,
   Sparkles,
+  Star,
   X,
 } from "lucide-react";
 import { getLucideIcon } from "@/utils/lucide";
@@ -71,6 +72,15 @@ const fade = {
   transition: { duration: 0.3 },
 };
 
+function ReviewStars({ rating, size = "h-4 w-4" }) {
+  return (
+    <span className="inline-flex items-center gap-0.5" aria-label={rating + " out of 5 stars"}>
+      {[1, 2, 3, 4, 5].map((star) => (
+        <Star key={star} className={size + " " + (star <= rating ? "fill-amber-400 text-amber-400" : "text-muted-foreground/30")} />
+      ))}
+    </span>
+  )
+}
 function bookingStatusVariant(status) {
   if (status === "completed") return "success";
   if (status === "cancelled") return "danger";
@@ -1073,10 +1083,14 @@ export function ProviderDetails() {
   const navigate = useNavigate();
   const { data: provider, isLoading, error } = useProviderQuery(id);
   const [feedback, setFeedback] = useState([]);
+  const [feedbackLoading, setFeedbackLoading] = useState(true);
 
   useEffect(() => {
     if (!id) return;
-    getProviderFeedback(id).then(setFeedback).catch(() => { });
+    getProviderFeedback(id)
+      .then(setFeedback)
+      .catch(() => setFeedback([]))
+      .finally(() => setFeedbackLoading(false));
   }, [id]);
 
   if (isLoading) return <LoadingGrid count={3} />;
@@ -1095,6 +1109,13 @@ export function ProviderDetails() {
   // service_rows is populated by attachProviderServices: [{ service_id, name, price }]
   const services = provider.service_rows || [];
   const certificates = Array.isArray(provider.certificates) ? provider.certificates : [];
+  const averageReview = feedback.length
+    ? feedback.reduce((sum, item) => sum + Number(item.rating || 0), 0) / feedback.length
+    : rating;
+  const ratingCounts = [5, 4, 3, 2, 1].map((star) => ({
+    star,
+    count: feedback.filter((item) => Number(item.rating) === star).length,
+  }));
 
   return (
     <motion.div className="space-y-6" {...fade}>
@@ -1219,30 +1240,79 @@ export function ProviderDetails() {
       </Card>
 
       {/* Customer reviews */}
-      <Card className="space-y-4">
-        <h3 className="font-semibold">Customer Reviews</h3>
-        {feedback.length === 0 ? (
-          <p className="text-sm text-muted-foreground">No reviews yet.</p>
-        ) : (
-          <div className="space-y-3">
-            {feedback.map((item) => (
-              <div key={item.id} className="rounded-xl border border-border p-4 space-y-1">
-                <div className="flex items-center justify-between">
-                  <p className="text-sm font-medium">{item.profiles?.full_name || "Customer"}</p>
-                  <span className="text-xs text-amber-500 font-semibold">★ {item.rating ?? "-"}</span>
+      <Card className="space-y-5">
+        <div>
+          <h3 className="font-semibold">Customer Reviews</h3>
+          <p className="mt-1 text-sm text-muted-foreground">Ratings and feedback from customers who booked this provider.</p>
+        </div>
+
+        {feedbackLoading ? (
+          <div className="h-36 animate-pulse rounded-xl bg-muted" />
+        ) : feedback.length > 0 ? (
+          <>
+            <div className="grid gap-6 rounded-xl border border-border bg-card p-4 sm:grid-cols-[180px_1fr] sm:items-center">
+              <div className="text-center">
+                <p className="text-5xl font-bold text-amber-500">{averageReview.toFixed(1)}</p>
+                <div className="mt-2 flex justify-center">
+                  <ReviewStars rating={Math.round(averageReview)} size="h-5 w-5" />
                 </div>
-                {item.comment && <p className="text-sm text-muted-foreground">{item.comment}</p>}
-                {item.bookings?.service_title && (
-                  <p className="text-xs text-muted-foreground">Service: {item.bookings.service_title}</p>
-                )}
+                <p className="mt-1 text-xs text-muted-foreground">
+                  {feedback.length} review{feedback.length !== 1 ? "s" : ""}
+                </p>
               </div>
-            ))}
-          </div>
+
+              <div className="space-y-2">
+                {ratingCounts.map(({ star, count }) => (
+                  <div key={star} className="flex items-center gap-2 text-xs">
+                    <span className="w-3 text-right text-muted-foreground">{star}</span>
+                    <Star className="h-3.5 w-3.5 shrink-0 fill-amber-400 text-amber-400" />
+                    <div className="h-2 flex-1 overflow-hidden rounded-full bg-muted">
+                      <div
+                        className="h-full rounded-full bg-amber-400 transition-all"
+                        style={{ width: (count / feedback.length) * 100 + "%" }}
+                      />
+                    </div>
+                    <span className="w-4 text-muted-foreground">{count}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            <div className="space-y-3">
+              {feedback.map((item) => (
+                <div key={item.id} className="rounded-xl border border-border bg-card p-4">
+                  <div className="flex flex-wrap items-start justify-between gap-3">
+                    <div>
+                      <p className="text-sm font-semibold">{item.profiles?.full_name || "Customer"}</p>
+                      {item.bookings?.service_title && (
+                        <p className="mt-0.5 text-xs text-muted-foreground">
+                          Service: {item.bookings.service_title}
+                          {item.bookings.booking_code ? " - #" + item.bookings.booking_code : ""}
+                        </p>
+                      )}
+                    </div>
+                    <div className="flex flex-col items-end gap-1">
+                      <ReviewStars rating={Number(item.rating) || 0} />
+                      <span className="text-[11px] text-muted-foreground">{formatDate(item.created_at)}</span>
+                    </div>
+                  </div>
+                  {item.comment && (
+                    <p className="mt-3 border-t border-border pt-3 text-sm leading-relaxed text-muted-foreground">
+                      {item.comment}
+                    </p>
+                  )}
+                </div>
+              ))}
+            </div>
+          </>
+        ) : (
+          <p className="rounded-xl border border-dashed border-border px-4 py-6 text-center text-sm text-muted-foreground">
+            No reviews yet. Be the first customer to share feedback after booking.
+          </p>
         )}
       </Card>
-
       <div className="flex justify-end gap-2">
-        <Button variant="outline" onClick={() => navigate(-1)}>← Go Back</Button>
+          <Button variant="outline" onClick={() => navigate(-1)}>← Go Back</Button>
       </div>
     </motion.div>
   );
@@ -1277,7 +1347,7 @@ export function BookProviderPage() {
         <SectionHeader title="Book a Provider" subtitle="No provider selected." />
         <Card>
           <p className="text-sm text-muted-foreground">Please go back and select a provider to book.</p>
-          <Button className="mt-4" variant="outline" onClick={() => navigate(-1)}>Go Back</Button>
+        <Button variant="outline" onClick={() => navigate(-1)}>â† Go Back</Button>
         </Card>
       </motion.div>
     );
