@@ -10,7 +10,7 @@ import 'services/fcm_service.dart';
 
 // Set your Razorpay test key here once for local runs.
 // You can still override it with --dart-define=RAZORPAY_KEY_ID=... when needed.
-const String razorpayTestKeyId = 'rzp_test_TOtw368qqXDngt';
+const String razorpayTestKeyId = 'rzp_test_TgI6bW1R7UfNre';
 const String razorpayKeyId = String.fromEnvironment(
   'RAZORPAY_KEY_ID',
   defaultValue: razorpayTestKeyId,

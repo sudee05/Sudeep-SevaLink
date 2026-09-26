@@ -40,6 +40,8 @@ const SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SU
 const WHATSAPP_ACCESS_TOKEN = (process.env.WHATSAPP_ACCESS_TOKEN || '').trim();
 const WHATSAPP_PHONE_ID = process.env.WHATSAPP_PHONE_NUMBER_ID || '';
 const VERIFY_TOKEN = process.env.WHATSAPP_VERIFY_TOKEN || 'sevalink_whatsapp_secret_sudeep';
+const RAZORPAY_KEY_ID = (process.env.RAZORPAY_KEY_ID || '').trim();
+const RAZORPAY_KEY_SECRET = (process.env.RAZORPAY_KEY_SECRET || '').trim();
 const PORT = Number(process.env.PORT || 3001);
 const PROVIDER_WEBSITE = 'https://sudeep-seva-link.vercel.app/provider';
 const CUSTOMER_REGISTER_WEBSITE = 'https://sudeep-seva-link.vercel.app/register';
@@ -164,7 +166,7 @@ const MSG = {
     askTime: 'Please enter the preferred time.\nFormat: HH:MM AM/PM  e.g. 10:30 AM  or 24h e.g. 14:30',
     invalidTime: 'Invalid time. Please use HH:MM AM/PM or 24h format.',
     confirmBooking: function(s) { return 'Please confirm your booking.\n\nService: ' + s.service + '\nProvider: ' + s.provider + '\nDate: ' + s.date + '\nTime: ' + s.time + '\nPrice: Rs. ' + s.price + '\nAddress: ' + s.address; },
-    bookingCreated: function(code, s) { return 'Thank you for your booking!\n\nBooking confirmed.\n\nCode: ' + code + '\nService: ' + s.service + '\nProvider: ' + s.provider + '\nDate: ' + s.date + '\nTime: ' + s.time + '\nStatus: Pending provider confirmation.\n\nTo monitor your booking status and view details, register on our website using the same email address (' + s.email + '):\n' + CUSTOMER_REGISTER_WEBSITE + '?email=' + encodeURIComponent(s.email || '') + '\n\nAlready have an account? Log in here:\n' + CUSTOMER_LOGIN_WEBSITE; },
+    bookingCreated: function(code, s) { return 'Booking created. Payment is required to send it to the provider.\n\nCode: ' + code + '\nService: ' + s.service + '\nProvider: ' + s.provider + '\nDate: ' + s.date + '\nTime: ' + s.time + '\nAmount: Rs. ' + s.price + '\n\nPay securely using this Razorpay link:\n' + s.paymentLink + '\n\nAfter payment, we will confirm your payment and notify you when the provider responds.'; },
     bookingFailed: 'Something went wrong while creating your booking. Please try again.',
     cancelled: 'Booking cancelled.',
     invalid: 'Sorry, I did not understand that. Please choose one of the options shown.',
@@ -369,13 +371,33 @@ async function notifyProvider(providerId, bookingCode) {
   } catch (err) { console.error('[notifyProvider]', err.message); }
 }
 
+
+async function createRazorpayPaymentLink(booking, opts) {
+  if (!RAZORPAY_KEY_ID || !RAZORPAY_KEY_SECRET) throw new Error('Razorpay is not configured. Set RAZORPAY_KEY_ID and RAZORPAY_KEY_SECRET.');
+  const amount = Math.round(Number(opts.amount) * 100);
+  if (!Number.isFinite(amount) || amount <= 0) throw new Error('Invalid booking amount.');
+  const auth = Buffer.from(RAZORPAY_KEY_ID + ':' + RAZORPAY_KEY_SECRET).toString('base64');
+  const response = await fetch('https://api.razorpay.com/v1/payment_links', {
+    method: 'POST', headers: { Authorization: 'Basic ' + auth, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ amount, currency: 'INR', accept_partial: false,
+      reference_id: booking.id, description: 'SevaLink booking ' + booking.booking_code,
+      customer: { name: opts.customerName, contact: opts.customerPhone },
+      notify: { sms: false, email: false }, reminder_enable: false,
+      notes: { booking_id: booking.id, booking_code: booking.booking_code } }),
+  });
+  const data = await response.json().catch(() => ({}));
+  if (!response.ok || !data.short_url) throw new Error((data.error && (data.error.description || data.error.reason)) || 'Could not create Razorpay payment link.');
+  const { error } = await adminClient.from('bookings').update({ razorpay_payment_link_id: data.id, updated_at: new Date().toISOString() }).eq('id', booking.id);
+  if (error) throw error;
+  return data;
+}
+
 async function createBooking(opts) {
   const customerId = opts.customerId, customerName = opts.customerName, customerPhone = opts.customerPhone, provider = opts.provider, service = opts.service, address = opts.address, bookingDate = opts.bookingDate, bookingTime = opts.bookingTime;
-  let scheduledDate;
-  try {
-    scheduledDate = new Date(bookingDate + 'T' + bookingTime + ':00');
-    if (isNaN(scheduledDate.getTime())) throw new Error('Invalid');
-  } catch (e) { scheduledDate = new Date(Date.now() + 86400000); scheduledDate.setHours(10, 0, 0, 0); }
+  if (!isBookingDateTimeAvailable(bookingDate, bookingTime)) {
+    throw new Error('Booking date/time must be today or a future date and time.');
+  }
+  const scheduledDate = getBookingDateTime(bookingDate, bookingTime);
   let validCustomerId = customerId;
   const { data: customerProfile } = await adminClient
     .from('profiles')
@@ -399,7 +421,7 @@ async function createBooking(opts) {
     service_id: service.id, customer_id: validCustomerId, provider_id: provider.providerId,
     service_title: service.name, provider_name: provider.businessName, customer_name: customerName,
     scheduled_date: scheduledDate.toISOString(), booking_date: bookingDate, booking_time: bookingTime,
-    status: 'pending', amount: provider.price, address,
+    status: 'payment_pending', payment_status: 'pending', amount: provider.price, address,
   }).select('id, booking_code').single();
   if (error) throw error;
   return data;
@@ -409,12 +431,45 @@ async function createBooking(opts) {
 /* date / time helpers                                                 */
 /* ------------------------------------------------------------------ */
 
+function isValidCalendarDate(year, month, day) {
+  var date = new Date(year, month - 1, day);
+  return date.getFullYear() === year && date.getMonth() === month - 1 && date.getDate() === day;
+}
+
 function parseDate(text) {
   var m = text.trim().match(/^(\d{1,2})[/\-](\d{1,2})[/\-](\d{4})$/);
-  if (m) { var iso = m[3] + '-' + m[2].padStart(2,'0') + '-' + m[1].padStart(2,'0'); if (!isNaN(new Date(iso).getTime())) return iso; }
+  if (m) {
+    var day = parseInt(m[1], 10), month = parseInt(m[2], 10), year = parseInt(m[3], 10);
+    if (!isValidCalendarDate(year, month, day)) return null;
+    return year + '-' + String(month).padStart(2, '0') + '-' + String(day).padStart(2, '0');
+  }
   m = text.trim().match(/^(\d{4})[/\-](\d{1,2})[/\-](\d{1,2})$/);
-  if (m) { var iso2 = m[1] + '-' + m[2].padStart(2,'0') + '-' + m[3].padStart(2,'0'); if (!isNaN(new Date(iso2).getTime())) return iso2; }
+  if (m) {
+    var year2 = parseInt(m[1], 10), month2 = parseInt(m[2], 10), day2 = parseInt(m[3], 10);
+    if (!isValidCalendarDate(year2, month2, day2)) return null;
+    return year2 + '-' + String(month2).padStart(2, '0') + '-' + String(day2).padStart(2, '0');
+  }
   return null;
+}
+
+function isBookingDateAvailable(dateIso, now) {
+  var parts = dateIso.split('-').map(Number);
+  var current = now || new Date();
+  var today = new Date(current.getFullYear(), current.getMonth(), current.getDate());
+  if (!isValidCalendarDate(parts[0], parts[1], parts[2])) return false;
+  var bookingDate = new Date(parts[0], parts[1] - 1, parts[2]);
+  return bookingDate >= today;
+}
+
+function getBookingDateTime(dateIso, time24) {
+  var dateParts = dateIso.split('-').map(Number);
+  var timeParts = time24.split(':').map(Number);
+  return new Date(dateParts[0], dateParts[1] - 1, dateParts[2], timeParts[0], timeParts[1], 0, 0);
+}
+
+function isBookingDateTimeAvailable(dateIso, time24, now) {
+  var current = now || new Date();
+  return isBookingDateAvailable(dateIso, current) && getBookingDateTime(dateIso, time24) > current;
 }
 
 function parseTime(text) {
@@ -665,7 +720,7 @@ async function handleMessage(opts) {
     case 'await_date': {
       if (inbound.kind!=='text') return sendText(phone,t(session,'invalidDate'));
       const dateIso = parseDate(inbound.text);
-      if (!dateIso) return sendText(phone,t(session,'invalidDate'));
+      if (!dateIso || !isBookingDateAvailable(dateIso)) return sendText(phone,t(session,'invalidDate'));
       session.draft.bookingDate=dateIso; session.step='await_time'; saveSession(phone,session);
       return sendText(phone,t(session,'askTime'));
     }
@@ -673,7 +728,7 @@ async function handleMessage(opts) {
     case 'await_time': {
       if (inbound.kind!=='text') return sendText(phone,t(session,'invalidTime'));
       const time24=parseTime(inbound.text);
-      if (!time24) return sendText(phone,t(session,'invalidTime'));
+      if (!time24 || !isBookingDateTimeAvailable(session.draft.bookingDate, time24)) return sendText(phone,t(session,'invalidTime'));
       session.draft.bookingTime=time24; session.step='confirm_booking'; saveSession(phone,session);
       return sendButtons(phone, t(session,'confirmBooking',{
         service: session.draft.service.title, provider: session.draft.provider.businessName,
@@ -689,10 +744,14 @@ async function handleMessage(opts) {
         await sendText(phone,t(session,'cancelled')); return showMainMenu(phone,session);
       }
       if (id!=='confirm_yes'&&id!=='1') return sendButtons(phone,t(session,'invalid'),[{ id:'confirm_yes', title:t(session,'btnConfirm') },{ id:'confirm_no', title:t(session,'btnCancel') }]);
+      if (!isBookingDateTimeAvailable(session.draft.bookingDate, session.draft.bookingTime)) {
+        session.step='await_time'; saveSession(phone,session);
+        return sendText(phone,t(session,'invalidTime'));
+      }
       try {
         const booking = await createBooking({ customerId:session.profile.id, customerPhone:phone, customerName:session.profile.full_name, provider:session.draft.provider, service:session.draft.service, address:session.draft.address, bookingDate:session.draft.bookingDate, bookingTime:session.draft.bookingTime });
-        await sendText(phone, t(session,'bookingCreated', booking.booking_code, { service:session.draft.service.title, provider:session.draft.provider.businessName, date:prettyDate(session.draft.bookingDate), time:prettyTime(session.draft.bookingTime), email:(session.profile && session.profile.email) || session.draft.email || '' }));
-        await notifyProvider(session.draft.provider.providerId, booking.booking_code);
+        const paymentLink = await createRazorpayPaymentLink(booking, { amount: session.draft.provider.price, customerName: session.profile.full_name, customerPhone: phone });
+        await sendText(phone, t(session,'bookingCreated', booking.booking_code, { service:session.draft.service.title, provider:session.draft.provider.businessName, date:prettyDate(session.draft.bookingDate), time:prettyTime(session.draft.bookingTime), price:session.draft.provider.price, paymentLink:paymentLink.short_url }));
         await wait(5000);
       } catch(err) { console.error('[createBooking]', err.message); await sendText(phone,t(session,'bookingFailed')); }
       session.step='main_menu'; session.draft={}; saveSession(phone,session);
