@@ -231,6 +231,37 @@ export async function getProviders() {
   return attachProviderServices(data || []);
 }
 
+// Compute real average ratings from booking_feedback for a list of provider IDs.
+// Returns a map: { [providerId]: averageRating }
+async function computeAverageRatings(providerIds) {
+  if (!providerIds.length) return {};
+  try {
+    const { data, error } = await supabase
+      .from("booking_feedback")
+      .select("provider_id, rating")
+      .in("provider_id", providerIds);
+    if (error) {
+      if (isMissingBookingFeedbackTableError(error)) return {};
+      console.warn("computeAverageRatings:", error.message);
+      return {};
+    }
+    const totals = {};
+    for (const row of data || []) {
+      const pid = row.provider_id;
+      if (!totals[pid]) totals[pid] = { sum: 0, count: 0 };
+      totals[pid].sum += Number(row.rating || 0);
+      totals[pid].count += 1;
+    }
+    const result = {};
+    for (const [pid, { sum, count }] of Object.entries(totals)) {
+      result[pid] = count > 0 ? sum / count : 0;
+    }
+    return result;
+  } catch {
+    return {};
+  }
+}
+
 export async function getProvidersByService(serviceId) {
   if (!serviceId) return [];
 
@@ -256,11 +287,15 @@ export async function getProvidersByService(serviceId) {
     return map;
   }, {});
 
+  // Compute real average rating from booking_feedback for each provider
+  const feedbackRatings = await computeAverageRatings(providerIds);
+
   if (data?.length) {
     const attached = await attachProviderServices(data);
     return attached.map((provider) => ({
       ...provider,
       price: servicePriceMap[provider.id] || provider.service_price || 0,
+      rating: feedbackRatings[provider.id] ?? Number(provider.rating || 0),
     }));
   }
 
@@ -275,6 +310,7 @@ export async function getProvidersByService(serviceId) {
   return attachedFallback.map((provider) => ({
     ...provider,
     price: servicePriceMap[provider.id] || provider.service_price || 0,
+    rating: feedbackRatings[provider.id] ?? Number(provider.rating || 0),
   }));
 }
 
@@ -466,27 +502,50 @@ export async function getAdminComplaints() {
 // ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ Bookings ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬
 
 export async function getBookings() {
-  // Try with joins first; fall back to plain select if FK aliases aren't set up
-  try {
-    const { data, error } = await supabase
-      .from("bookings")
-      .select(
-        `*,
-        customer:profiles!bookings_customer_id_fkey(full_name, phone),
-        provider:providers!bookings_provider_id_fkey(business_name),
-        service:services!bookings_service_id_fkey(name)`,
-      )
-      .order("created_at", { ascending: false });
-    if (!error) {
-      return (data || []).map(normalizeBooking);
-    }
-  } catch {
-    // fall through to plain select
-  }
-  // Fallback: plain select (no joins)
-  const { data, error } = await supabase.from("bookings").select("*").order("created_at", { ascending: false });
+  // Fetch all bookings first, then enrich with related data via separate
+  // queries. This avoids reliance on FK constraint names which may not match
+  // the aliases expected by Supabase's join syntax.
+  const { data: bookings, error } = await supabase
+    .from("bookings")
+    .select("*")
+    .order("created_at", { ascending: false });
   if (error) throw error;
-  return (data || []).map(normalizeBooking);
+
+  const rows = bookings || [];
+  if (!rows.length) return [];
+
+  const uniqueIds = (key) => [...new Set(rows.map((r) => r[key]).filter(Boolean))];
+  const customerIds = uniqueIds("customer_id");
+  const providerIds = uniqueIds("provider_id");
+  const serviceIds = uniqueIds("service_id");
+
+  const [profiles, providers, services] = await Promise.all([
+    customerIds.length
+      ? supabase.from("profiles").select("id, full_name, phone").in("id", customerIds)
+      : Promise.resolve({ data: [] }),
+    providerIds.length
+      ? supabase.from("providers").select("id, business_name").in("id", providerIds)
+      : Promise.resolve({ data: [] }),
+    serviceIds.length
+      ? supabase.from("services").select("id, name").in("id", serviceIds)
+      : Promise.resolve({ data: [] }),
+  ]);
+
+  const profileMap = new Map((profiles.data || []).map((p) => [p.id, p]));
+  const providerMap = new Map((providers.data || []).map((p) => [p.id, p]));
+  const serviceMap = new Map((services.data || []).map((s) => [s.id, s]));
+
+  return rows.map((booking) => {
+    const cust = profileMap.get(booking.customer_id);
+    const prov = providerMap.get(booking.provider_id);
+    const svc = serviceMap.get(booking.service_id);
+    return normalizeBooking({
+      ...booking,
+      customer: cust ? { full_name: cust.full_name, phone: cust.phone } : null,
+      provider: prov ? { business_name: prov.business_name } : null,
+      service: svc ? { name: svc.name } : null,
+    });
+  });
 }
 
 export async function getBookingById(id) {

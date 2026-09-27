@@ -11,6 +11,11 @@ final _providerDetailProvider =
   (ref, providerId) => api.getProviderById(providerId),
 );
 
+final _providerFeedbackProvider =
+    FutureProvider.autoDispose.family<List<Map<String, dynamic>>, String>(
+  (ref, providerId) => api.getProviderFeedback(providerId),
+);
+
 class ProviderDetailScreen extends ConsumerWidget {
   final String providerId;
 
@@ -23,7 +28,10 @@ class ProviderDetailScreen extends ConsumerWidget {
     return Scaffold(
       appBar: AppBar(title: const Text('Provider Details')),
       body: providerAsync.when(
-        data: (provider) => _ProviderDetailContent(provider: provider),
+        data: (provider) => _ProviderDetailContent(
+          provider: provider,
+          feedback: ref.watch(_providerFeedbackProvider(provider.id)),
+        ),
         loading: () => const Center(child: CircularProgressIndicator()),
         error: (error, _) => _ProviderDetailError(message: error.toString()),
       ),
@@ -33,8 +41,9 @@ class ProviderDetailScreen extends ConsumerWidget {
 
 class _ProviderDetailContent extends StatelessWidget {
   final ProviderModel provider;
+  final AsyncValue<List<Map<String, dynamic>>> feedback;
 
-  const _ProviderDetailContent({required this.provider});
+  const _ProviderDetailContent({required this.provider, required this.feedback});
 
   @override
   Widget build(BuildContext context) {
@@ -142,11 +151,120 @@ class _ProviderDetailContent extends StatelessWidget {
             ),
           ),
         ),
+        const SizedBox(height: 16),
+        _ProviderReviews(feedback: feedback),
       ],
     );
   }
 }
 
+class _ProviderReviews extends StatelessWidget {
+  final AsyncValue<List<Map<String, dynamic>>> feedback;
+  const _ProviderReviews({required this.feedback});
+
+  @override
+  Widget build(BuildContext context) {
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: feedback.when(
+          loading: () => const SizedBox(height: 80, child: Center(child: CircularProgressIndicator())),
+          error: (error, _) => const Text('Reviews are unavailable right now.'),
+          data: (reviews) {
+            final average = reviews.isEmpty
+                ? 0.0
+                : reviews.fold<double>(
+                      0,
+                      (sum, item) => sum + ((item['rating'] as num?)?.toDouble() ?? 0),
+                    ) /
+                    reviews.length;
+            return Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text('Ratings & Feedback', style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700)),
+                const SizedBox(height: 10),
+                if (reviews.isEmpty)
+                  const Text('No reviews yet.')
+                else ...[
+                  Row(
+                    children: [
+                      Text(average.toStringAsFixed(1), style: const TextStyle(fontSize: 30, fontWeight: FontWeight.w800)),
+                      const SizedBox(width: 12),
+                      Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          _ReviewStars(rating: average.round()),
+                          Text('${reviews.length} review${reviews.length == 1 ? '' : 's'}'),
+                        ],
+                      ),
+                    ],
+                  ),
+                  const Divider(height: 24),
+                  ...reviews.map((review) => _ReviewTile(review: review)),
+                ],
+              ],
+            );
+          },
+        ),
+      ),
+    );
+  }
+}
+
+class _ReviewTile extends StatelessWidget {
+  final Map<String, dynamic> review;
+  const _ReviewTile({required this.review});
+
+  @override
+  Widget build(BuildContext context) {
+    final profile = review['profiles'] as Map<String, dynamic>?;
+    final name = profile?['full_name'] as String? ?? 'Customer';
+    final rating = (review['rating'] as num?)?.toInt() ?? 0;
+    final comment = review['comment'] as String?;
+    final date = DateTime.tryParse(review['created_at']?.toString() ?? '');
+
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Expanded(child: Text(name, style: const TextStyle(fontWeight: FontWeight.w700))),
+              if (date != null) Text(DateFormat('dd MMM yyyy').format(date), style: Theme.of(context).textTheme.bodySmall),
+            ],
+          ),
+          const SizedBox(height: 4),
+          _ReviewStars(rating: rating),
+          if (comment != null && comment.trim().isNotEmpty) ...[
+            const SizedBox(height: 6),
+            Text(comment),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+class _ReviewStars extends StatelessWidget {
+  final int rating;
+  const _ReviewStars({required this.rating});
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: List.generate(
+        5,
+        (index) => Icon(
+          index < rating ? Icons.star_rounded : Icons.star_border_rounded,
+          size: 16,
+          color: AppColors.warning,
+        ),
+      ),
+    );
+  }
+}
 class _ProviderAvatar extends StatelessWidget {
   final ProviderModel provider;
 

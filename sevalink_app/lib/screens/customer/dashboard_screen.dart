@@ -8,6 +8,9 @@ import '../../services/razorpay_service.dart';
 import '../../theme/app_theme.dart';
 import '../../widgets/lucide_network_icon.dart';
 import 'package:intl/intl.dart';
+import 'package:geolocator/geolocator.dart';
+import 'package:http/http.dart' as http;
+import 'dart:convert';
 
 final _categoriesProvider = FutureProvider<List<ServiceCategory>>((ref) => api.getCategories());
 final _servicesProvider = FutureProvider<List<ServiceModel>>((ref) => api.getServices());
@@ -735,12 +738,49 @@ class _BookingBottomSheetState extends ConsumerState<_BookingBottomSheet> {
   DateTime? _date;
   TimeOfDay? _time;
   bool _loading = false;
+  bool _fetchingLocation = false;
 
   @override
   void dispose() {
     _addressCtrl.dispose();
     _notesCtrl.dispose();
     super.dispose();
+  }
+
+  Future<void> _useCurrentLocation() async {
+    if (_fetchingLocation) return;
+    setState(() => _fetchingLocation = true);
+    try {
+      if (!await Geolocator.isLocationServiceEnabled()) {
+        throw Exception("Please enable location services and try again.");
+      }
+      var permission = await Geolocator.checkPermission();
+      if (permission == LocationPermission.denied) {
+        permission = await Geolocator.requestPermission();
+      }
+      if (permission == LocationPermission.denied || permission == LocationPermission.deniedForever) {
+        throw Exception("Location permission was denied.");
+      }
+      final position = await Geolocator.getCurrentPosition();
+      final uri = Uri.https("nominatim.openstreetmap.org", "/reverse", {
+        "format": "jsonv2",
+        "lat": position.latitude.toString(),
+        "lon": position.longitude.toString(),
+      });
+      final response = await http.get(uri, headers: {"User-Agent": "SevaLink Flutter app"});
+      if (response.statusCode != 200) throw Exception("Address lookup failed.");
+      final data = jsonDecode(response.body) as Map<String, dynamic>;
+      final address = data["display_name"] as String?;
+      if (address == null || address.isEmpty) throw Exception("Address not found.");
+      if (mounted) {
+        _addressCtrl.text = address;
+        showSnack(context, "Current address added.");
+      }
+    } catch (error) {
+      if (mounted) showSnack(context, error.toString().replaceFirst("Exception: ", ""), isError: true);
+    } finally {
+      if (mounted) setState(() => _fetchingLocation = false);
+    }
   }
 
   Future<void> _submit() async {
@@ -896,12 +936,26 @@ class _BookingBottomSheetState extends ConsumerState<_BookingBottomSheet> {
               ],
             ),
             const SizedBox(height: 10),
-            TextField(
-              controller: _addressCtrl,
-              decoration: const InputDecoration(
-                hintText: 'Service address *',
-                prefixIcon: Icon(Icons.location_on_outlined),
-              ),
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Expanded(
+                  child: TextField(
+                    controller: _addressCtrl,
+                    decoration: const InputDecoration(
+                      hintText: 'Service address *',
+                      prefixIcon: Icon(Icons.location_on_outlined),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                OutlinedButton(
+                  onPressed: _fetchingLocation ? null : _useCurrentLocation,
+                  child: _fetchingLocation
+                      ? const SizedBox(height: 20, width: 20, child: CircularProgressIndicator(strokeWidth: 2))
+                      : const Icon(Icons.my_location_outlined),
+                ),
+              ],
             ),
             const SizedBox(height: 10),
             TextField(

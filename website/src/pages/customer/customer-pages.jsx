@@ -1152,7 +1152,7 @@ export function ProviderDetails() {
                 )}
               </div>
               <div className="flex items-center gap-1 rounded-full bg-amber-50 px-3 py-1 text-sm font-semibold text-amber-600 dark:bg-amber-900/20 dark:text-amber-400">
-                ★ {rating.toFixed(1)}
+                ★ {averageReview.toFixed(1)}
                 <span className="font-normal text-muted-foreground">/ 5</span>
               </div>
             </div>

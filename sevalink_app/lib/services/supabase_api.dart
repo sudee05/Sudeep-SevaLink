@@ -417,6 +417,15 @@ Future<void> counterReschedule(String bookingId, DateTime proposedDate, {String 
   }).eq('id', bookingId);
 }
 
+Future<List<Map<String, dynamic>>> getProviderFeedback(String providerId) async {
+  final data = await supabase
+      .from('booking_feedback')
+      .select('*, profiles(full_name), bookings(booking_code, service_title)')
+      .eq('provider_id', providerId)
+      .order('created_at', ascending: false);
+  return (data as List).map((item) => Map<String, dynamic>.from(item as Map)).toList();
+}
+
 Future<void> submitFeedback({
   required String bookingId,
   required String providerId,

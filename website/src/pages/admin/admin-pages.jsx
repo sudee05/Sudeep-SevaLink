@@ -256,6 +256,8 @@ export function AdminUsersPage() {
   const dispatch = useDispatch();
   const { rows, status, error } = useSelector(selectAdminSection("users"));
   const [refreshing, setRefreshing] = useState(false);
+  const [search, setSearch] = useState("");
+  const [roleFilter, setRoleFilter] = useState("all");
 
   useEffect(() => {
     if (status === "idle") dispatch(fetchAdminSection("users"));
@@ -267,6 +269,18 @@ export function AdminUsersPage() {
     await dispatch(fetchAdminSection("users"));
     setRefreshing(false);
   }
+
+  const filteredRows = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    return (rows || []).filter((row) => {
+      const matchesSearch = !q ||
+        (row.full_name || "").toLowerCase().includes(q) ||
+        (row.phone || "").toLowerCase().includes(q) ||
+        (row.email || "").toLowerCase().includes(q);
+      const matchesRole = roleFilter === "all" || row.role === roleFilter;
+      return matchesSearch && matchesRole;
+    });
+  }, [rows, search, roleFilter]);
 
   return (
     <motion.div className="space-y-4" {...fade}>
@@ -286,15 +300,29 @@ export function AdminUsersPage() {
         }
       />
       <Card className="grid gap-3 md:grid-cols-4">
-        <Input className="md:col-span-2" placeholder="Search Users" />
-        <Select placeholder="Filter" options={[{ label: "All", value: "all" }]} />
-        <Button variant="outline">Apply</Button>
+        <Input
+          className="md:col-span-2"
+          placeholder="Search by name, phone, or email"
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+        />
+        <Select
+          value={roleFilter}
+          onChange={(e) => setRoleFilter(e.target.value)}
+          options={[
+            { label: "All Roles", value: "all" },
+            { label: "Customer", value: "customer" },
+            { label: "Provider", value: "provider" },
+            { label: "Admin", value: "admin" },
+          ]}
+        />
+        <Button variant="outline" onClick={() => { setSearch(""); setRoleFilter("all"); }}>Clear</Button>
       </Card>
       {status === "loading" ? (
         <LoadingGrid count={3} />
       ) : status === "failed" ? (
         <ErrorState description={error} onRetry={handleRefresh} />
-      ) : rows.length ? (
+      ) : filteredRows.length ? (
         <DataTable
           columns={[
             { key: "full_name", label: "Name", render: (row) => row.full_name || "Unnamed user" },
@@ -311,10 +339,10 @@ export function AdminUsersPage() {
               ),
             },
           ]}
-          rows={rows}
+          rows={filteredRows}
         />
       ) : (
-        <EmptyState title="No users found" />
+        <EmptyState title={search || roleFilter !== "all" ? "No users match filters" : "No users found"} />
       )}
     </motion.div>
   );
@@ -850,6 +878,7 @@ export function AdminBookingsPage() {
   const { rows, status, error } = useSelector(selectAdminSection("bookings"));
   const [search, setSearch] = useState("");
   const [filterStatus, setFilterStatus] = useState("");
+  const [selectedBooking, setSelectedBooking] = useState(null);
 
   useEffect(() => {
     if (status === "idle") dispatch(fetchAdminSection("bookings"));
@@ -975,8 +1004,8 @@ export function AdminBookingsPage() {
             {
               key: "action",
               label: "Action",
-              render: () => (
-                <Button size="sm" variant="outline">
+              render: (row) => (
+                <Button size="sm" variant="outline" onClick={() => setSelectedBooking(row)}>
                   View
                 </Button>
               ),
@@ -988,6 +1017,111 @@ export function AdminBookingsPage() {
       ) : (
         <EmptyState title="No bookings found" />
       )}
+
+      {/* Booking Detail Modal */}
+      <AnimatePresence>
+        {selectedBooking && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4"
+            onClick={() => setSelectedBooking(null)}
+          >
+            <motion.div
+              initial={{ scale: 0.95, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.95, opacity: 0 }}
+              className="w-full max-w-lg max-h-[85vh] overflow-y-auto rounded-2xl border border-border bg-card p-6 shadow-xl"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="flex items-center justify-between mb-4">
+                <h2 className="text-lg font-bold">Booking Details</h2>
+                <Button size="sm" variant="outline" onClick={() => setSelectedBooking(null)}>✕</Button>
+              </div>
+              <div className="space-y-3 text-sm">
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <p className="text-muted-foreground text-xs">Booking Code</p>
+                    <p className="font-mono font-semibold">{selectedBooking.booking_code || selectedBooking.id}</p>
+                  </div>
+                  <div>
+                    <p className="text-muted-foreground text-xs">Status</p>
+                    <Badge variant={selectedBooking.status === "completed" ? "success" : selectedBooking.status === "cancelled" ? "danger" : "warning"}>
+                      {selectedBooking.status}
+                    </Badge>
+                  </div>
+                </div>
+                <hr className="border-border" />
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <p className="text-muted-foreground text-xs">Customer</p>
+                    <p className="font-medium">{selectedBooking.customer_name || "-"}</p>
+                    {selectedBooking.customer_phone && selectedBooking.customer_phone !== "-" && <p className="text-xs text-muted-foreground">{selectedBooking.customer_phone}</p>}
+                  </div>
+                  <div>
+                    <p className="text-muted-foreground text-xs">Provider</p>
+                    <p className="font-medium">{selectedBooking.provider_name || "-"}</p>
+                  </div>
+                </div>
+                <div>
+                  <p className="text-muted-foreground text-xs">Service</p>
+                  <p className="font-medium">{selectedBooking.service_title || "-"}</p>
+                </div>
+                <hr className="border-border" />
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <p className="text-muted-foreground text-xs">Scheduled Date</p>
+                    <p className="font-medium">{formatDate(selectedBooking.scheduled_date || selectedBooking.booking_date || selectedBooking.created_at)}</p>
+                  </div>
+                  <div>
+                    <p className="text-muted-foreground text-xs">Time</p>
+                    <p className="font-medium">{selectedBooking.booking_time || "-"}</p>
+                  </div>
+                </div>
+                {selectedBooking.address && (
+                  <div>
+                    <p className="text-muted-foreground text-xs">Address</p>
+                    <p className="font-medium">{selectedBooking.address}</p>
+                  </div>
+                )}
+                <hr className="border-border" />
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <p className="text-muted-foreground text-xs">Amount</p>
+                    <p className="font-semibold text-base">{formatCurrency(selectedBooking.amount || 0)}</p>
+                  </div>
+                  <div>
+                    <p className="text-muted-foreground text-xs">Payment Status</p>
+                    <Badge variant={(selectedBooking.payment_status || "pending") === "paid" ? "success" : "warning"}>
+                      {selectedBooking.payment_status || "pending"}
+                    </Badge>
+                  </div>
+                </div>
+                {selectedBooking.razorpay_payment_id && (
+                  <div>
+                    <p className="text-muted-foreground text-xs">Razorpay Payment ID</p>
+                    <p className="font-mono text-xs">{selectedBooking.razorpay_payment_id}</p>
+                  </div>
+                )}
+                {selectedBooking.notes && (
+                  <div>
+                    <p className="text-muted-foreground text-xs">Notes</p>
+                    <p>{selectedBooking.notes}</p>
+                  </div>
+                )}
+                <div>
+                  <p className="text-muted-foreground text-xs">Created</p>
+                  <p className="text-xs">{formatDate(selectedBooking.created_at)}</p>
+                </div>
+              </div>
+              <div className="mt-4 flex justify-end">
+                <Button variant="outline" onClick={() => setSelectedBooking(null)}>Close</Button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </motion.div>
   );
 }

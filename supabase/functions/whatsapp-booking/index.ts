@@ -154,22 +154,27 @@ interface ButtonSpec {
   title: string;
 }
 
-function sendButtons(to: string, bodyText: string, buttons: ButtonSpec[]) {
+function sendButtons(to: string, bodyText: string, buttons: ButtonSpec[], headerImageUrl?: string) {
+  // deno-lint-ignore no-explicit-any
+  const interactive: Record<string, any> = {
+    type: "button",
+    body: { text: bodyText },
+    action: {
+      buttons: buttons.slice(0, 3).map((b) => ({
+        type: "reply",
+        reply: { id: b.id, title: String(b.title).slice(0, 20) },
+      })),
+    },
+  };
+  if (headerImageUrl) {
+    interactive.header = { type: "image", image: { link: headerImageUrl } };
+  }
   return callMeta({
     messaging_product: "whatsapp",
     recipient_type: "individual",
     to,
     type: "interactive",
-    interactive: {
-      type: "button",
-      body: { text: bodyText },
-      action: {
-        buttons: buttons.slice(0, 3).map((b) => ({
-          type: "reply",
-          reply: { id: b.id, title: String(b.title).slice(0, 20) },
-        })),
-      },
-    },
+    interactive,
   });
 }
 
@@ -305,11 +310,13 @@ interface MsgTable {
 
 const MSG: { en: MsgTable; kn: MsgTable } = {
   en: {
+    menuHint: "\n\n_Type MENU anytime to jump to the main menu._",
     chooseLang: "Welcome to SevaLink!\n\nPlease choose your language.",
     welcome: "Welcome to SevaLink.",
     sessionExpired: "Your session timed out after 5 minutes. Starting fresh.",
     thankYou: "Thank you for using SevaLink!",
     btnStartAgain: "Start Again",
+    btnBack: "Back",
     askName: "You are new here. Please send your full name.",
     askEmail: "Thanks. Please send your email address.",
     invalidEmail: "That does not look like a valid email. Please try again.",
@@ -383,7 +390,6 @@ const MSG: { en: MsgTable; kn: MsgTable } = {
       "\n\nPay securely using this Razorpay link:\n" + url,
     btnBook: "Book",
     btnViewDetails: "View Details",
-    btnBack: "Back",
     btnConfirm: "Confirm",
     btnCancel: "Cancel",
     btnPayNow: "Pay Now",
@@ -394,6 +400,7 @@ const MSG: { en: MsgTable; kn: MsgTable } = {
     lblServices: "Services",
     lblProviders: "Providers",
     lblBookings: "My Bookings",
+    lblBack: "◀ Back",
     mainMenuBody: (name: string) => "Hello " + name + "! How can we help you today?",
     mainMenuBodyNew: "Welcome! What would you like to do?",
     menuBookService: "Book a Service",
@@ -409,11 +416,13 @@ const MSG: { en: MsgTable; kn: MsgTable } = {
   },
 
   kn: {
+    menuHint: "\n\n_ಯಾವುದೇ ಸಮಯದಲ್ಲಿ ಮುಖ್ಯ ಮೆನುಗೆ ಹೋಗಲು MENU ಎಂದು ಟೈಪ್ ಮಾಡಿ._",
     chooseLang: KN_STRINGS.chooseLang,
     welcome: KN_STRINGS.welcome,
     sessionExpired: KN_STRINGS.sessionExpired,
     thankYou: KN_STRINGS.thankYou,
     btnStartAgain: KN_STRINGS.btnStartAgain,
+    btnBack: KN_STRINGS.btnBack,
     askName: KN_STRINGS.askName,
     askEmail: KN_STRINGS.askEmail,
     invalidEmail: KN_STRINGS.invalidEmail,
@@ -486,7 +495,6 @@ const MSG: { en: MsgTable; kn: MsgTable } = {
       KN_STRINGS.paymentLink_suffix + url,
     btnBook: KN_STRINGS.btnBook,
     btnViewDetails: KN_STRINGS.btnViewDetails,
-    btnBack: KN_STRINGS.btnBack,
     btnConfirm: KN_STRINGS.btnConfirm,
     btnCancel: KN_STRINGS.btnCancel,
     btnPayNow: KN_STRINGS.btnPayNow,
@@ -497,6 +505,7 @@ const MSG: { en: MsgTable; kn: MsgTable } = {
     lblServices: KN_STRINGS.lblServices,
     lblProviders: KN_STRINGS.lblProviders,
     lblBookings: KN_STRINGS.lblBookings,
+    lblBack: KN_STRINGS.btnBack ? "◀ " + KN_STRINGS.btnBack : "◀ Back",
     mainMenuBody: (name: string) => KN_STRINGS.mainMenuBody_prefix + name + KN_STRINGS.mainMenuBody_suffix,
     mainMenuBodyNew: KN_STRINGS.mainMenuBodyNew,
     menuBookService: KN_STRINGS.menuBookService,
@@ -520,6 +529,14 @@ function t(session: Session, key: string, ...rest: any[]): string {
   const val = strings[key] !== undefined ? strings[key] : MSG.en[key];
   if (typeof val === "function") return val(...rest);
   return val !== undefined ? (val as string) : key;
+}
+
+// Appends the "Type MENU anytime..." hint to a body of text. Used on every
+// free-text prompt (and list prompts) so a user who wanders off the flow
+// always has a printed way back to the main menu, on top of the global
+// MENU keyword handling in handleMessage.
+function withMenuHint(session: Session, text: string): string {
+  return text + t(session, "menuHint");
 }
 
 /* ------------------------------------------------------------------ */
@@ -979,6 +996,11 @@ const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 /* show helpers                                                        */
 /* ------------------------------------------------------------------ */
 
+// Main menu is now sent as a single interactive "button" message with the
+// SevaLink logo as its header image, instead of a separate image message
+// followed by a list message. WhatsApp button headers only support images
+// (not list headers), so the 3 main-menu options are sent as buttons rather
+// than a list; there's no back button here since this is the top of the flow.
 async function showMainMenu(phone: string, session: Session, wasInvalid?: boolean) {
   const name = session.profile && session.profile.full_name;
   const bodyText = wasInvalid
@@ -988,13 +1010,12 @@ async function showMainMenu(phone: string, session: Session, wasInvalid?: boolea
     : t(session, "mainMenuBodyNew");
   session.step = "main_menu";
   await saveSession(phone, session);
-  const items: ListItem[] = [
-    { id: "menu_book", title: t(session, "menuBookService"), description: t(session, "menuBookDesc") },
-    { id: "menu_bookings", title: t(session, "menuMyBookings"), description: t(session, "menuBookingsDesc") },
-    { id: "menu_help", title: t(session, "menuHelp"), description: t(session, "menuHelpDesc") },
+  const buttons: ButtonSpec[] = [
+    { id: "menu_book", title: t(session, "menuBookService") },
+    { id: "menu_bookings", title: t(session, "menuMyBookings") },
+    { id: "menu_help", title: t(session, "menuHelp") },
   ];
-  await sendImage(phone, SEVALINK_LOGO_URL, "SevaLink");
-  return sendList(phone, numberedBody(bodyText, items), t(session, "menuChooseBtn"), items, t(session, "menuLabel"));
+  return sendButtons(phone, bodyText, buttons, SEVALINK_LOGO_URL);
 }
 
 async function showCategories(phone: string, session: Session, wasInvalid?: boolean) {
@@ -1004,8 +1025,12 @@ async function showCategories(phone: string, session: Session, wasInvalid?: bool
   session.draft.categories = items;
   session.step = "categories";
   await saveSession(phone, session);
-  const body = numberedBody(wasInvalid ? t(session, "invalid") + " " + t(session, "chooseCategory") : t(session, "chooseCategory"), items);
-  return sendList(phone, body, t(session, "menuChooseBtn"), items, t(session, "lblCategories"));
+  const body = withMenuHint(
+    session,
+    numberedBody(wasInvalid ? t(session, "invalid") + " " + t(session, "chooseCategory") : t(session, "chooseCategory"), items),
+  );
+  const displayItems = [{ id: "go_back", title: t(session, "lblBack") }, ...items];
+  return sendList(phone, body, t(session, "menuChooseBtn"), displayItems, t(session, "lblCategories"));
 }
 
 async function showServices(phone: string, session: Session, wasInvalid?: boolean) {
@@ -1015,8 +1040,12 @@ async function showServices(phone: string, session: Session, wasInvalid?: boolea
   session.draft.services = items;
   session.step = "services";
   await saveSession(phone, session);
-  const body = numberedBody(wasInvalid ? t(session, "invalid") + " " + t(session, "chooseService") : t(session, "chooseService"), items);
-  return sendList(phone, body, t(session, "menuChooseBtn"), items, t(session, "lblServices"));
+  const body = withMenuHint(
+    session,
+    numberedBody(wasInvalid ? t(session, "invalid") + " " + t(session, "chooseService") : t(session, "chooseService"), items),
+  );
+  const displayItems = [{ id: "go_back", title: t(session, "lblBack") }, ...items];
+  return sendList(phone, body, t(session, "menuChooseBtn"), displayItems, t(session, "lblServices"));
 }
 
 async function showProviders(phone: string, session: Session, wasInvalid?: boolean) {
@@ -1031,8 +1060,12 @@ async function showProviders(phone: string, session: Session, wasInvalid?: boole
   session.draft.providers = items;
   session.step = "providers";
   await saveSession(phone, session);
-  const body = numberedBody(wasInvalid ? t(session, "invalid") + " " + t(session, "chooseProvider") : t(session, "chooseProvider"), items);
-  return sendList(phone, body, t(session, "menuChooseBtn"), items, t(session, "lblProviders"));
+  const body = withMenuHint(
+    session,
+    numberedBody(wasInvalid ? t(session, "invalid") + " " + t(session, "chooseProvider") : t(session, "chooseProvider"), items),
+  );
+  const displayItems = [{ id: "go_back", title: t(session, "lblBack") }, ...items];
+  return sendList(phone, body, t(session, "menuChooseBtn"), displayItems, t(session, "lblProviders"));
 }
 
 async function showMyBookings(phone: string, session: Session, wasInvalid?: boolean) {
@@ -1047,8 +1080,12 @@ async function showMyBookings(phone: string, session: Session, wasInvalid?: bool
   session.draft.bookingList = items;
   session.step = "view_bookings";
   await saveSession(phone, session);
-  const body = numberedBody(wasInvalid ? t(session, "invalid") + " " + t(session, "chooseBooking") : t(session, "chooseBooking"), items);
-  return sendList(phone, body, t(session, "menuChooseBtn"), items, t(session, "lblBookings"));
+  const body = withMenuHint(
+    session,
+    numberedBody(wasInvalid ? t(session, "invalid") + " " + t(session, "chooseBooking") : t(session, "chooseBooking"), items),
+  );
+  const displayItems = [{ id: "go_back", title: t(session, "lblBack") }, ...items];
+  return sendList(phone, body, t(session, "menuChooseBtn"), displayItems, t(session, "lblBookings"));
 }
 
 async function showBookingDetail(phone: string, session: Session) {
@@ -1077,22 +1114,27 @@ async function showBookingDetail(phone: string, session: Session) {
 /* ------------------------------------------------------------------ */
 
 // Called once the language is known (either it already was, or the customer
-// just picked one). A known, already-onboarded customer gets a short
-// acknowledgment + a button rather than the "Welcome to SevaLink" intro
-// again; a brand-new customer still gets the real welcome + onboarding.
+// just picked one). A brand-new customer gets the real "Welcome to SevaLink"
+// intro + onboarding. A known, already-onboarded customer — whether this is
+// right after picking a language, or they just said "hi" after being gone
+// for days — goes straight to the main menu, which already greets them by
+// name ("Hello <name>! How can we help you today?"). We deliberately do NOT
+// send the post-booking "Thank you for using SevaLink!" ack here: that
+// message belongs only right after a booking is completed (see the
+// confirm_booking handler), not on every plain greeting.
 async function proceedPastLanguage(phone: string, session: Session) {
   const profile = session.profile || (await findProfileByPhone(phone));
   if (profile) {
     session.profile = profile;
-    session.step = "welcome_ack";
-    await saveSession(phone, session);
-    return sendButtons(phone, t(session, "thankYou"), [{ id: "show_menu", title: t(session, "btnStartAgain") }]);
+    return showMainMenu(phone, session);
   }
   await sendText(phone, t(session, "welcome"));
   session.step = "onboard_name";
   session.draft = { name: null, email: null };
   await saveSession(phone, session);
-  return sendText(phone, t(session, "askName"));
+  return sendButtons(phone, withMenuHint(session, t(session, "askName")), [
+    { id: "go_back", title: t(session, "btnBack") },
+  ]);
 }
 
 async function handleMessage(opts: { phone: string; inbound: Inbound }) {
@@ -1144,23 +1186,50 @@ async function handleMessage(opts: { phone: string; inbound: Inbound }) {
     }
 
     case "welcome_ack": {
-      // Any tap (or stray text) here just moves on to the menu — the point
-      // of this step is to avoid re-sending the welcome/language intro to an
-      // already-onboarded returning user, not to gate the menu behind a
-      // specific button id.
+      // Reached only right after a booking is completed (see confirm_booking
+      // below), where we deliberately paused on a "Thank you!" + Start Again
+      // button instead of dropping straight into the menu. Any tap (or stray
+      // text) here just moves on to the menu now.
       return showMainMenu(phone, session);
     }
 
     case "onboard_name": {
-      if (inbound.kind !== "text" || inbound.text.length < 2) return sendText(phone, t(session, "askName"));
+      const id = btnId(inbound);
+      if (id === "go_back") {
+        session.step = "choose_lang";
+        await saveSession(phone, session);
+        return sendButtons(phone, MSG.en.chooseLang as string, [
+          { id: "lang_en", title: "English" },
+          { id: "lang_kn", title: "Kannada" },
+        ]);
+      }
+      if (inbound.kind !== "text" || inbound.text.length < 2) {
+        return sendButtons(phone, withMenuHint(session, t(session, "askName")), [
+          { id: "go_back", title: t(session, "btnBack") },
+        ]);
+      }
       session.draft.name = inbound.text;
       session.step = "onboard_email";
       await saveSession(phone, session);
-      return sendText(phone, t(session, "askEmail"));
+      return sendButtons(phone, withMenuHint(session, t(session, "askEmail")), [
+        { id: "go_back", title: t(session, "btnBack") },
+      ]);
     }
 
     case "onboard_email": {
-      if (inbound.kind !== "text" || !EMAIL_RE.test(inbound.text)) return sendText(phone, t(session, "invalidEmail"));
+      const id = btnId(inbound);
+      if (id === "go_back") {
+        session.step = "onboard_name";
+        await saveSession(phone, session);
+        return sendButtons(phone, withMenuHint(session, t(session, "askName")), [
+          { id: "go_back", title: t(session, "btnBack") },
+        ]);
+      }
+      if (inbound.kind !== "text" || !EMAIL_RE.test(inbound.text)) {
+        return sendButtons(phone, withMenuHint(session, t(session, "invalidEmail")), [
+          { id: "go_back", title: t(session, "btnBack") },
+        ]);
+      }
       const profile = await createProfile({ phone, name: session.draft.name, email: inbound.text });
       session.profile = { ...profile, email: inbound.text.trim() };
       session.step = "main_menu";
@@ -1192,6 +1261,8 @@ async function handleMessage(opts: { phone: string; inbound: Inbound }) {
     }
 
     case "categories": {
+      const id = btnId(inbound);
+      if (id === "go_back") return showMainMenu(phone, session);
       const choice = resolveChoice(inbound, session.draft.categories || []);
       if (!choice) return showCategories(phone, session, true);
       session.draft.category = choice;
@@ -1201,6 +1272,8 @@ async function handleMessage(opts: { phone: string; inbound: Inbound }) {
     }
 
     case "services": {
+      const id = btnId(inbound);
+      if (id === "go_back") return showCategories(phone, session);
       const choice = resolveChoice(inbound, session.draft.services || []);
       if (!choice) return showServices(phone, session, true);
       session.draft.service = choice;
@@ -1210,6 +1283,8 @@ async function handleMessage(opts: { phone: string; inbound: Inbound }) {
     }
 
     case "providers": {
+      const id = btnId(inbound);
+      if (id === "go_back") return showServices(phone, session);
       const choice = resolveChoice(inbound, session.draft.providers || []);
       if (!choice) return showProviders(phone, session, true);
       session.draft.provider = choice;
@@ -1218,6 +1293,7 @@ async function handleMessage(opts: { phone: string; inbound: Inbound }) {
       return sendButtons(phone, t(session, "providerSummary", choice), [
         { id: "book_now", title: t(session, "btnBook") },
         { id: "view_details", title: t(session, "btnViewDetails") },
+        { id: "go_back", title: t(session, "btnBack") },
       ]);
     }
 
@@ -1236,11 +1312,19 @@ async function handleMessage(opts: { phone: string; inbound: Inbound }) {
       if (id === "book_now" || id === "1") {
         session.step = "await_address";
         await saveSession(phone, session);
-        return sendText(phone, t(session, "askAddress"));
+        return sendButtons(phone, withMenuHint(session, t(session, "askAddress")), [
+          { id: "go_back", title: t(session, "btnBack") },
+        ]);
+      }
+      if (id === "go_back" || id === "back_to_providers") {
+        session.step = "providers";
+        await saveSession(phone, session);
+        return showProviders(phone, session);
       }
       return sendButtons(phone, t(session, "invalid"), [
         { id: "book_now", title: t(session, "btnBook") },
         { id: "view_details", title: t(session, "btnViewDetails") },
+        { id: "go_back", title: t(session, "btnBack") },
       ]);
     }
 
@@ -1249,7 +1333,9 @@ async function handleMessage(opts: { phone: string; inbound: Inbound }) {
       if (id === "book_now" || id === "1") {
         session.step = "await_address";
         await saveSession(phone, session);
-        return sendText(phone, t(session, "askAddress"));
+        return sendButtons(phone, withMenuHint(session, t(session, "askAddress")), [
+          { id: "go_back", title: t(session, "btnBack") },
+        ]);
       }
       if (id === "back_to_providers") {
         session.step = "providers";
@@ -1263,27 +1349,77 @@ async function handleMessage(opts: { phone: string; inbound: Inbound }) {
     }
 
     case "await_address": {
-      if (inbound.kind !== "text" || inbound.text.length < 5) return sendText(phone, t(session, "askAddress"));
+      const id = btnId(inbound);
+      if (id === "go_back") {
+        session.step = "provider_action";
+        await saveSession(phone, session);
+        return sendButtons(phone, t(session, "providerSummary", session.draft.provider), [
+          { id: "book_now", title: t(session, "btnBook") },
+          { id: "view_details", title: t(session, "btnViewDetails") },
+          { id: "go_back", title: t(session, "btnBack") },
+        ]);
+      }
+      if (inbound.kind !== "text" || inbound.text.length < 5) {
+        return sendButtons(phone, withMenuHint(session, t(session, "askAddress")), [
+          { id: "go_back", title: t(session, "btnBack") },
+        ]);
+      }
       session.draft.address = inbound.text;
       session.step = "await_date";
       await saveSession(phone, session);
-      return sendText(phone, t(session, "askDate"));
+      return sendButtons(phone, withMenuHint(session, t(session, "askDate")), [
+        { id: "go_back", title: t(session, "btnBack") },
+      ]);
     }
 
     case "await_date": {
-      if (inbound.kind !== "text") return sendText(phone, t(session, "invalidDate"));
+      const id = btnId(inbound);
+      if (id === "go_back") {
+        session.step = "await_address";
+        await saveSession(phone, session);
+        return sendButtons(phone, withMenuHint(session, t(session, "askAddress")), [
+          { id: "go_back", title: t(session, "btnBack") },
+        ]);
+      }
+      if (inbound.kind !== "text") {
+        return sendButtons(phone, withMenuHint(session, t(session, "invalidDate")), [
+          { id: "go_back", title: t(session, "btnBack") },
+        ]);
+      }
       const dateIso = parseDate(inbound.text);
-      if (!dateIso || !isBookingDateAvailable(dateIso)) return sendText(phone, t(session, "invalidDate"));
+      if (!dateIso || !isBookingDateAvailable(dateIso)) {
+        return sendButtons(phone, withMenuHint(session, t(session, "invalidDate")), [
+          { id: "go_back", title: t(session, "btnBack") },
+        ]);
+      }
       session.draft.bookingDate = dateIso;
       session.step = "await_time";
       await saveSession(phone, session);
-      return sendText(phone, t(session, "askTime"));
+      return sendButtons(phone, withMenuHint(session, t(session, "askTime")), [
+        { id: "go_back", title: t(session, "btnBack") },
+      ]);
     }
 
     case "await_time": {
-      if (inbound.kind !== "text") return sendText(phone, t(session, "invalidTime"));
+      const id = btnId(inbound);
+      if (id === "go_back") {
+        session.step = "await_date";
+        await saveSession(phone, session);
+        return sendButtons(phone, withMenuHint(session, t(session, "askDate")), [
+          { id: "go_back", title: t(session, "btnBack") },
+        ]);
+      }
+      if (inbound.kind !== "text") {
+        return sendButtons(phone, withMenuHint(session, t(session, "invalidTime")), [
+          { id: "go_back", title: t(session, "btnBack") },
+        ]);
+      }
       const time24 = parseTime(inbound.text);
-      if (!time24 || !isBookingDateTimeAvailable(session.draft.bookingDate, time24)) return sendText(phone, t(session, "invalidTime"));
+      if (!time24 || !isBookingDateTimeAvailable(session.draft.bookingDate, time24)) {
+        return sendButtons(phone, withMenuHint(session, t(session, "invalidTime")), [
+          { id: "go_back", title: t(session, "btnBack") },
+        ]);
+      }
       session.draft.bookingTime = time24;
       session.step = "confirm_booking";
       await saveSession(phone, session);
@@ -1306,6 +1442,13 @@ async function handleMessage(opts: { phone: string; inbound: Inbound }) {
 
     case "confirm_booking": {
       const id = btnId(inbound);
+      if (id === "go_back") {
+        session.step = "await_time";
+        await saveSession(phone, session);
+        return sendButtons(phone, withMenuHint(session, t(session, "askTime")), [
+          { id: "go_back", title: t(session, "btnBack") },
+        ]);
+      }
       if (id === "confirm_no" || id === "2") {
         session.step = "main_menu";
         session.draft = {};
@@ -1364,6 +1507,14 @@ async function handleMessage(opts: { phone: string; inbound: Inbound }) {
           await sendText(phone, t(session, "bookingCreatedNoLink", booking.booking_code));
         }
         await wait(5000);
+        // Booking (and its Razorpay link, when available) has just been sent.
+        // Don't drop straight back into the main menu — just thank the
+        // customer and let them tap "Start Again" when they're ready for
+        // another round, same as the returning-customer welcome_ack flow.
+        session.step = "welcome_ack";
+        session.draft = {};
+        await saveSession(phone, session);
+        return sendButtons(phone, t(session, "thankYou"), [{ id: "show_menu", title: t(session, "btnStartAgain") }]);
       } catch (err) {
         const message = err instanceof Error ? err.message : String(err);
         console.error("[createBooking]", message);
@@ -1376,6 +1527,8 @@ async function handleMessage(opts: { phone: string; inbound: Inbound }) {
     }
 
     case "view_bookings": {
+      const id = btnId(inbound);
+      if (id === "go_back") return showMainMenu(phone, session);
       const choice = resolveChoice(inbound, session.draft.bookingList || []);
       if (!choice) return showMyBookings(phone, session, true);
       session.draft.selectedBooking = choice;
