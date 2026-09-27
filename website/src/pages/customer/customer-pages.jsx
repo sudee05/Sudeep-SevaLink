@@ -1442,11 +1442,21 @@ export function BookProviderPage() {
 
     setIsFetchingLocation(true);
     navigator.geolocation.getCurrentPosition(
-      ({ coords }) => {
-        const location = `Current location: ${coords.latitude.toFixed(6)}, ${coords.longitude.toFixed(6)}`;
-        setBookingForm((form) => ({ ...form, address: location }));
-        setIsFetchingLocation(false);
-        toast.success("Current location added to the service address.");
+      async ({ coords }) => {
+        const coordinates = `${coords.latitude.toFixed(6)}, ${coords.longitude.toFixed(6)}`;
+        try {
+          const response = await fetch(`https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${coords.latitude}&lon=${coords.longitude}`);
+          if (!response.ok) throw new Error("Address lookup failed");
+          const data = await response.json();
+          const address = data.display_name || `Current location: ${coordinates}`;
+          setBookingForm((form) => ({ ...form, address }));
+          toast.success("Current address added to the service address.");
+        } catch {
+          setBookingForm((form) => ({ ...form, address: `Current location: ${coordinates}` }));
+          toast.error("Could not find the street address, so coordinates were added instead.");
+        } finally {
+          setIsFetchingLocation(false);
+        }
       },
       (error) => {
         setIsFetchingLocation(false);
