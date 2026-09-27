@@ -5,6 +5,8 @@ export interface KnStrings {
   chooseLang: string;
   welcome: string;
   sessionExpired: string;
+  thankYou: string;
+  btnStartAgain: string;
   askName: string;
   askEmail: string;
   invalidEmail: string;
@@ -50,6 +52,12 @@ export interface KnStrings {
   bookingCreated_date: string;
   bookingCreated_time: string;
   bookingCreated_status: string;
+  bookingCreated_paymentHeader: string;
+  bookingCreated_amountLabel: string;
+  bookingCreated_payLinkIntro: string;
+  bookingCreated_afterPayment: string;
+  bookingCreatedNoLink_prefix: string;
+  bookingCreatedNoLink_suffix: string;
   bookingFailed: string;
   cancelled: string;
   invalid: string;
@@ -72,11 +80,15 @@ export interface KnStrings {
   cancelSuccess_prefix: string;
   cancelSuccess_suffix: string;
   cancelFailed: string;
+  paymentLink_prefix: string;
+  paymentLink_amount: string;
+  paymentLink_suffix: string;
   btnBook: string;
   btnViewDetails: string;
   btnBack: string;
   btnConfirm: string;
   btnCancel: string;
+  btnPayNow: string;
   btnYes: string;
   btnNo: string;
   btnOk: string;
@@ -105,6 +117,10 @@ export const KN_STRINGS: KnStrings = {
   chooseLang: "ಸೇವಾಲಿಂಕ್‌ಗೆ ಸ್ವಾಗತ!\n\nದಯವಿಟ್ಟು ನಿಮ್ಮ ಭಾಷೆಯನ್ನು ಆಯ್ಕೆಮಾಡಿ.",
   welcome: "ಸೇವಾಲಿಂಕ್‌ಗೆ ಸ್ವಾಗತ.",
   sessionExpired: "5 ನಿಮಿಷಗಳ ಕಾಲ ಯಾವುದೇ ಪ್ರತಿಕ್ರಿಯೆ ಇಲ್ಲದ ಕಾರಣ ಸೆಷನ್ ಮುಗಿದಿದೆ. ಹೊಸದಾಗಿ ಪ್ರಾರಂಭಿಸೋಣ.",
+  // NOTE: machine-translated, not from the original kn-strings.json — please
+  // have a Kannada speaker review before relying on it in production.
+  thankYou: "ಸೇವಾಲಿಂಕ್ ಬಳಸಿದ್ದಕ್ಕಾಗಿ ಧನ್ಯವಾದಗಳು!",
+  btnStartAgain: "ಮತ್ತೆ ಪ್ರಾರಂಭಿಸಿ",
   askName: "ನೀವು ಹೊಸ ಬಳಕೆದಾರರು. ದಯವಿಟ್ಟು ನಿಮ್ಮ ಪೂರ್ಣ ಹೆಸರನ್ನು ಕಳುಹಿಸಿ.",
   askEmail: "ಧನ್ಯವಾದಗಳು. ದಯವಿಟ್ಟು ನಿಮ್ಮ ಇಮೇಲ್ ವಿಳಾಸವನ್ನು ಕಳುಹಿಸಿ.",
   invalidEmail: "ಇದು ಸರಿಯಾದ ಇಮೇಲ್ ವಿಳಾಸವಲ್ಲ. ದಯವಿಟ್ಟು ಮತ್ತೆ ಕಳುಹಿಸಿ.",
@@ -150,6 +166,17 @@ export const KN_STRINGS: KnStrings = {
   bookingCreated_date: "\nದಿನಾಂಕ: ",
   bookingCreated_time: "\nಸಮಯ: ",
   bookingCreated_status: "\nಸ್ಥಿತಿ: ಸೇವಾ ಪೂರೈಕೆದಾರರ ದೃಢೀಕರಣಕ್ಕಾಗಿ ಕಾಯಲಾಗುತ್ತಿದೆ.",
+  // NOTE: machine-translated for the new Razorpay payment-link flow — this
+  // text was not in the original kn-strings.json, so please have a Kannada
+  // speaker review it before relying on it in production.
+  bookingCreated_paymentHeader: "ಬುಕ್ಕಿಂಗ್ ರಚಿಸಲಾಗಿದೆ. ಪೂರೈಕೆದಾರರಿಗೆ ಕಳುಹಿಸಲು ಪಾವತಿ ಅಗತ್ಯವಿದೆ.",
+  bookingCreated_amountLabel: "\nಮೊತ್ತ: ರೂ. ",
+  bookingCreated_payLinkIntro: "\n\nಈ Razorpay ಲಿಂಕ್ ಬಳಸಿ ಸುರಕ್ಷಿತವಾಗಿ ಪಾವತಿಸಿ:\n",
+  bookingCreated_afterPayment:
+    "\n\nಪಾವತಿಯ ನಂತರ, ನಾವು ನಿಮ್ಮ ಪಾವತಿಯನ್ನು ದೃಢೀಕರಿಸಿ ಪೂರೈಕೆದಾರರು ಪ್ರತಿಕ್ರಿಯಿಸಿದಾಗ ನಿಮಗೆ ತಿಳಿಸುತ್ತೇವೆ.",
+  bookingCreatedNoLink_prefix: "ನಿಮ್ಮ ಬುಕ್ಕಿಂಗ್ (ಕೋಡ್: ",
+  bookingCreatedNoLink_suffix:
+    ") ರಚಿಸಲಾಗಿದೆ, ಆದರೆ ಈಗ ಪಾವತಿ ಲಿಂಕ್ ರಚಿಸಲು ಸಾಧ್ಯವಾಗಲಿಲ್ಲ.\n\nನನ್ನ ಬುಕ್ಕಿಂಗ್‌ಗಳನ್ನು ತೆರೆಯಿರಿ, ಈ ಬುಕ್ಕಿಂಗ್ ಆಯ್ಕೆಮಾಡಿ, ಮತ್ತು ಮತ್ತೆ ಪ್ರಯತ್ನಿಸಲು ಈಗ ಪಾವತಿಸಿ ಒತ್ತಿ.",
   bookingFailed: "ಬುಕ್ಕಿಂಗ್ ಮಾಡುವಾಗ ತೊಂದರೆ ಉಂಟಾಯಿತು. ಮತ್ತೆ ಪ್ರಯತ್ನಿಸಿ.",
   cancelled: "ಬುಕ್ಕಿಂಗ್ ರದ್ದುಗೊಳಿಸಲಾಗಿದೆ.",
   invalid: "ಕ್ಷಮಿಸಿ, ನನಗೆ ಅರ್ಥವಾಗಲಿಲ್ಲ. ದಯವಿಟ್ಟು ತೋರಿಸಿರುವ ಆಯ್ಕೆಗಳಲ್ಲಿ ಒಂದನ್ನು ಆಯ್ಕೆಮಾಡಿ.",
@@ -172,11 +199,15 @@ export const KN_STRINGS: KnStrings = {
   cancelSuccess_prefix: "ಬುಕ್ಕಿಂಗ್ ",
   cancelSuccess_suffix: " ಅನ್ನು ಯಶಸ್ವಿಯಾಗಿ ರದ್ದುಗೊಳಿಸಲಾಗಿದೆ.",
   cancelFailed: "ಬುಕ್ಕಿಂಗ್ ರದ್ದುಗೊಳಿಸಲು ಸಾಧ್ಯವಾಗಲಿಲ್ಲ. ಮತ್ತೆ ಪ್ರಯತ್ನಿಸಿ.",
+  paymentLink_prefix: "ಬುಕ್ಕಿಂಗ್ ",
+  paymentLink_amount: " ಗಾಗಿ ಪಾವತಿ ಬಾಕಿ ಇದೆ.\nಮೊತ್ತ: ರೂ. ",
+  paymentLink_suffix: "\n\nಈ Razorpay ಲಿಂಕ್ ಬಳಸಿ ಸುರಕ್ಷಿತವಾಗಿ ಪಾವತಿಸಿ:\n",
   btnBook: "ಬುಕ್ ಮಾಡಿ",
   btnViewDetails: "ವಿವರಗಳನ್ನು ನೋಡಿ",
   btnBack: "ಹಿಂದೆ",
   btnConfirm: "ದೃಢೀಕರಿಸಿ",
   btnCancel: "ರದ್ದುಗೊಳಿಸಿ",
+  btnPayNow: "ಈಗ ಪಾವತಿಸಿ",
   btnYes: "ಹೌದು, ರದ್ದುಗೊಳಿಸಿ",
   btnNo: "ಇಲ್ಲ, ಹಾಗೆಯೇ ಇರಲಿ",
   btnOk: "ಸರಿ",

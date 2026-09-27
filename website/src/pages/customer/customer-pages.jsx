@@ -1330,6 +1330,7 @@ export function BookProviderPage() {
 
   const [bookingForm, setBookingForm] = useState({ booking_date: "", booking_time: "", address: "", notes: "" });
   const [isProcessingPayment, setIsProcessingPayment] = useState(false);
+  const [isFetchingLocation, setIsFetchingLocation] = useState(false);
 
   const bookingMutation = useMutation({
     mutationFn: createBookingWithPayment,
@@ -1433,6 +1434,31 @@ export function BookProviderPage() {
     }
   }
 
+  function handleUseCurrentLocation() {
+    if (!navigator.geolocation) {
+      toast.error("Location services are not supported by this browser.");
+      return;
+    }
+
+    setIsFetchingLocation(true);
+    navigator.geolocation.getCurrentPosition(
+      ({ coords }) => {
+        const location = `Current location: ${coords.latitude.toFixed(6)}, ${coords.longitude.toFixed(6)}`;
+        setBookingForm((form) => ({ ...form, address: location }));
+        setIsFetchingLocation(false);
+        toast.success("Current location added to the service address.");
+      },
+      (error) => {
+        setIsFetchingLocation(false);
+        const message = error.code === error.PERMISSION_DENIED
+          ? "Location permission was denied. Please allow access and try again."
+          : "Could not fetch your current location. Please enter the address manually.";
+        toast.error(message);
+      },
+      { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 },
+    );
+  }
+
   return (
     <motion.div className="space-y-6" {...fade}>
       <SectionHeader
@@ -1470,7 +1496,13 @@ export function BookProviderPage() {
             <span className="text-sm font-medium">Booking time</span>
             <TimePicker value={bookingForm.booking_time} onChange={(time) => setBookingForm((f) => ({ ...f, booking_time: time }))} />
           </label>
-          <Input required placeholder="Service address" className="md:col-span-2" value={bookingForm.address} onChange={(e) => setBookingForm((f) => ({ ...f, address: e.target.value }))} />
+          <div className="flex flex-col gap-2 md:col-span-2 sm:flex-row">
+            <Input required placeholder="Service address" className="flex-1" value={bookingForm.address} onChange={(e) => setBookingForm((f) => ({ ...f, address: e.target.value }))} />
+            <Button type="button" variant="outline" onClick={handleUseCurrentLocation} disabled={isFetchingLocation}>
+              <MapPin className="h-4 w-4" />
+              {isFetchingLocation ? "Fetching location..." : "Use current location"}
+            </Button>
+          </div>
           <Textarea placeholder="Special instructions" className="md:col-span-2" value={bookingForm.notes} onChange={(e) => setBookingForm((f) => ({ ...f, notes: e.target.value }))} />
 
           {/* Payment summary */}

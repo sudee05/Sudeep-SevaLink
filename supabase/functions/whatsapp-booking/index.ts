@@ -32,12 +32,9 @@ const SERVICE_ROLE_KEY =
 const WHATSAPP_ACCESS_TOKEN = (Deno.env.get("WHATSAPP_ACCESS_TOKEN") || "").trim();
 const WHATSAPP_PHONE_ID = Deno.env.get("WHATSAPP_PHONE_NUMBER_ID") || "";
 const VERIFY_TOKEN = Deno.env.get("WHATSAPP_VERIFY_TOKEN") || "sevalink_whatsapp_secret_sudeep";
+const RAZORPAY_KEY_ID = (Deno.env.get("RAZORPAY_KEY_ID") || "").trim();
+const RAZORPAY_KEY_SECRET = (Deno.env.get("RAZORPAY_KEY_SECRET") || "").trim();
 const PROVIDER_WEBSITE = "https://sudeep-seva-link.vercel.app/provider";
-// ASSUMPTION: guessing the route based on the other website constants below.
-// Confirm this matches your actual payment page and adjust if not.
-const PAYMENT_WEBSITE = "https://sudeep-seva-link.vercel.app/pay";
-const CUSTOMER_REGISTER_WEBSITE = "https://sudeep-seva-link.vercel.app/register";
-const CUSTOMER_LOGIN_WEBSITE = "https://sudeep-seva-link.vercel.app/login";
 const SEVALINK_LOGO_URL =
   "https://giygtxqatkrgjeuojgma.supabase.co/storage/v1/object/public/avatars/sevalink_logo.png";
 
@@ -48,6 +45,20 @@ if (!SERVICE_ROLE_KEY) {
 }
 if (!WHATSAPP_PHONE_ID) {
   console.warn("WARNING: WHATSAPP_PHONE_NUMBER_ID is not set — outbound sends will fail.");
+}
+if (!RAZORPAY_KEY_ID || !RAZORPAY_KEY_SECRET) {
+  console.warn("WARNING: RAZORPAY_KEY_ID/RAZORPAY_KEY_SECRET is not set — payment link creation will fail.");
+} else {
+  // Safe to log: this reveals which key was loaded (test vs live, and that
+  // it's non-empty) without exposing the secret itself. If Razorpay ever
+  // responds "Authentication failed", check this line first — it usually
+  // means the key id/secret pair is wrong or mismatched (e.g. a test key id
+  // paired with a live secret, or vice versa).
+  const mode = RAZORPAY_KEY_ID.startsWith("rzp_live_") ? "live" : RAZORPAY_KEY_ID.startsWith("rzp_test_") ? "test" : "unknown";
+  console.log(
+    "[config] Razorpay key id: " + RAZORPAY_KEY_ID.slice(0, 12) + "... (mode: " + mode + ", secret length: " +
+      RAZORPAY_KEY_SECRET.length + ")",
+  );
 }
 
 const adminClient: SupabaseClient = createClient(SUPABASE_URL, SERVICE_ROLE_KEY);
@@ -268,7 +279,8 @@ interface BookingCreatedInput {
   provider: string;
   date: string;
   time: string;
-  email: string;
+  price: number;
+  paymentLink: string;
 }
 
 // deno-lint-ignore no-explicit-any
@@ -296,6 +308,8 @@ const MSG: { en: MsgTable; kn: MsgTable } = {
     chooseLang: "Welcome to SevaLink!\n\nPlease choose your language.",
     welcome: "Welcome to SevaLink.",
     sessionExpired: "Your session timed out after 5 minutes. Starting fresh.",
+    thankYou: "Thank you for using SevaLink!",
+    btnStartAgain: "Start Again",
     askName: "You are new here. Please send your full name.",
     askEmail: "Thanks. Please send your email address.",
     invalidEmail: "That does not look like a valid email. Please try again.",
@@ -332,15 +346,17 @@ const MSG: { en: MsgTable; kn: MsgTable } = {
       "\nPrice: Rs. " + s.price +
       "\nAddress: " + s.address,
     bookingCreated: (code: string, s: BookingCreatedInput) =>
-      "Thank you for your booking!\n\nBooking confirmed.\n\nCode: " + code +
+      "Booking created. Payment is required to send it to the provider.\n\nCode: " + code +
       "\nService: " + s.service +
       "\nProvider: " + s.provider +
       "\nDate: " + s.date +
       "\nTime: " + s.time +
-      "\nStatus: Pending provider confirmation." +
-      "\n\nTo monitor your booking status and view details, register on our website using the same email address (" +
-      s.email + "):\n" + CUSTOMER_REGISTER_WEBSITE + "?email=" + encodeURIComponent(s.email || "") +
-      "\n\nAlready have an account? Log in here:\n" + CUSTOMER_LOGIN_WEBSITE,
+      "\nAmount: Rs. " + s.price +
+      "\n\nPay securely using this Razorpay link:\n" + s.paymentLink +
+      "\n\nAfter payment, we will confirm your payment and notify you when the provider responds.",
+    bookingCreatedNoLink: (code: string) =>
+      "Your booking (Code: " + code + ") was created, but we could not generate a payment link just now." +
+      "\n\nOpen My Bookings, select this booking, and tap Pay Now to try again.",
     bookingFailed: "Something went wrong while creating your booking. Please try again.",
     cancelled: "Booking cancelled.",
     invalid: "Sorry, I did not understand that. Please choose one of the options shown.",
@@ -364,7 +380,7 @@ const MSG: { en: MsgTable; kn: MsgTable } = {
     paymentLink: (b: BookingRow, url: string) =>
       "Payment pending for booking " + b.booking_code +
       "\nAmount: Rs. " + b.amount +
-      "\n\nComplete your payment here:\n" + url,
+      "\n\nPay securely using this Razorpay link:\n" + url,
     btnBook: "Book",
     btnViewDetails: "View Details",
     btnBack: "Back",
@@ -396,6 +412,8 @@ const MSG: { en: MsgTable; kn: MsgTable } = {
     chooseLang: KN_STRINGS.chooseLang,
     welcome: KN_STRINGS.welcome,
     sessionExpired: KN_STRINGS.sessionExpired,
+    thankYou: KN_STRINGS.thankYou,
+    btnStartAgain: KN_STRINGS.btnStartAgain,
     askName: KN_STRINGS.askName,
     askEmail: KN_STRINGS.askEmail,
     invalidEmail: KN_STRINGS.invalidEmail,
@@ -433,16 +451,17 @@ const MSG: { en: MsgTable; kn: MsgTable } = {
       KN_STRINGS.confirmBooking_price + x.price +
       KN_STRINGS.confirmBooking_address + x.address,
     bookingCreated: (code: string, x: BookingCreatedInput) =>
-      KN_STRINGS.bookingCreated_header +
+      KN_STRINGS.bookingCreated_paymentHeader +
       KN_STRINGS.bookingCreated_code + code +
       KN_STRINGS.bookingCreated_service + x.service +
       KN_STRINGS.bookingCreated_provider + x.provider +
       KN_STRINGS.bookingCreated_date + x.date +
       KN_STRINGS.bookingCreated_time + x.time +
-      KN_STRINGS.bookingCreated_status + "\n\n" +
-      KN_STRINGS.bookingWebsiteNotice_prefix + x.email + KN_STRINGS.bookingWebsiteNotice_suffix + "\n" +
-      CUSTOMER_REGISTER_WEBSITE + "?email=" + encodeURIComponent(x.email || "") + "\n\n" +
-      KN_STRINGS.bookingLoginNotice + "\n" + CUSTOMER_LOGIN_WEBSITE,
+      KN_STRINGS.bookingCreated_amountLabel + x.price +
+      KN_STRINGS.bookingCreated_payLinkIntro + x.paymentLink +
+      KN_STRINGS.bookingCreated_afterPayment,
+    bookingCreatedNoLink: (code: string) =>
+      KN_STRINGS.bookingCreatedNoLink_prefix + code + KN_STRINGS.bookingCreatedNoLink_suffix,
     bookingFailed: KN_STRINGS.bookingFailed,
     cancelled: KN_STRINGS.cancelled,
     invalid: KN_STRINGS.invalid,
@@ -701,6 +720,12 @@ async function getProviderPhone(providerId: string): Promise<string | null> {
   return (data && (data as any).profiles && (data as any).profiles.phone) || null;
 }
 
+// Not called from anywhere in this file anymore — booking creation now sends
+// the customer a Razorpay link and only becomes "accepted"/notifiable once
+// payment succeeds. Kept here (unused) for a payment-confirmation webhook
+// handler (e.g. Razorpay's payment_link.paid event) to call once that path
+// exists — that handler is what should notify the provider going forward,
+// not booking creation.
 async function notifyProvider(providerId: string, bookingCode: string) {
   try {
     const providerPhone = await getProviderPhone(providerId);
@@ -718,6 +743,52 @@ async function notifyProvider(providerId: string, bookingCode: string) {
   }
 }
 
+interface RazorpayPaymentLink {
+  id: string;
+  short_url: string;
+  [key: string]: unknown;
+}
+
+async function createRazorpayPaymentLink(
+  booking: { id: string; booking_code: string },
+  opts: { amount: number; customerName: string; customerPhone: string },
+): Promise<RazorpayPaymentLink> {
+  if (!RAZORPAY_KEY_ID || !RAZORPAY_KEY_SECRET) {
+    throw new Error("Razorpay is not configured. Set RAZORPAY_KEY_ID and RAZORPAY_KEY_SECRET.");
+  }
+  const amount = Math.round(Number(opts.amount) * 100);
+  if (!Number.isFinite(amount) || amount <= 0) throw new Error("Invalid booking amount.");
+  // Razorpay key id/secret are plain ASCII, so btoa is safe here (no need for
+  // Node's Buffer / a "node:buffer" import just for this one encode).
+  const auth = btoa(RAZORPAY_KEY_ID + ":" + RAZORPAY_KEY_SECRET);
+  const response = await fetch("https://api.razorpay.com/v1/payment_links", {
+    method: "POST",
+    headers: { Authorization: "Basic " + auth, "Content-Type": "application/json" },
+    body: JSON.stringify({
+      amount,
+      currency: "INR",
+      accept_partial: false,
+      reference_id: booking.id,
+      description: "SevaLink booking " + booking.booking_code,
+      customer: { name: opts.customerName, contact: opts.customerPhone },
+      notify: { sms: false, email: false },
+      reminder_enable: false,
+      notes: { booking_id: booking.id, booking_code: booking.booking_code },
+    }),
+  });
+  // deno-lint-ignore no-explicit-any
+  const data: any = await response.json().catch(() => ({}));
+  if (!response.ok || !data.short_url) {
+    throw new Error((data.error && (data.error.description || data.error.reason)) || "Could not create Razorpay payment link.");
+  }
+  const { error } = await adminClient
+    .from("bookings")
+    .update({ razorpay_payment_link_id: data.id, updated_at: new Date().toISOString() })
+    .eq("id", booking.id);
+  if (error) throw error;
+  return data as RazorpayPaymentLink;
+}
+
 async function createBooking(opts: {
   customerId: string;
   customerName: string;
@@ -729,14 +800,10 @@ async function createBooking(opts: {
   bookingTime: string;
 }) {
   const { customerId, customerName, customerPhone, provider, service, address, bookingDate, bookingTime } = opts;
-  let scheduledDate: Date;
-  try {
-    scheduledDate = new Date(bookingDate + "T" + bookingTime + ":00");
-    if (isNaN(scheduledDate.getTime())) throw new Error("Invalid");
-  } catch {
-    scheduledDate = new Date(Date.now() + 86400000);
-    scheduledDate.setHours(10, 0, 0, 0);
+  if (!isBookingDateTimeAvailable(bookingDate, bookingTime)) {
+    throw new Error("Booking date/time must be today or a future date and time.");
   }
+  const scheduledDate = getBookingDateTime(bookingDate, bookingTime);
 
   let validCustomerId: string | null = customerId;
   const { data: customerProfile } = await adminClient.from("profiles").select("id").eq("id", customerId).maybeSingle();
@@ -766,7 +833,8 @@ async function createBooking(opts: {
       scheduled_date: scheduledDate.toISOString(),
       booking_date: bookingDate,
       booking_time: bookingTime,
-      status: "pending",
+      status: "payment_pending",
+      payment_status: "pending",
       amount: provider.price,
       address,
     })
@@ -780,18 +848,49 @@ async function createBooking(opts: {
 /* date / time helpers                                                 */
 /* ------------------------------------------------------------------ */
 
+function isValidCalendarDate(year: number, month: number, day: number): boolean {
+  const date = new Date(year, month - 1, day);
+  return date.getFullYear() === year && date.getMonth() === month - 1 && date.getDate() === day;
+}
+
 function parseDate(text: string): string | null {
   let m = text.trim().match(/^(\d{1,2})[/\-](\d{1,2})[/\-](\d{4})$/);
   if (m) {
-    const iso = m[3] + "-" + m[2].padStart(2, "0") + "-" + m[1].padStart(2, "0");
-    if (!isNaN(new Date(iso).getTime())) return iso;
+    const day = parseInt(m[1], 10);
+    const month = parseInt(m[2], 10);
+    const year = parseInt(m[3], 10);
+    if (!isValidCalendarDate(year, month, day)) return null;
+    return year + "-" + String(month).padStart(2, "0") + "-" + String(day).padStart(2, "0");
   }
   m = text.trim().match(/^(\d{4})[/\-](\d{1,2})[/\-](\d{1,2})$/);
   if (m) {
-    const iso2 = m[1] + "-" + m[2].padStart(2, "0") + "-" + m[3].padStart(2, "0");
-    if (!isNaN(new Date(iso2).getTime())) return iso2;
+    const year2 = parseInt(m[1], 10);
+    const month2 = parseInt(m[2], 10);
+    const day2 = parseInt(m[3], 10);
+    if (!isValidCalendarDate(year2, month2, day2)) return null;
+    return year2 + "-" + String(month2).padStart(2, "0") + "-" + String(day2).padStart(2, "0");
   }
   return null;
+}
+
+function isBookingDateAvailable(dateIso: string, now?: Date): boolean {
+  const parts = dateIso.split("-").map(Number);
+  const current = now || new Date();
+  const today = new Date(current.getFullYear(), current.getMonth(), current.getDate());
+  if (!isValidCalendarDate(parts[0], parts[1], parts[2])) return false;
+  const bookingDate = new Date(parts[0], parts[1] - 1, parts[2]);
+  return bookingDate >= today;
+}
+
+function getBookingDateTime(dateIso: string, time24: string): Date {
+  const dateParts = dateIso.split("-").map(Number);
+  const timeParts = time24.split(":").map(Number);
+  return new Date(dateParts[0], dateParts[1] - 1, dateParts[2], timeParts[0], timeParts[1], 0, 0);
+}
+
+function isBookingDateTimeAvailable(dateIso: string, time24: string, now?: Date): boolean {
+  const current = now || new Date();
+  return isBookingDateAvailable(dateIso, current) && getBookingDateTime(dateIso, time24) > current;
 }
 
 function parseTime(text: string): string | null {
@@ -955,8 +1054,6 @@ async function showMyBookings(phone: string, session: Session, wasInvalid?: bool
 async function showBookingDetail(phone: string, session: Session) {
   const bk = session.draft.selectedBooking as BookingRow;
   const detailText = t(session, "bookingDetail", bk);
-  // ASSUMPTION: "payment_pending" is a guess at the exact status string your
-  // bookings table uses — confirm/adjust this to match your schema.
   if (bk.status === "payment_pending") {
     return sendButtons(phone, detailText, [
       { id: "pay_booking", title: t(session, "btnPayNow") },
@@ -978,6 +1075,25 @@ async function showBookingDetail(phone: string, session: Session) {
 /* ------------------------------------------------------------------ */
 /* main flow handler                                                   */
 /* ------------------------------------------------------------------ */
+
+// Called once the language is known (either it already was, or the customer
+// just picked one). A known, already-onboarded customer gets a short
+// acknowledgment + a button rather than the "Welcome to SevaLink" intro
+// again; a brand-new customer still gets the real welcome + onboarding.
+async function proceedPastLanguage(phone: string, session: Session) {
+  const profile = session.profile || (await findProfileByPhone(phone));
+  if (profile) {
+    session.profile = profile;
+    session.step = "welcome_ack";
+    await saveSession(phone, session);
+    return sendButtons(phone, t(session, "thankYou"), [{ id: "show_menu", title: t(session, "btnStartAgain") }]);
+  }
+  await sendText(phone, t(session, "welcome"));
+  session.step = "onboard_name";
+  session.draft = { name: null, email: null };
+  await saveSession(phone, session);
+  return sendText(phone, t(session, "askName"));
+}
 
 async function handleMessage(opts: { phone: string; inbound: Inbound }) {
   const { phone, inbound } = opts;
@@ -1002,8 +1118,8 @@ async function handleMessage(opts: { phone: string; inbound: Inbound }) {
 
   // Entry point
   if (session.step === "init") {
-    if (wasExpired && !isGreeting(inbound)) await sendText(phone, t(session, "sessionExpired"));
     if (!session.lang) {
+      if (wasExpired && !isGreeting(inbound)) await sendText(phone, t(session, "sessionExpired"));
       session.step = "choose_lang";
       await saveSession(phone, session);
       return sendButtons(phone, MSG.en.chooseLang as string, [
@@ -1011,16 +1127,8 @@ async function handleMessage(opts: { phone: string; inbound: Inbound }) {
         { id: "lang_kn", title: "Kannada" },
       ]);
     }
-    await sendText(phone, t(session, "welcome"));
-    const profile = session.profile || (await findProfileByPhone(phone));
-    if (profile) {
-      session.profile = profile;
-      return showMainMenu(phone, session);
-    }
-    session.step = "onboard_name";
-    session.draft = { name: null, email: null };
-    await saveSession(phone, session);
-    return sendText(phone, t(session, "askName"));
+    if (wasExpired && !isGreeting(inbound)) await sendText(phone, t(session, "sessionExpired"));
+    return proceedPastLanguage(phone, session);
   }
 
   const btnId = (ib: Inbound): string =>
@@ -1032,16 +1140,15 @@ async function handleMessage(opts: { phone: string; inbound: Inbound }) {
       session.lang = id === "lang_kn" || id === "kn" || id === "kannada" ? "kn" : "en";
       session.step = "init";
       await saveSession(phone, session);
-      await sendText(phone, t(session, "welcome"));
-      const profile = session.profile || (await findProfileByPhone(phone));
-      if (profile) {
-        session.profile = profile;
-        return showMainMenu(phone, session);
-      }
-      session.step = "onboard_name";
-      session.draft = { name: null, email: null };
-      await saveSession(phone, session);
-      return sendText(phone, t(session, "askName"));
+      return proceedPastLanguage(phone, session);
+    }
+
+    case "welcome_ack": {
+      // Any tap (or stray text) here just moves on to the menu — the point
+      // of this step is to avoid re-sending the welcome/language intro to an
+      // already-onboarded returning user, not to gate the menu behind a
+      // specific button id.
+      return showMainMenu(phone, session);
     }
 
     case "onboard_name": {
@@ -1166,7 +1273,7 @@ async function handleMessage(opts: { phone: string; inbound: Inbound }) {
     case "await_date": {
       if (inbound.kind !== "text") return sendText(phone, t(session, "invalidDate"));
       const dateIso = parseDate(inbound.text);
-      if (!dateIso) return sendText(phone, t(session, "invalidDate"));
+      if (!dateIso || !isBookingDateAvailable(dateIso)) return sendText(phone, t(session, "invalidDate"));
       session.draft.bookingDate = dateIso;
       session.step = "await_time";
       await saveSession(phone, session);
@@ -1176,7 +1283,7 @@ async function handleMessage(opts: { phone: string; inbound: Inbound }) {
     case "await_time": {
       if (inbound.kind !== "text") return sendText(phone, t(session, "invalidTime"));
       const time24 = parseTime(inbound.text);
-      if (!time24) return sendText(phone, t(session, "invalidTime"));
+      if (!time24 || !isBookingDateTimeAvailable(session.draft.bookingDate, time24)) return sendText(phone, t(session, "invalidTime"));
       session.draft.bookingTime = time24;
       session.step = "confirm_booking";
       await saveSession(phone, session);
@@ -1212,6 +1319,11 @@ async function handleMessage(opts: { phone: string; inbound: Inbound }) {
           { id: "confirm_no", title: t(session, "btnCancel") },
         ]);
       }
+      if (!isBookingDateTimeAvailable(session.draft.bookingDate, session.draft.bookingTime)) {
+        session.step = "await_time";
+        await saveSession(phone, session);
+        return sendText(phone, t(session, "invalidTime"));
+      }
       try {
         const booking = await createBooking({
           customerId: session.profile.id,
@@ -1223,17 +1335,34 @@ async function handleMessage(opts: { phone: string; inbound: Inbound }) {
           bookingDate: session.draft.bookingDate,
           bookingTime: session.draft.bookingTime,
         });
-        await sendText(
-          phone,
-          t(session, "bookingCreated", booking.booking_code, {
-            service: session.draft.service.title,
-            provider: session.draft.provider.businessName,
-            date: prettyDate(session.draft.bookingDate),
-            time: prettyTime(session.draft.bookingTime),
-            email: (session.profile && session.profile.email) || session.draft.email || "",
-          }),
-        );
-        await notifyProvider(session.draft.provider.providerId, booking.booking_code);
+
+        // Split from booking creation: if this fails, the booking row already
+        // exists (status "payment_pending") — telling the customer the whole
+        // booking failed here would be wrong and could cause a duplicate
+        // booking. Instead let them know it was created and point them at
+        // "My Bookings" -> Pay Now, which regenerates a Razorpay link.
+        try {
+          const paymentLink = await createRazorpayPaymentLink(booking, {
+            amount: session.draft.provider.price,
+            customerName: session.profile.full_name,
+            customerPhone: phone,
+          });
+          await sendText(
+            phone,
+            t(session, "bookingCreated", booking.booking_code, {
+              service: session.draft.service.title,
+              provider: session.draft.provider.businessName,
+              date: prettyDate(session.draft.bookingDate),
+              time: prettyTime(session.draft.bookingTime),
+              price: session.draft.provider.price,
+              paymentLink: paymentLink.short_url,
+            }),
+          );
+        } catch (err) {
+          const message = err instanceof Error ? err.message : String(err);
+          console.error("[createRazorpayPaymentLink]", message);
+          await sendText(phone, t(session, "bookingCreatedNoLink", booking.booking_code));
+        }
         await wait(5000);
       } catch (err) {
         const message = err instanceof Error ? err.message : String(err);
@@ -1259,10 +1388,24 @@ async function handleMessage(opts: { phone: string; inbound: Inbound }) {
       const id = btnId(inbound);
       if (id === "pay_booking") {
         const bk = session.draft.selectedBooking as BookingRow & { id: string };
-        // ASSUMPTION: query params here are a guess — point this at whatever
-        // route your site actually uses to resume payment for a booking.
-        const payUrl = PAYMENT_WEBSITE + "?bookingId=" + encodeURIComponent(bk.id) + "&code=" + encodeURIComponent(bk.booking_code);
-        await sendText(phone, t(session, "paymentLink", bk, payUrl));
+        // NOTE: this creates a fresh Razorpay payment link every time "Pay
+        // Now" is tapped. If the customer taps it more than once, they'll
+        // get multiple valid links for the same booking. Consider fetching
+        // the previously stored razorpay_payment_link_id via Razorpay's
+        // Payment Links "fetch" API first and reusing it while still valid,
+        // rather than always minting a new one.
+        try {
+          const paymentLink = await createRazorpayPaymentLink(bk, {
+            amount: bk.amount,
+            customerName: session.profile.full_name,
+            customerPhone: phone,
+          });
+          await sendText(phone, t(session, "paymentLink", bk, paymentLink.short_url));
+        } catch (err) {
+          const message = err instanceof Error ? err.message : String(err);
+          console.error("[pay_booking]", message);
+          await sendText(phone, t(session, "bookingFailed"));
+        }
         return showBookingDetail(phone, session);
       }
       if (id === "cancel_booking") {
